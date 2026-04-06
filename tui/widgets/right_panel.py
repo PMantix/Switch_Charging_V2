@@ -23,6 +23,23 @@ MODE_STYLES = {
     "charge": "bold green",
     "discharge": "bold yellow",
     "pulse_charge": "bold magenta",
+    "debug": "bold cyan",
+}
+
+MODE_LABELS = {
+    "idle": "IDLE",
+    "charge": "CHARGE",
+    "discharge": "DISCHARGE",
+    "pulse_charge": "PULSE",
+    "debug": "DEBUG",
+}
+
+MODE_KEYS = {
+    "idle": "i",
+    "charge": "c",
+    "discharge": "x",
+    "pulse_charge": "p",
+    "debug": "g",
 }
 
 
@@ -86,20 +103,34 @@ class RightPanel(Widget):
         t.append(" MODE", style="bold cyan underline")
         t.append("\n\n")
 
-        for m in ["idle", "charge", "discharge", "pulse_charge"]:
+        for m in ["idle", "charge", "discharge", "pulse_charge", "debug"]:
             sel = (m == self.mode)
             radio = "\u25cf" if sel else "\u25cb"
             style = MODE_STYLES.get(m, "white")
-            key = {"idle": "i", "charge": "c", "discharge": "x", "pulse_charge": "p"}[m]
+            key = MODE_KEYS.get(m, "?")
+            label = MODE_LABELS.get(m, m.upper())
             if sel:
                 t.append(f" {radio} ", style=style)
-                t.append(f"{m.upper()}", style=f"{style}")
+                t.append(f"{label}", style=f"{style}")
             else:
                 t.append(f" {radio} ", style="dim")
-                t.append(f"{m.upper()}", style="dim")
+                t.append(f"{label}", style="dim")
             t.append(f"  ", style="dim")
             t.append(f" {key} ", style="bold white on dark_blue")
             t.append("\n")
+
+        if self.mode == "debug":
+            t.append("\n")
+            t.append(" DEBUG: ", style="bold cyan")
+            t.append("1", style="bold white on dark_blue")
+            t.append(" P1  ", style="dim")
+            t.append("2", style="bold white on dark_blue")
+            t.append(" P2  ", style="dim")
+            t.append("3", style="bold white on dark_blue")
+            t.append(" N1  ", style="dim")
+            t.append("4", style="bold white on dark_blue")
+            t.append(" N2\n", style="dim")
+
         t.append("\n")
 
         # -- Sequences --

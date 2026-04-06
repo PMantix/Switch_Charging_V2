@@ -17,6 +17,7 @@ from textual.widgets import Footer, Header, Static, Input, Label
 from textual.worker import Worker
 
 from tui.client import PiClient, ConnectionState
+from tui.discovery import discover_async, save_host
 from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS
 from tui.widgets.left_panel import LeftPanel
 from tui.widgets.right_panel import RightPanel
@@ -28,14 +29,14 @@ log = logging.getLogger(__name__)
 MIN_FREQ = 0.1
 MAX_FREQ = 300.0
 
-CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge"]
+CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug"]
 
 
 # ---------------------------------------------------------------------------
 # Connection dialog
 # ---------------------------------------------------------------------------
 class ConnectDialog(ModalScreen[str]):
-    """Modal dialog for entering the Pi's IP address."""
+    """Modal dialog that auto-discovers the Pi or accepts a manual IP."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
@@ -46,8 +47,8 @@ class ConnectDialog(ModalScreen[str]):
         align: center middle;
     }
     #connect-box {
-        width: 50;
-        height: 10;
+        width: 56;
+        height: 12;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -57,6 +58,12 @@ class ConnectDialog(ModalScreen[str]):
         width: 100%;
         margin-bottom: 1;
     }
+    #connect-status {
+        text-align: center;
+        width: 100%;
+        margin-bottom: 1;
+        color: $text-muted;
+    }
     #connect-hint {
         text-align: center;
         width: 100%;
@@ -65,16 +72,64 @@ class ConnectDialog(ModalScreen[str]):
     }
     """
 
+    def __init__(self, auto_discover: bool = True):
+        super().__init__()
+        self._auto_discover = auto_discover
+
     def compose(self) -> ComposeResult:
         with Vertical(id="connect-box"):
             yield Label("Connect to Raspberry Pi", id="connect-title")
-            yield Input(placeholder="IP address (e.g. 192.168.1.100)", id="ip-input")
-            yield Label("Press Enter to connect, Escape to cancel", id="connect-hint")
+            yield Label("", id="connect-status")
+            yield Input(placeholder="IP address or Enter to auto-discover", id="ip-input")
+            yield Label("Enter=connect, blank=scan, Escape=cancel", id="connect-hint")
+
+    def on_mount(self) -> None:
+        if self._auto_discover:
+            self._start_discovery()
+
+    def _start_discovery(self) -> None:
+        status = self.query_one("#connect-status", Label)
+        status.update("[bold cyan]Scanning for Pi server...[/]")
+        discover_async(
+            callback=self._on_discovery_result,
+            on_status=self._on_discovery_status,
+        )
+
+    def _on_discovery_status(self, msg: str) -> None:
+        try:
+            self.app.call_from_thread(self._update_status, msg)
+        except Exception:
+            pass
+
+    def _update_status(self, msg: str) -> None:
+        try:
+            status = self.query_one("#connect-status", Label)
+            status.update(f"[dim]{msg}[/]")
+        except Exception:
+            pass
+
+    def _on_discovery_result(self, ip: Optional[str]) -> None:
+        try:
+            self.app.call_from_thread(self._handle_discovery_result, ip)
+        except Exception:
+            pass
+
+    def _handle_discovery_result(self, ip: Optional[str]) -> None:
+        if ip:
+            status = self.query_one("#connect-status", Label)
+            status.update(f"[bold green]Found Pi at {ip}[/]")
+            self.dismiss(ip)
+        else:
+            status = self.query_one("#connect-status", Label)
+            status.update("[bold red]Auto-discovery failed[/] — enter IP manually")
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         value = event.value.strip()
         if value:
             self.dismiss(value)
+        else:
+            # Re-run discovery
+            self._start_discovery()
 
     def action_cancel(self) -> None:
         self.dismiss("")
@@ -110,13 +165,16 @@ class HelpScreen(ModalScreen[None]):
                 "[bold cyan]Switching Circuit V2 - Key Bindings[/]\n\n"
                 "[bold]Space[/]     Toggle start/stop (idle <-> charge)\n"
                 "[bold]1-8[/]       Select sequence\n"
+                "[bold]= / -[/]     Frequency +/- 0.1 Hz (fine)\n"
                 "[bold]w / s[/]     Frequency +/- 0.1 Hz (fine)\n"
                 "[bold]e / d[/]     Frequency +/- 1.0 Hz (medium)\n"
                 "[bold]W / S[/]     Frequency +/- 10 Hz (coarse)\n"
-                "[bold]m[/]         Cycle mode (idle->charge->discharge)\n"
+                "[bold]m[/]         Cycle mode (idle->charge->...->debug)\n"
                 "[bold]c[/]         Set mode: Charge\n"
                 "[bold]i[/]         Set mode: Idle\n"
                 "[bold]x[/]         Set mode: Discharge\n"
+                "[bold]g[/]         Set mode: Debug\n"
+                "[bold]1-4[/]       Debug: toggle P1 / P2 / N1 / N2\n"
                 "[bold]r[/]         Reconnect to Pi\n"
                 "[bold]?[/]         Toggle this help\n"
                 "[bold]q[/]         Quit\n\n"
@@ -197,6 +255,9 @@ class SwitchingCircuitApp(App):
         Binding("x", "mode_discharge", "Discharge", show=False),
         Binding("p", "mode_pulse", "Pulse", show=False),
         Binding("r", "reconnect", "Reconnect", show=False),
+        Binding("g", "mode_debug", "Debug", show=False),
+        Binding("=", "freq_up_fine", "+0.1Hz", show=False),
+        Binding("-", "freq_down_fine", "-0.1Hz", show=False),
     ]
 
     def __init__(self, host: str = "", port: int = 5555):
@@ -235,8 +296,40 @@ class SwitchingCircuitApp(App):
         if self._initial_host:
             self._do_connect(self._initial_host, self._initial_port)
         else:
-            # Show the connection dialog
-            self.push_screen(ConnectDialog(), self._on_connect_dialog_result)
+            # Try auto-discovery first, fall back to manual dialog
+            self._update_status_connection(False, "Discovering Pi...")
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            conn_bar.conn_label = "Scanning..."
+            discover_async(
+                callback=self._on_auto_discover_result,
+                on_status=self._on_auto_discover_status,
+            )
+
+    def _on_auto_discover_status(self, msg: str) -> None:
+        try:
+            self.call_from_thread(self._update_discover_status, msg)
+        except Exception:
+            pass
+
+    def _update_discover_status(self, msg: str) -> None:
+        try:
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            conn_bar.conn_label = msg
+        except Exception:
+            pass
+
+    def _on_auto_discover_result(self, ip: Optional[str]) -> None:
+        try:
+            self.call_from_thread(self._handle_auto_discover, ip)
+        except Exception:
+            pass
+
+    def _handle_auto_discover(self, ip: Optional[str]) -> None:
+        if ip:
+            self._do_connect(ip, self._initial_port)
+        else:
+            # Auto-discovery failed, show manual dialog
+            self.push_screen(ConnectDialog(auto_discover=False), self._on_connect_dialog_result)
 
     def _on_connect_dialog_result(self, result: str) -> None:
         if result:
@@ -268,6 +361,7 @@ class SwitchingCircuitApp(App):
             None, self._client.connect, host, port
         )
         if connected:
+            save_host(host)
             # Subscribe to the state stream
             await loop.run_in_executor(None, self._client.subscribe)
 
@@ -288,6 +382,7 @@ class SwitchingCircuitApp(App):
         self._circuit_mode = mode
         self._current_freq = freq
         self._current_seq = seq
+        self._last_fets = fets
 
         # Determine state index from FET states
         state_idx = self._fets_to_state_index(fets)
@@ -375,6 +470,17 @@ class SwitchingCircuitApp(App):
     def action_mode_pulse(self) -> None:
         self._send_mode("pulse_charge")
 
+    def action_mode_debug(self) -> None:
+        self._send_mode("debug")
+
+    # -- Actions: Debug FET control ------------------------------------------
+
+    def _toggle_fet(self, index: int) -> None:
+        """Toggle a single FET on/off. Only works in debug mode."""
+        if self._client and self._client.connection_state == ConnectionState.CONNECTED:
+            current = self._last_fets[index] if hasattr(self, "_last_fets") else False
+            self._client.set_fet(index, not current)
+
     # -- Actions: Sequence ---------------------------------------------------
 
     def _send_sequence(self, seq: int) -> None:
@@ -382,16 +488,28 @@ class SwitchingCircuitApp(App):
             self._client.set_sequence(seq)
 
     def action_seq_1(self) -> None:
-        self._send_sequence(0)
+        if self._circuit_mode == "debug":
+            self._toggle_fet(0)
+        else:
+            self._send_sequence(0)
 
     def action_seq_2(self) -> None:
-        self._send_sequence(1)
+        if self._circuit_mode == "debug":
+            self._toggle_fet(1)
+        else:
+            self._send_sequence(1)
 
     def action_seq_3(self) -> None:
-        self._send_sequence(2)
+        if self._circuit_mode == "debug":
+            self._toggle_fet(2)
+        else:
+            self._send_sequence(2)
 
     def action_seq_4(self) -> None:
-        self._send_sequence(3)
+        if self._circuit_mode == "debug":
+            self._toggle_fet(3)
+        else:
+            self._send_sequence(3)
 
     def action_seq_5(self) -> None:
         self._send_sequence(4)

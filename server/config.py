@@ -6,22 +6,64 @@ live here so every other module imports from a single source of truth.
 """
 
 # ---------------------------------------------------------------------------
-# GPIO pin assignments
+# RP2040-Zero GPIO pin assignments (gate drive + sensing)
+#
+# The Pi no longer drives MOSFETs directly. It sends commands to the
+# RP2040-Zero over USB serial. These pin numbers are the RP2040 GPIOs
+# and are used as reference / for RP2040 firmware configuration.
 # ---------------------------------------------------------------------------
-PIN_P1 = 17          # High-side MOSFET A
-PIN_P2 = 27          # High-side MOSFET B
-PIN_N1 = 22          # Low-side MOSFET A
-PIN_N2 = 23          # Low-side MOSFET B
+RP2040_PIN_P1 = 2          # GP2 → UCC5304 (U1) → P1 high-side MOSFET
+RP2040_PIN_P2 = 3          # GP3 → UCC5304 (U2) → P2 high-side MOSFET
+RP2040_PIN_N1 = 4          # GP4 → UCC5304 (U3) → N1 low-side MOSFET
+RP2040_PIN_N2 = 5          # GP5 → UCC5304 (U4) → N2 low-side MOSFET
 
-PIN_TM1637_CLK = 18  # TM1637 display clock
-PIN_TM1637_DIO = 24  # TM1637 display data
+RP2040_PIN_I2C_SDA = 6     # GP6 → INA226 shared I2C bus (SDA)
+RP2040_PIN_I2C_SCL = 7     # GP7 → INA226 shared I2C bus (SCL)
 
-PIN_ROTARY_CLK = 16  # Rotary encoder clock
-PIN_ROTARY_DT = 20   # Rotary encoder data
-PIN_ROTARY_BTN = 21  # Rotary encoder push-button
+RP2040_PIN_ADC0 = 26       # GP26 → Built-in ADC ch0 (transient capture)
+RP2040_PIN_ADC1 = 27       # GP27 → Built-in ADC ch1 (transient capture)
+RP2040_PIN_ADC2 = 28       # GP28 → Built-in ADC ch2 (transient capture)
 
-# All MOSFET outputs are active-high (V2 uses MOSFET driver ICs)
+RP2040_PIN_ROTARY_A_CLK = 8   # GP8  → Rotary dial A clock
+RP2040_PIN_ROTARY_A_DT = 9    # GP9  → Rotary dial A data
+RP2040_PIN_ROTARY_A_SW = 10   # GP10 → Rotary dial A switch
+
+RP2040_PIN_7SEG_CLK = 14   # GP14 → 7-segment display clock (TM1637)
+RP2040_PIN_7SEG_DIO = 15   # GP15 → 7-segment display data
+
+# All MOSFET outputs are active-high (V2 uses UCC5304 MOSFET driver ICs)
 MOSFET_ACTIVE_HIGH = True
+
+# ---------------------------------------------------------------------------
+# Legacy aliases — used by GPIODriver and server __main__ until the server
+# is refactored to communicate with the RP2040 over USB serial instead of
+# driving GPIOs directly.  These map to the *Pi* GPIO pins for mock/dev use.
+# ---------------------------------------------------------------------------
+PIN_P1 = 17          # Pi GPIO17 (dev/mock only — production uses RP2040 GP2)
+PIN_P2 = 27          # Pi GPIO27 (dev/mock only — production uses RP2040 GP3)
+PIN_N1 = 22          # Pi GPIO22 (dev/mock only — production uses RP2040 GP4)
+PIN_N2 = 23          # Pi GPIO23 (dev/mock only — production uses RP2040 GP5)
+
+PIN_TM1637_CLK = 18  # Pi GPIO18 (moving to RP2040 GP14)
+PIN_TM1637_DIO = 24  # Pi GPIO24 (moving to RP2040 GP15)
+
+PIN_ROTARY_CLK = 16  # Pi GPIO16 (moving to RP2040 GP8)
+PIN_ROTARY_DT = 20   # Pi GPIO20 (moving to RP2040 GP9)
+PIN_ROTARY_BTN = 21  # Pi GPIO21 (moving to RP2040 GP10)
+
+# ---------------------------------------------------------------------------
+# INA226 I2C addresses (D-FLIFE breakout modules)
+# ---------------------------------------------------------------------------
+INA226_ADDR_P1 = 0x40      # High-side left  (A1=GND, A0=GND)
+INA226_ADDR_P2 = 0x41      # High-side right (A1=GND, A0=VS)
+INA226_ADDR_N1 = 0x44      # Low-side left   (A1=VS,  A0=GND)
+INA226_ADDR_N2 = 0x45      # Low-side right  (A1=VS,  A0=VS)
+
+# ---------------------------------------------------------------------------
+# USB serial connection to RP2040-Zero
+# ---------------------------------------------------------------------------
+RP2040_SERIAL_PORT = "/dev/ttyACM0"   # default on Pi
+RP2040_SERIAL_BAUD = 115200
 
 # ---------------------------------------------------------------------------
 # H-bridge state definitions

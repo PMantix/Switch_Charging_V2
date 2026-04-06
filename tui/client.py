@@ -188,6 +188,12 @@ class PiClient:
     def set_frequency(self, frequency: float) -> Optional[dict]:
         return self.send_command({"cmd": "set_frequency", "frequency": frequency})
 
+    def set_fet(self, index: int, on: bool) -> Optional[dict]:
+        return self.send_command({"cmd": "set_fet", "index": index, "on": on})
+
+    def debug_step(self) -> Optional[dict]:
+        return self.send_command({"cmd": "debug_step"})
+
     # -- Background receive --------------------------------------------------
 
     def _recv_loop(self) -> None:

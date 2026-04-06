@@ -182,6 +182,22 @@ class CommandServer:
                 self._engine.set_frequency(float(freq))
                 return {"ok": True, "frequency": self._engine.get_frequency()}
 
+            elif cmd == "set_fet":
+                index = msg.get("index")
+                on = msg.get("on")
+                if index is None or on is None:
+                    return {"ok": False, "error": "Missing 'index' or 'on' field"}
+                self._mc.set_fet(int(index), bool(on))
+                return {"ok": True, "fet_states": self._mc.get_status()["fet_states"]}
+
+            elif cmd == "debug_step":
+                step = self._mc.debug_step()
+                return {
+                    "ok": True,
+                    "debug_step": step,
+                    "fet_states": self._mc.get_status()["fet_states"],
+                }
+
             elif cmd == "subscribe":
                 with self._sub_lock:
                     self._subscribers.add(sock)

@@ -52,14 +52,19 @@ class LeftPanel(Widget):
                 ("  i  ", "Idle"),
                 ("  x  ", "Discharge"),
                 ("  p  ", "Pulse Charge"),
+                ("  g  ", "Debug"),
             ]),
             ("FREQUENCY", [
+                (" =/- ", "+/- 0.1 Hz"),
                 (" w/s ", "+/- 0.1 Hz"),
                 (" e/d ", "+/- 1.0 Hz"),
                 (" W/S ", "+/- 10 Hz"),
             ]),
             ("SEQUENCE", [
                 (" 1-8 ", "Select"),
+            ]),
+            ("DEBUG (g)", [
+                (" 1-4 ", "Toggle P1/P2/N1/N2"),
             ]),
             ("OTHER", [
                 ("  r  ", "Reconnect"),
