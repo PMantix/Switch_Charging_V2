@@ -66,6 +66,14 @@ class LeftPanel(Widget):
             ("DEBUG (g)", [
                 (" 1-4 ", "Toggle P1/P2/N1/N2"),
             ]),
+            ("SENSORS", [
+                (" / * ", "Rate -/+"),
+                ("  v  ", "Cycle plot mode"),
+            ]),
+            ("RECORD", [
+                ("  l  ", "Start/stop"),
+                (" [ ] ", "Duration -/+"),
+            ]),
             ("OTHER", [
                 ("  r  ", "Reconnect"),
                 ("  q  ", "Quit"),

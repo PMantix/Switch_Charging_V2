@@ -236,6 +236,9 @@ def main():
     cmd_server = CommandServer(mc, engine)
     cmd_server.start()
 
+    # Start sensor streaming at default rate
+    gpio.set_sensor_rate(15.0)
+
     # Local hardware (rotary + display)
     rotary_ctrl = None
     display_mgr = None

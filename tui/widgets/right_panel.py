@@ -60,6 +60,7 @@ class RightPanel(Widget):
     step: reactive[int] = reactive(0)
     connected: reactive[bool] = reactive(False)
     conn_status: reactive[str] = reactive("Disconnected")
+    current_path: reactive[str] = reactive("")
 
     def render(self) -> Text:
         t = Text()
@@ -154,6 +155,13 @@ class RightPanel(Widget):
         t.append(" 1-8 ", style="bold white on dark_blue")
         t.append(" Select sequence\n", style="dim")
 
+        # -- Current Path --
+        if self.current_path:
+            t.append("\n")
+            t.append(" PATH", style="bold cyan underline")
+            t.append("\n")
+            t.append(f" {self.current_path}\n", style="dim italic")
+
         return t
 
     def watch_mode(self, _: str) -> None:
@@ -172,4 +180,7 @@ class RightPanel(Widget):
         self.refresh()
 
     def watch_conn_status(self, _: str) -> None:
+        self.refresh()
+
+    def watch_current_path(self, _: str) -> None:
         self.refresh()

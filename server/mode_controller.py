@@ -139,6 +139,7 @@ class ModeController:
             "step": engine_state["step"],
             "frequency": engine_state["frequency"],
             "fet_states": engine_state["fet_states"],
+            "sensors": self._gpio.get_sensor_data(),
         }
         if mode == Mode.DEBUG:
             status["debug_step"] = debug_step

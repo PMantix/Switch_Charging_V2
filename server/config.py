@@ -56,7 +56,7 @@ PIN_ROTARY_BTN = 21  # Pi GPIO21 (moving to RP2040 GP10)
 # ---------------------------------------------------------------------------
 INA226_ADDR_P1 = 0x40      # High-side left  (A1=GND, A0=GND)
 INA226_ADDR_P2 = 0x41      # High-side right (A1=GND, A0=VS)
-INA226_ADDR_N1 = 0x44      # Low-side left   (A1=VS,  A0=GND)
+INA226_ADDR_N1 = 0x43      # Low-side left   (A0=SCL, A1=GND)
 INA226_ADDR_N2 = 0x45      # Low-side right  (A1=VS,  A0=VS)
 
 # ---------------------------------------------------------------------------

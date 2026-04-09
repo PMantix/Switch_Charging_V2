@@ -13,11 +13,13 @@ import threading
 from time import sleep
 
 from server.config import SERVER_HOST, SERVER_PORT
+from server.recorder import PiRecorder
 
 log = logging.getLogger(__name__)
 
-# Update rate for subscription broadcasts (Hz)
-_SUBSCRIBE_HZ = 15
+# Broadcast rate bounds (Hz) — caps TUI update rate regardless of sensor rate
+_DEFAULT_SUBSCRIBE_HZ = 15
+_MAX_SUBSCRIBE_HZ = 30
 
 
 class CommandServer:
@@ -34,6 +36,8 @@ class CommandServer:
 
         self._server_socket = None
         self._stop_event = threading.Event()
+        self._broadcast_hz = _DEFAULT_SUBSCRIBE_HZ
+        self._recorder = PiRecorder()
 
         # Active subscribers (set of socket objects)
         self._subscribers = set()
@@ -198,6 +202,42 @@ class CommandServer:
                     "fet_states": self._mc.get_status()["fet_states"],
                 }
 
+            elif cmd == "set_sensor_rate":
+                rate = msg.get("rate")
+                if rate is None:
+                    return {"ok": False, "error": "Missing 'rate' field"}
+                rate = float(rate)
+                self._mc._gpio.set_sensor_rate(rate)
+                # Broadcast to TUI capped at _MAX_SUBSCRIBE_HZ
+                self._broadcast_hz = min(max(rate, _DEFAULT_SUBSCRIBE_HZ), _MAX_SUBSCRIBE_HZ)
+                return {"ok": True, "sensor_rate": self._mc._gpio.get_sensor_rate()}
+
+            elif cmd == "pi_record_start":
+                max_samples = int(msg.get("max_samples", 0))
+                rec_mode = msg.get("rec_mode", "unknown")
+                rec_freq = float(msg.get("rec_freq", 1.0))
+                rec_seq = int(msg.get("rec_seq", 0))
+                rec_sensor_hz = float(msg.get("rec_sensor_hz", 15.0))
+                path = self._recorder.start(
+                    max_samples, mode=rec_mode, freq=rec_freq,
+                    seq=rec_seq, sensor_hz=rec_sensor_hz,
+                )
+                return {"ok": True, "path": path}
+
+            elif cmd == "pi_record_stop":
+                path = self._recorder.stop()
+                count = self._recorder.sample_count
+                return {"ok": True, "path": path, "samples": count}
+
+            elif cmd == "pi_record_status":
+                return {
+                    "ok": True,
+                    "recording": self._recorder.is_recording,
+                    "samples": self._recorder.sample_count,
+                    "max_samples": self._recorder.max_samples,
+                    "path": str(self._recorder.file_path) if self._recorder.file_path else None,
+                }
+
             elif cmd == "subscribe":
                 with self._sub_lock:
                     self._subscribers.add(sock)
@@ -216,10 +256,22 @@ class CommandServer:
     # -- subscription broadcast ---------------------------------------------
 
     def _broadcast_loop(self):
-        """Push state snapshots to all subscribers at ~15 Hz."""
-        interval = 1.0 / _SUBSCRIBE_HZ
+        """Push state snapshots to all subscribers when fresh sensor data arrives."""
+        from time import monotonic
+        last_broadcast = 0.0
         while not self._stop_event.is_set():
-            sleep(interval)
+            # Wait for fresh sensor data, but enforce minimum interval
+            min_interval = 1.0 / self._broadcast_hz
+            gpio = self._mc._gpio
+            got_new = gpio.wait_for_new_sensor_data(timeout=min_interval)
+            if self._stop_event.is_set():
+                break
+
+            # Throttle: skip if we broadcasted too recently
+            now = monotonic()
+            if now - last_broadcast < min_interval * 0.9:
+                continue
+            last_broadcast = now
 
             with self._sub_lock:
                 if not self._subscribers:
@@ -227,6 +279,13 @@ class CommandServer:
                 subscribers = list(self._subscribers)
 
             status = self._mc.get_status()
+
+            # Pi-side recording (happens at stream rate, no network hop)
+            if self._recorder.is_recording:
+                still_going = self._recorder.record(status)
+                if not still_going:
+                    log.info("Pi recording auto-stopped at %d samples", self._recorder.sample_count)
+
             payload = {"event": "state", **status}
 
             dead = []

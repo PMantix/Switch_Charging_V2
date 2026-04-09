@@ -17,10 +17,12 @@ from textual.widgets import Footer, Header, Static, Input, Label
 from textual.worker import Worker
 
 from tui.client import PiClient, ConnectionState
+from tui.data_logger import DataLogger
 from tui.discovery import discover_async, save_host
-from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS
+from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
 from tui.widgets.left_panel import LeftPanel
 from tui.widgets.right_panel import RightPanel
+from tui.widgets.sensor_plot import SensorPlot
 from tui.widgets.connection_bar import ConnectionBar
 from tui.widgets.mascot import Mascot
 
@@ -175,6 +177,10 @@ class HelpScreen(ModalScreen[None]):
                 "[bold]x[/]         Set mode: Discharge\n"
                 "[bold]g[/]         Set mode: Debug\n"
                 "[bold]1-4[/]       Debug: toggle P1 / P2 / N1 / N2\n"
+                "[bold]* / /[/]     Sensor rate +/- (0.5-20 Hz)\n"
+                "[bold]v[/]         Cycle plot mode (line/dot/bar)\n"
+                "[bold]l[/]         Start/stop recording\n"
+                "[bold][ / ][/]     Recording duration -/+\n"
                 "[bold]r[/]         Reconnect to Pi\n"
                 "[bold]?[/]         Toggle this help\n"
                 "[bold]q[/]         Quit\n\n"
@@ -226,6 +232,12 @@ class SwitchingCircuitApp(App):
     CircuitDiagram {
         width: auto;
     }
+    SensorPlot {
+        width: 100%;
+        height: auto;
+        border-top: solid $accent;
+        margin-top: 1;
+    }
     Mascot {
         height: auto;
     }
@@ -258,6 +270,12 @@ class SwitchingCircuitApp(App):
         Binding("g", "mode_debug", "Debug", show=False),
         Binding("=", "freq_up_fine", "+0.1Hz", show=False),
         Binding("-", "freq_down_fine", "-0.1Hz", show=False),
+        Binding("*", "sensor_rate_up", "Sensor+", show=False),
+        Binding("/", "sensor_rate_down", "Sensor-", show=False),
+        Binding("v", "cycle_viz", "Viz Mode", show=False),
+        Binding("l", "toggle_log", "Log", show=False),
+        Binding("[", "log_duration_down", "Dur-", show=False),
+        Binding("]", "log_duration_up", "Dur+", show=False),
     ]
 
     def __init__(self, host: str = "", port: int = 5555):
@@ -268,6 +286,7 @@ class SwitchingCircuitApp(App):
         self._circuit_mode = "idle"
         self._current_freq = 1.0
         self._current_seq = 0
+        self._data_logger = DataLogger()
 
     # -- Compose -------------------------------------------------------------
 
@@ -280,6 +299,7 @@ class SwitchingCircuitApp(App):
                 yield Mascot(id="mascot")
             with Vertical(id="center-col"):
                 yield CircuitDiagram(id="circuit")
+                yield SensorPlot(id="sensor-plot")
             with Vertical(id="right-col"):
                 yield RightPanel(id="right-panel")
         yield Footer()
@@ -389,13 +409,39 @@ class SwitchingCircuitApp(App):
 
         # Update widgets
         circuit = self.query_one("#circuit", CircuitDiagram)
-        circuit.update_from_server(fets, state_idx)
+        circuit.update_from_server(fets, state_idx, mode=mode)
 
         rpanel = self.query_one("#right-panel", RightPanel)
         rpanel.mode = mode
         rpanel.sequence = seq
         rpanel.frequency = freq
         rpanel.step = step
+        rpanel.current_path = STATE_PATHS[state_idx] if 0 <= state_idx <= 5 else ""
+
+        sensors = data.get("sensors", {})
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        plot.push_data(sensors)
+
+        # Data logging
+        if self._data_logger.is_logging and self._data_logger.tier:
+            from tui.data_logger import RecordTier
+            tier = self._data_logger.tier
+
+            if tier == RecordTier.MAC:
+                still_going = self._data_logger.record(data)
+                if not still_going:
+                    self._on_recording_done()
+                    return
+            elif tier == RecordTier.PI:
+                if self._data_logger.check_pi_done():
+                    self._on_recording_done()
+                    return
+
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            elapsed = self._data_logger.elapsed
+            dur = self._data_logger.duration_s
+            remaining = max(0, dur - elapsed)
+            conn_bar.conn_label = f"\u25cf REC [{tier.value}] {remaining:.0f}s left"
 
         mascot = self.query_one("#mascot", Mascot)
         mascot.circuit_mode = mode
@@ -548,6 +594,88 @@ class SwitchingCircuitApp(App):
 
     def action_freq_down_coarse(self) -> None:
         self._adjust_freq(-10.0)
+
+    # -- Actions: Sensor Rate -------------------------------------------------
+
+    SENSOR_RATES = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
+
+    def _set_sensor_rate(self, rate: float) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        plot.sensor_rate = rate
+        if self._client and self._client.connection_state == ConnectionState.CONNECTED:
+            self._client.send_command({"cmd": "set_sensor_rate", "rate": rate})
+
+    def action_sensor_rate_up(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        current = plot.sensor_rate
+        for r in self.SENSOR_RATES:
+            if r > current + 0.01:
+                self._set_sensor_rate(r)
+                return
+
+    def action_sensor_rate_down(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        current = plot.sensor_rate
+        for r in reversed(self.SENSOR_RATES):
+            if r < current - 0.01:
+                self._set_sensor_rate(r)
+                return
+
+    def action_cycle_viz(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        plot.cycle_mode()
+
+    LOG_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1800, 3600]
+
+    def _on_recording_done(self, desc: Optional[str] = None) -> None:
+        """Called when any recording tier finishes."""
+        if desc is None:
+            _, desc = self._data_logger.stop()
+        conn_bar = self.query_one("#conn-bar", ConnectionBar)
+        conn_bar.conn_label = "Connected"
+        self.notify(desc, title="Recording complete")
+
+    def action_toggle_log(self) -> None:
+        if self._data_logger.is_logging:
+            # Early stop
+            tier, desc = self._data_logger.stop()
+            self._on_recording_done(desc)
+        else:
+            plot = self.query_one("#sensor-plot", SensorPlot)
+            tier, desc = self._data_logger.start(
+                mode=self._circuit_mode,
+                freq=self._current_freq,
+                seq=self._current_seq,
+                sensor_hz=plot.sensor_rate,
+                client=self._client,
+            )
+            self.notify(desc, title=f"Recording [{tier.value}]")
+
+    def action_log_duration_up(self) -> None:
+        current = self._data_logger.duration_s
+        for d in self.LOG_DURATIONS:
+            if d > current + 0.5:
+                self._data_logger.duration_s = d
+                self._show_duration()
+                return
+
+    def action_log_duration_down(self) -> None:
+        current = self._data_logger.duration_s
+        for d in reversed(self.LOG_DURATIONS):
+            if d < current - 0.5:
+                self._data_logger.duration_s = d
+                self._show_duration()
+                return
+
+    def _show_duration(self) -> None:
+        from tui.data_logger import select_tier
+        dur = self._data_logger.duration_s
+        tier = select_tier(dur)
+        if dur >= 60:
+            dur_str = f"{dur/60:.0f}min"
+        else:
+            dur_str = f"{dur:.0f}s"
+        self.notify(f"Record: {dur_str} -> {tier.value}", title="Duration")
 
     # -- Actions: Help & Reconnect -------------------------------------------
 

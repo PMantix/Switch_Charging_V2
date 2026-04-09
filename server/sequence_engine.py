@@ -140,8 +140,11 @@ class SequenceEngine:
                 step = self._step
                 pulse = self._pulse_mode
 
-            # step_time matches V1: full cycle = 2 periods
+            # step_time: for 4-step sequences, full cycle = 4 * step_time
+            # pulse mode has 2 steps, so double step_time to match the same cycle period
             step_time = (1.0 / freq) / 2.0
+            if pulse:
+                step_time *= 2.0
 
             now = time()
             if now - last_step_time >= step_time:
