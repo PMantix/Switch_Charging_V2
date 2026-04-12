@@ -20,24 +20,6 @@ class LeftPanel(Widget):
     def render(self) -> Text:
         t = Text()
 
-        # -- H-Bridge States --
-        t.append(" H-BRIDGE STATES\n", style="bold cyan underline")
-        t.append("\n")
-
-        states = [
-            ("0", "P1+N1", "Forward",    "bold green"),
-            ("1", "P1+N2", "Cross A-B",  "bold green"),
-            ("2", "P2+N1", "Cross B-A",  "bold green"),
-            ("3", "P2+N2", "Reverse",    "bold green"),
-            ("4", "ALL",   "Discharge",  "bold yellow"),
-            ("5", "---",   "Idle",       "bold red"),
-        ]
-        for num, fets, desc, style in states:
-            t.append(f" {num} ", style="bold white")
-            t.append(f"{fets:<6}", style=style)
-            t.append(f" {desc}\n", style="dim")
-        t.append("\n")
-
         # -- Key Bindings --
         t.append(" KEY BINDINGS\n", style="bold cyan underline")
         t.append("\n")
@@ -53,6 +35,12 @@ class LeftPanel(Widget):
                 ("  x  ", "Discharge"),
                 ("  p  ", "Pulse Charge"),
                 ("  g  ", "Debug"),
+                ("  a  ", "Auto (schedule)"),
+            ]),
+            ("AUTO (a)", [
+                ("  n  ", "Skip step"),
+                ("Space", "Pause / Resume"),
+                ("  i  ", "Stop auto"),
             ]),
             ("FREQUENCY", [
                 (" =/- ", "+/- 0.1 Hz"),
@@ -76,6 +64,7 @@ class LeftPanel(Widget):
             ]),
             ("OTHER", [
                 ("  r  ", "Reconnect"),
+                ("  ?  ", "Help"),
                 ("  q  ", "Quit"),
             ]),
         ]

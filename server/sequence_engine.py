@@ -108,27 +108,36 @@ class SequenceEngine:
         log.info("SequenceEngine stopped")
 
     def get_state(self):
-        """Return a snapshot dict of the engine's current state."""
-        with self._lock:
-            seq_idx = self._sequence_index
-            step = self._step
-            freq = self._frequency
-        return {
+        """Return a snapshot dict of the engine's current state.
+
+        Uses a cached copy updated atomically by the engine thread so
+        callers (broadcast loop) never contend on the engine's hot-path lock.
+        """
+        return dict(self._cached_state)
+
+    # -- internals ----------------------------------------------------------
+
+    def _update_cache(self, seq_idx, step, freq):
+        """Atomically update the cached state dict read by get_state()."""
+        self._cached_state = {
             "sequence": seq_idx,
             "step": step,
             "frequency": round(freq, 2),
             "fet_states": self._gpio.get_fet_states(),
         }
 
-    # -- internals ----------------------------------------------------------
-
     def _run(self):
         """Main loop: step through the sequence at the configured rate."""
         last_step_time = time()
+        self._cached_state = {
+            "sequence": 0, "step": 0,
+            "frequency": self._frequency, "fet_states": [False]*4,
+        }
 
         while not self._stop_event.is_set():
-            # Block until resumed (or stop)
-            self._pause_event.wait(timeout=0.05)
+            # Block until resumed (or stop).  Short timeout so high-freq
+            # switching (up to 300 Hz → 1.67ms steps) is not starved.
+            self._pause_event.wait(timeout=0.002)
             if self._stop_event.is_set():
                 break
             if not self._pause_event.is_set():
@@ -159,5 +168,7 @@ class SequenceEngine:
 
                 with self._lock:
                     self._step = (step + 1) % num_steps
+                    new_step = self._step
 
                 last_step_time = now
+                self._update_cache(seq_idx, new_step, freq)

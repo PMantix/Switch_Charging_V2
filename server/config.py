@@ -120,6 +120,13 @@ DEFAULT_FREQ = 1.0   # Hz
 DEAD_TIME = 0.002    # 2 ms
 
 # ---------------------------------------------------------------------------
+# Auto mode (cycler-synchronized switching)
+# ---------------------------------------------------------------------------
+AUTO_SENSE_WINDOW_S = 0.5       # seconds in transparent mode for sensing
+AUTO_SENSE_INTERVAL_S = 60      # sense interval during active switching (s)
+AUTO_SCHEDULE_DIR = "schedules"  # default directory for schedule files
+
+# ---------------------------------------------------------------------------
 # Command server
 # ---------------------------------------------------------------------------
 SERVER_HOST = "0.0.0.0"

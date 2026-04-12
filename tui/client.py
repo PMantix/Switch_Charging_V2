@@ -194,6 +194,26 @@ class PiClient:
     def debug_step(self) -> Optional[dict]:
         return self.send_command({"cmd": "debug_step"})
 
+    # -- Auto mode -----------------------------------------------------------
+
+    def load_schedule(self, path: str) -> Optional[dict]:
+        return self.send_command({"cmd": "load_schedule", "path": path})
+
+    def list_schedules(self) -> Optional[dict]:
+        return self.send_command({"cmd": "list_schedules"})
+
+    def auto_status(self) -> Optional[dict]:
+        return self.send_command({"cmd": "auto_status"})
+
+    def auto_pause(self) -> Optional[dict]:
+        return self.send_command({"cmd": "auto_pause"})
+
+    def auto_resume(self) -> Optional[dict]:
+        return self.send_command({"cmd": "auto_resume"})
+
+    def auto_skip_step(self) -> Optional[dict]:
+        return self.send_command({"cmd": "auto_skip_step"})
+
     # -- Background receive --------------------------------------------------
 
     def _recv_loop(self) -> None:

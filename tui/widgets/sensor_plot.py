@@ -1,8 +1,12 @@
 """
 Switching Circuit V2 - Sensor Timeseries Plot Widget.
 
-Two stacked plots (Voltage, Current) with all 4 sensors overlaid
-on shared axes. Three visualization modes: line, dot, bar.
+Two display modes:
+  Compact — two overlaid plots (Voltage, Current) with all 4 sensors.
+  Expanded — 8 individual plots in a 2-column grid (Voltage | Current)
+             with rows +A (P1), +B (P2), -A (N1), -B (N2).
+
+The app toggles `expanded` based on available terminal width.
 Uses braille characters for sub-character resolution.
 """
 
@@ -21,6 +25,13 @@ SENSOR_COLORS = {
     "N2": "magenta",
 }
 
+SENSOR_LABELS = {
+    "P1": "+A",
+    "P2": "+B",
+    "N1": "-A",
+    "N2": "-B",
+}
+
 VIZ_MODES = ["line", "dot", "bar"]
 
 # Braille character encoding
@@ -36,9 +47,13 @@ BRAILLE_DOT = [
 # Block elements for bar mode (8 levels, bottom-up)
 BAR_BLOCKS = " \u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588"
 
+# Bit flags for colors — used in the bytearray braille grid to avoid set() allocations
+COLOR_BITS = {"green": 1, "cyan": 2, "yellow": 4, "magenta": 8}
+BIT_TO_COLOR = {1: "green", 2: "cyan", 4: "yellow", 8: "magenta"}
+
 
 class SensorPlot(Widget):
-    """Rolling timeseries plots with multiple visualization modes."""
+    """Rolling timeseries plots with compact and expanded modes."""
 
     DEFAULT_CSS = """
     SensorPlot {
@@ -51,6 +66,12 @@ class SensorPlot(Widget):
 
     sensor_rate: reactive[float] = reactive(2.0)
     viz_mode: reactive[str] = reactive("line")
+    expanded: reactive[bool] = reactive(False)
+
+    # Expanded plot sizing is driven by the available_width / available_height
+    # reactives set by the app's on_resize handler.
+    available_width: reactive[int] = reactive(0)
+    available_height: reactive[int] = reactive(0)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -61,8 +82,12 @@ class SensorPlot(Widget):
             for name in ["P1", "P2", "N1", "N2"]
         }
         self._last_update = 0.0
+        self._last_render_time = 0.0
+        self._min_render_interval = 1.0 / 15  # cap plot redraws at ~15 fps
 
     def push_data(self, sensors: dict) -> None:
+        """Ingest sensor data. Rate-limited refresh — coalesces with batch_update
+        when called from _apply_state."""
         if not sensors:
             return
         now = monotonic()
@@ -73,13 +98,15 @@ class SensorPlot(Widget):
                 i = data.get("current", 0.0)
                 self._history[name].append((now, v, i))
         self._last_update = now
-        self.refresh()
+        if now - self._last_render_time >= self._min_render_interval:
+            self._last_render_time = now
+            self.refresh()
 
     def cycle_mode(self) -> None:
         idx = VIZ_MODES.index(self.viz_mode)
         self.viz_mode = VIZ_MODES[(idx + 1) % len(VIZ_MODES)]
 
-    # -- Plot builders -------------------------------------------------------
+    # -- Braille plot engine ---------------------------------------------------
 
     def _calc_range(self, all_series: dict[str, list[float]], data_width: int):
         """Get min/max across all series for the visible window."""
@@ -96,16 +123,17 @@ class SensorPlot(Widget):
 
     def _build_braille_plot(self, all_series: dict[str, list[float]],
                             width: int, height: int, connect: bool):
-        """Build a braille plot. If connect=True, draw lines between points."""
+        """Build a braille plot using a flat bytearray grid (no set() allocations)."""
         data_width = width * 2
         dot_rows = height * 4
         mn, mx = self._calc_range(all_series, data_width)
         rng = mx - mn
 
-        # grid[col][row] = set of colors
-        grid = [[set() for _ in range(dot_rows)] for _ in range(data_width)]
+        # Flat grid: grid[col * dot_rows + row] = color bit mask
+        grid = bytearray(data_width * dot_rows)
 
         for color, vals in all_series.items():
+            bit = COLOR_BITS.get(color, 1)
             series = vals[-data_width:]
             offset = data_width - len(series)
 
@@ -115,16 +143,15 @@ class SensorPlot(Widget):
                 norm = (v - mn) / rng
                 row = int((1.0 - norm) * (dot_rows - 1) + 0.5)
                 row = max(0, min(dot_rows - 1, row))
-                grid[col][row].add(color)
+                grid[col * dot_rows + row] |= bit
 
-                # Interpolate between previous and current point
                 if connect and prev_row is not None and col > 0:
                     prev_col = col - 1
                     r0, r1 = prev_row, row
                     if r0 != r1:
                         step = 1 if r1 > r0 else -1
                         for r in range(r0 + step, r1, step):
-                            grid[prev_col][r].add(color)
+                            grid[prev_col * dot_rows + r] |= bit
 
                 prev_row = row
 
@@ -134,25 +161,30 @@ class SensorPlot(Widget):
             row_chars = []
             for char_col in range(width):
                 pattern = BRAILLE_BASE
-                colors_in_cell = set()
+                cell_bits = 0
                 for sub_col in range(2):
                     dc = char_col * 2 + sub_col
                     if dc >= data_width:
                         continue
+                    base = dc * dot_rows
                     for sub_row in range(4):
                         dr = char_row * 4 + sub_row
                         if dr >= dot_rows:
                             continue
-                        if grid[dc][dr]:
+                        b = grid[base + dr]
+                        if b:
                             pattern |= BRAILLE_DOT[sub_col][sub_row]
-                            colors_in_cell.update(grid[dc][dr])
+                            cell_bits |= b
 
                 if pattern == BRAILLE_BASE:
                     row_chars.append((" ", "dim"))
                 else:
-                    # When multiple colors share a cell, blend by picking
-                    # the one with more dots, or first alphabetically
-                    c = sorted(colors_in_cell)[0] if colors_in_cell else "dim"
+                    # Pick the lowest-bit color (priority: green > cyan > yellow > magenta)
+                    c = "dim"
+                    for bit_val, color_name in BIT_TO_COLOR.items():
+                        if cell_bits & bit_val:
+                            c = color_name
+                            break
                     row_chars.append((chr(pattern), c))
             rows.append(row_chars)
 
@@ -164,14 +196,12 @@ class SensorPlot(Widget):
         data_width = width
         mn, mx = self._calc_range(all_series, data_width)
         rng = mx - mn
-        total_rows = height * 8  # 8 levels per character height
 
         rows_out = []
         for color, vals in all_series.items():
             series = vals[-data_width:]
             pad = data_width - len(series)
             row_chars = []
-            # Pad left
             for _ in range(pad):
                 row_chars.append((" ", "dim"))
             for v in series:
@@ -183,24 +213,24 @@ class SensorPlot(Widget):
 
         return rows_out, (mn, mx)
 
-    # -- Render --------------------------------------------------------------
+    # -- Render helpers --------------------------------------------------------
 
     def _render_plot_header(self, t: Text, label: str, style: str,
                             mn: float, mx: float, unit: str) -> None:
         t.append(f" {label}", style=style)
         t.append(f"  {mn:.2f}{unit} \u2014 {mx:.2f}{unit}\n", style="dim")
 
-    def _render_braille_rows(self, t: Text, rows: list) -> None:
+    def _render_braille_rows(self, t: Text, rows: list, width: int) -> None:
         for row in rows:
             t.append(" \u2502", style="dim")
             for ch, color in row:
                 t.append(ch, style=color)
             t.append("\u2502\n", style="dim")
         t.append(" \u2514", style="dim")
-        t.append("\u2500" * self._plot_width, style="dim")
+        t.append("\u2500" * width, style="dim")
         t.append("\u2518\n", style="dim")
 
-    def _render_bar_rows(self, t: Text, bar_data: list) -> None:
+    def _render_bar_rows(self, t: Text, bar_data: list, width: int) -> None:
         for color, row_chars in bar_data:
             name = [n for n, c in SENSOR_COLORS.items() if c == color]
             label = name[0] if name else "?"
@@ -210,10 +240,14 @@ class SensorPlot(Widget):
                 t.append(ch, style=c)
             t.append("\u2502\n", style="dim")
         t.append("    \u2514", style="dim")
-        t.append("\u2500" * self._plot_width, style="dim")
+        t.append("\u2500" * width, style="dim")
         t.append("\u2518\n", style="dim")
 
-    def render(self) -> Text:
+    # -- Compact render (original: 2 overlaid plots) --------------------------
+
+    def _render_compact_from(self, history: dict = None) -> Text:
+        if history is None:
+            history = self._history
         t = Text()
         pw = self._plot_width
         ph = self._plot_height
@@ -240,7 +274,7 @@ class SensorPlot(Widget):
         v_series = {}
         i_series = {}
         for name in ["P1", "P2", "N1", "N2"]:
-            hist = self._history[name]
+            hist = history.get(name, [])
             if hist:
                 v_series[SENSOR_COLORS[name]] = [v for _, v, _ in hist]
                 i_series[SENSOR_COLORS[name]] = [i * 1000 for _, _, i in hist]
@@ -250,26 +284,170 @@ class SensorPlot(Widget):
             connect = (mode == "line")
             v_rows, (v_mn, v_mx) = self._build_braille_plot(v_series, pw, ph, connect)
             self._render_plot_header(t, "VOLTAGE", "bold yellow", v_mn, v_mx, "V")
-            self._render_braille_rows(t, v_rows)
+            self._render_braille_rows(t, v_rows, pw)
         else:
             bar_data, (v_mn, v_mx) = self._build_bar_plot(v_series, pw, 1)
             self._render_plot_header(t, "VOLTAGE", "bold yellow", v_mn, v_mx, "V")
-            self._render_bar_rows(t, bar_data)
+            self._render_bar_rows(t, bar_data, pw)
 
         # -- Current --
         if mode in ("line", "dot"):
             i_rows, (i_mn, i_mx) = self._build_braille_plot(i_series, pw, ph, connect)
             self._render_plot_header(t, "CURRENT", "bold green", i_mn, i_mx, "mA")
-            self._render_braille_rows(t, i_rows)
+            self._render_braille_rows(t, i_rows, pw)
         else:
             bar_data, (i_mn, i_mx) = self._build_bar_plot(i_series, pw, 1)
             self._render_plot_header(t, "CURRENT", "bold green", i_mn, i_mx, "mA")
-            self._render_bar_rows(t, bar_data)
+            self._render_bar_rows(t, bar_data, pw)
 
         return t
 
+    # -- Expanded render (8 individual plots: 2 cols x 4 rows) ----------------
+
+    def _expanded_dims(self) -> tuple:
+        """Calculate per-plot width and height from available space.
+
+        Layout overhead per row:
+          "  │" + col_w + "│ │" + col_w + "│"  => col_w*2 + 8 chars
+        So col_w = (avail_width - 8) // 2
+
+        Height overhead: 2 lines header + 4 sensors * (1 label + ph plot + 1 border)
+          => total rows = 2 + 4*(ph+2)   => ph = (avail_height - 2) / 4 - 2
+        """
+        aw = self.available_width if self.available_width > 0 else 70
+        ah = self.available_height if self.available_height > 0 else 30
+
+        col_w = max(16, (aw - 8) // 2)
+        ph = max(3, (ah - 2) // 4 - 2)
+
+        return col_w, ph
+
+    def _render_expanded_from(self, history: dict = None) -> Text:
+        if history is None:
+            history = self._history
+        t = Text()
+        mode = self.viz_mode
+        connect = (mode == "line")
+
+        col_w, ph = self._expanded_dims()
+
+        # Header
+        t.append(" SENSORS ", style="bold cyan underline")
+        t.append(f"[{self.sensor_rate:.0f}Hz]", style="dim")
+        t.append(f" [{mode}]", style="dim cyan")
+        t.append("  ")
+        t.append("v", style="bold white on dark_blue")
+        t.append("viz\n", style="dim")
+
+        # Column headers — align to plot positions
+        v_header = "VOLTAGE"
+        i_header = "CURRENT"
+        pad = col_w - len(v_header) + 2
+        t.append(f"      {v_header}", style="bold yellow")
+        t.append(" " * max(1, pad), style="dim")
+        t.append(f"  {i_header}\n", style="bold green")
+
+        sensor_order = ["P1", "P2", "N1", "N2"]
+
+        for sensor in sensor_order:
+            hist = history.get(sensor, [])
+            color = SENSOR_COLORS[sensor]
+            label = SENSOR_LABELS[sensor]
+
+            # Extract voltage and current series
+            v_vals = [v for _, v, _ in hist] if hist else []
+            i_vals = [i * 1000 for _, _, i in hist] if hist else []
+
+            v_series = {color: v_vals}
+            i_series = {color: i_vals}
+
+            if mode == "bar":
+                # Bar mode: use block characters
+                v_bar, (v_mn, v_mx) = self._build_bar_plot(v_series, col_w, 1)
+                i_bar, (i_mn, i_mx) = self._build_bar_plot(i_series, col_w, 1)
+
+                # Sensor label + range header
+                t.append(f" {label} ", style=f"bold {color}")
+                t.append(f"{v_mn:.2f}-{v_mx:.2f}V", style="dim")
+                range_gap = col_w - 10
+                t.append(" " * max(1, range_gap), style="dim")
+                t.append(f"  {i_mn:.1f}-{i_mx:.1f}mA\n", style="dim")
+
+                # Render bar rows side-by-side
+                for (v_color, v_chars), (i_color, i_chars) in zip(v_bar, i_bar):
+                    t.append("  \u2502", style="dim")
+                    for ch, c in v_chars:
+                        t.append(ch, style=c)
+                    t.append("\u2502 \u2502", style="dim")
+                    for ch, c in i_chars:
+                        t.append(ch, style=c)
+                    t.append("\u2502\n", style="dim")
+
+                # Bottom border
+                t.append("  \u2514", style="dim")
+                t.append("\u2500" * col_w, style="dim")
+                t.append("\u2518", style="dim")
+                t.append(" ", style="dim")
+                t.append("\u2514", style="dim")
+                t.append("\u2500" * col_w, style="dim")
+                t.append("\u2518\n", style="dim")
+            else:
+                # Line/dot mode: use braille characters
+                v_rows, (v_mn, v_mx) = self._build_braille_plot(
+                    v_series, col_w, ph, connect)
+                i_rows, (i_mn, i_mx) = self._build_braille_plot(
+                    i_series, col_w, ph, connect)
+
+                # Sensor label + range header
+                t.append(f" {label} ", style=f"bold {color}")
+                t.append(f"{v_mn:.2f}-{v_mx:.2f}V", style="dim")
+                range_gap = col_w - 10
+                t.append(" " * max(1, range_gap), style="dim")
+                t.append(f"  {i_mn:.1f}-{i_mx:.1f}mA\n", style="dim")
+
+                # Render braille rows side-by-side
+                for row_idx in range(ph):
+                    t.append("  \u2502", style="dim")
+                    for ch, c in v_rows[row_idx]:
+                        t.append(ch, style=c)
+                    t.append("\u2502", style="dim")
+
+                    t.append(" ", style="dim")
+
+                    t.append("\u2502", style="dim")
+                    for ch, c in i_rows[row_idx]:
+                        t.append(ch, style=c)
+                    t.append("\u2502\n", style="dim")
+
+                # Bottom border
+                t.append("  \u2514", style="dim")
+                t.append("\u2500" * col_w, style="dim")
+                t.append("\u2518", style="dim")
+                t.append(" ", style="dim")
+                t.append("\u2514", style="dim")
+                t.append("\u2500" * col_w, style="dim")
+                t.append("\u2518\n", style="dim")
+
+        return t
+
+    # -- Main render -----------------------------------------------------------
+
+    def render(self) -> Text:
+        if self.expanded:
+            return self._render_expanded_from()
+        return self._render_compact_from()
+
     def watch_sensor_rate(self, _: float) -> None:
-        self.refresh()
+        self._dirty = True
 
     def watch_viz_mode(self, _: str) -> None:
-        self.refresh()
+        self._dirty = True
+
+    def watch_expanded(self, _: bool) -> None:
+        self._dirty = True
+
+    def watch_available_width(self, _: int) -> None:
+        self._dirty = True
+
+    def watch_available_height(self, _: int) -> None:
+        self._dirty = True

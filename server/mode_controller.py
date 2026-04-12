@@ -22,6 +22,7 @@ class Mode(enum.Enum):
     DISCHARGE = "discharge"
     PULSE_CHARGE = "pulse_charge"
     DEBUG = "debug"
+    AUTO = "auto"
 
 
 class ModeController:
@@ -32,6 +33,8 @@ class ModeController:
         self._engine = sequence_engine
         self._lock = threading.Lock()
         self._mode = Mode.IDLE
+        self._auto_engine = None       # AutoEngine instance when in AUTO mode
+        self._loaded_schedule = None   # Schedule loaded but not yet running
 
         # Ensure we start in a safe state
         self._gpio.all_off()
@@ -57,12 +60,31 @@ class ModeController:
                     f"Valid modes: {', '.join(m.value for m in Mode)}"
                 )
 
-        with self._lock:
-            if mode == self._mode:
-                return self._mode
+        # If leaving AUTO externally, stop the auto engine first
+        if self._auto_engine and mode != Mode.AUTO:
+            log.info("Stopping auto engine due to external mode change to %s", mode.value)
+            self._auto_engine.stop()
+            self._auto_engine = None
 
-            old = self._mode
-            log.info("Mode transition: %s -> %s", old.value, mode.value)
+        if mode == Mode.AUTO:
+            return self._start_auto_mode()
+
+        return self._set_mode_internal(mode)
+
+    def _set_mode_internal(self, mode):
+        """
+        Internal mode transition — used by AutoEngine to change circuit
+        state without stopping itself.  When the auto engine is running,
+        the reported mode stays AUTO; only the hardware state changes.
+        """
+        with self._lock:
+            auto_active = self._auto_engine and self._auto_engine.running
+            if auto_active:
+                log.info("Auto circuit action: %s", mode.value)
+            else:
+                if mode == self._mode:
+                    return self._mode
+                log.info("Mode transition: %s -> %s", self._mode.value, mode.value)
 
             # Dead-time interlock: all off -> wait -> new state
             self._engine.pause()
@@ -89,8 +111,48 @@ class ModeController:
                 # All off, engine stays paused — individual FETs controlled manually
                 self._debug_step = -1  # -1 = manual, 0-3 = stepping
 
-            self._mode = mode
+            # Keep reported mode as AUTO when auto engine is driving
+            if not (self._auto_engine and self._auto_engine.running):
+                self._mode = mode
             return self._mode
+
+    def _start_auto_mode(self):
+        """Start auto mode with the loaded schedule."""
+        from server.auto_engine import AutoEngine
+
+        if self._loaded_schedule is None:
+            raise ValueError("No schedule loaded — load a schedule before entering auto mode")
+
+        # Stop any existing auto engine
+        if self._auto_engine:
+            self._auto_engine.stop()
+
+        self._auto_engine = AutoEngine(
+            schedule=self._loaded_schedule,
+            get_sensor_data_fn=self._gpio.get_sensor_data,
+            set_mode_fn=lambda m: self._set_mode_internal(Mode(m)),
+            set_sequence_fn=self._engine.set_sequence,
+            set_frequency_fn=self._engine.set_frequency,
+        )
+        with self._lock:
+            self._mode = Mode.AUTO
+        self._auto_engine.start()
+        log.info("Auto mode started with schedule %r", self._loaded_schedule.name)
+        return Mode.AUTO
+
+    # -- schedule management -------------------------------------------------
+
+    def load_schedule(self, schedule):
+        """Load a schedule for auto mode (does not start it)."""
+        self._loaded_schedule = schedule
+        log.info("Schedule loaded: %r (%d steps, %d repeats)",
+                 schedule.name, len(schedule.steps), schedule.repeat)
+
+    def get_loaded_schedule(self):
+        return self._loaded_schedule
+
+    def get_auto_engine(self):
+        return self._auto_engine
 
     def get_mode(self):
         with self._lock:
@@ -143,4 +205,6 @@ class ModeController:
         }
         if mode == Mode.DEBUG:
             status["debug_step"] = debug_step
+        if mode == Mode.AUTO and self._auto_engine:
+            status["auto"] = self._auto_engine.get_status()
         return status

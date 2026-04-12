@@ -1,0 +1,49 @@
+{
+  "name": "CCCV_cycle_test",
+  "description": "100mA CC charge to 4.2V, CV hold, 30min rest, 100mA discharge to 2.5V, 30min rest",
+  "detection_thresholds": {
+    "rest_threshold": 0.005,
+    "charge_min": 0.008,
+    "discharge_min": 0.008,
+    "cv_decline_rate": -0.001,
+    "cv_voltage_stability": 0.005,
+    "debounce_count": 5
+  },
+  "steps": [
+    {
+      "name": "CC Charge",
+      "expected_state": "cc_charge",
+      "circuit_action": "charge",
+      "sequence": 1,
+      "frequency": 10.0,
+      "timeout_s": 7200
+    },
+    {
+      "name": "CV Charge",
+      "expected_state": "cv_charge",
+      "circuit_action": "discharge",
+      "timeout_s": 3600
+    },
+    {
+      "name": "Rest 1",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 1800
+    },
+    {
+      "name": "CC Discharge",
+      "expected_state": "discharge",
+      "circuit_action": "discharge",
+      "timeout_s": 7200
+    },
+    {
+      "name": "Rest 2",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 1800
+    }
+  ],
+  "repeat": 50,
+  "default_on_timeout": "advance",
+  "default_timeout_grace_s": 60
+}

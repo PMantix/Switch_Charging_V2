@@ -9,7 +9,7 @@ from textual.widget import Widget
 from rich.text import Text
 
 
-MODES = ["idle", "charge", "discharge", "pulse_charge", "debug"]
+MODES = ["idle", "charge", "discharge", "pulse_charge", "debug", "auto"]
 
 MODE_KEYS = {
     "idle": "i",
@@ -17,6 +17,7 @@ MODE_KEYS = {
     "discharge": "x",
     "pulse_charge": "p",
     "debug": "g",
+    "auto": "a",
 }
 
 MODE_LABELS = {
@@ -25,6 +26,7 @@ MODE_LABELS = {
     "discharge": "DISCHARGE",
     "pulse_charge": "PULSE",
     "debug": "DEBUG",
+    "auto": "AUTO",
 }
 
 MODE_STYLES = {
@@ -33,6 +35,7 @@ MODE_STYLES = {
     "discharge": "bold yellow",
     "pulse_charge": "bold magenta",
     "debug": "bold cyan",
+    "auto": "bold blue",
 }
 
 

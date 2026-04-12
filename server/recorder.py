@@ -70,6 +70,7 @@ class PiRecorder:
                 "p2_voltage", "p2_current_a",
                 "n1_voltage", "n1_current_a",
                 "n2_voltage", "n2_current_a",
+                "auto_step", "auto_detected_state", "auto_match",
             ])
 
             self._sample_count = 0
@@ -98,6 +99,12 @@ class PiRecorder:
                 s = sensors.get(name, {})
                 return s.get(field, 0.0) if isinstance(s, dict) and "error" not in s else 0.0
 
+            # Auto mode columns (empty strings if not in auto mode)
+            auto = status.get("auto", {})
+            auto_step = auto.get("step_name", "") if auto else ""
+            auto_detected = auto.get("detected_state", "") if auto else ""
+            auto_match = auto.get("match", "") if auto else ""
+
             self._writer.writerow([
                 f"{elapsed:.6f}",
                 mode, seq, step, f"{freq:.2f}",
@@ -106,6 +113,7 @@ class PiRecorder:
                 f"{_sv('P2', 'voltage'):.6f}", f"{_sv('P2', 'current'):.8f}",
                 f"{_sv('N1', 'voltage'):.6f}", f"{_sv('N1', 'current'):.8f}",
                 f"{_sv('N2', 'voltage'):.6f}", f"{_sv('N2', 'current'):.8f}",
+                auto_step, auto_detected, auto_match,
             ])
 
             self._sample_count += 1

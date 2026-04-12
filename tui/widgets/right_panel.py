@@ -24,6 +24,7 @@ MODE_STYLES = {
     "discharge": "bold yellow",
     "pulse_charge": "bold magenta",
     "debug": "bold cyan",
+    "auto": "bold blue",
 }
 
 MODE_LABELS = {
@@ -32,6 +33,7 @@ MODE_LABELS = {
     "discharge": "DISCHARGE",
     "pulse_charge": "PULSE",
     "debug": "DEBUG",
+    "auto": "AUTO",
 }
 
 MODE_KEYS = {
@@ -40,6 +42,7 @@ MODE_KEYS = {
     "discharge": "x",
     "pulse_charge": "p",
     "debug": "g",
+    "auto": "a",
 }
 
 
@@ -62,8 +65,25 @@ class RightPanel(Widget):
     conn_status: reactive[str] = reactive("Disconnected")
     current_path: reactive[str] = reactive("")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._text_cache = None
+        self._text_cache_key = None
+
     def render(self) -> Text:
+        key = (self.mode, self.sequence, self.frequency, self.step,
+               self.connected, self.conn_status, self.current_path)
+        if key == self._text_cache_key and self._text_cache is not None:
+            return self._text_cache
+        t = self._render_impl()
+        self._text_cache = t
+        self._text_cache_key = key
+        return t
+
+    def _render_impl(self) -> Text:
         t = Text()
+        t.append(" Tab", style="bold white on dark_blue")
+        t.append(" \u2192 Auto panel\n\n", style="dim")
 
         # -- Status --
         t.append(" STATUS\n", style="bold cyan underline")
@@ -104,7 +124,7 @@ class RightPanel(Widget):
         t.append(" MODE", style="bold cyan underline")
         t.append("\n\n")
 
-        for m in ["idle", "charge", "discharge", "pulse_charge", "debug"]:
+        for m in ["idle", "charge", "discharge", "pulse_charge", "debug", "auto"]:
             sel = (m == self.mode)
             radio = "\u25cf" if sel else "\u25cb"
             style = MODE_STYLES.get(m, "white")
@@ -132,6 +152,24 @@ class RightPanel(Widget):
             t.append("4", style="bold white on dark_blue")
             t.append(" N2\n", style="dim")
 
+        t.append("\n")
+
+        # -- H-Bridge States --
+        t.append(" H-BRIDGE STATES", style="bold cyan underline")
+        t.append("\n\n")
+
+        hb_states = [
+            ("0", "P1+N1", "+A/-A",  "bold green"),
+            ("1", "P1+N2", "+A/-B",  "bold green"),
+            ("2", "P2+N1", "+B/-A",  "bold green"),
+            ("3", "P2+N2", "+B/-B",  "bold green"),
+            ("4", "ALL",   "All ON", "bold yellow"),
+            ("5", "---",   "Idle",   "bold red"),
+        ]
+        for num, fets, desc, style in hb_states:
+            t.append(f" {num} ", style="bold white")
+            t.append(f"{fets:<6}", style=style)
+            t.append(f" {desc}\n", style="dim")
         t.append("\n")
 
         # -- Sequences --

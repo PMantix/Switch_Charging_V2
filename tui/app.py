@@ -11,7 +11,8 @@ from typing import Optional
 
 from textual.app import App, ComposeResult
 from textual.binding import Binding
-from textual.containers import Horizontal, Vertical
+from textual.containers import Container, Horizontal, Vertical
+from textual.events import Resize
 from textual.screen import ModalScreen
 from textual.widgets import Footer, Header, Static, Input, Label
 from textual.worker import Worker
@@ -23,15 +24,17 @@ from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
 from tui.widgets.left_panel import LeftPanel
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
+from tui.widgets.auto_panel import AutoPanel
 from tui.widgets.connection_bar import ConnectionBar
 from tui.widgets.mascot import Mascot
+from tui.widgets.schedule_screen import SchedulePickerScreen, SchedulePreviewScreen
 
 log = logging.getLogger(__name__)
 
 MIN_FREQ = 0.1
 MAX_FREQ = 300.0
 
-CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug"]
+CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug", "auto"]
 
 
 # ---------------------------------------------------------------------------
@@ -153,11 +156,13 @@ class HelpScreen(ModalScreen[None]):
         align: center middle;
     }
     #help-box {
-        width: 56;
-        height: 24;
+        width: 58;
+        height: auto;
+        max-height: 90%;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
+        overflow-y: auto;
     }
     """
 
@@ -165,30 +170,36 @@ class HelpScreen(ModalScreen[None]):
         with Vertical(id="help-box"):
             yield Static(
                 "[bold cyan]Switching Circuit V2 - Key Bindings[/]\n\n"
-                "[bold]Space[/]     Toggle start/stop (idle <-> charge)\n"
-                "[bold]1-8[/]       Select sequence\n"
-                "[bold]= / -[/]     Frequency +/- 0.1 Hz (fine)\n"
-                "[bold]w / s[/]     Frequency +/- 0.1 Hz (fine)\n"
-                "[bold]e / d[/]     Frequency +/- 1.0 Hz (medium)\n"
-                "[bold]W / S[/]     Frequency +/- 10 Hz (coarse)\n"
-                "[bold]m[/]         Cycle mode (idle->charge->...->debug)\n"
-                "[bold]c[/]         Set mode: Charge\n"
-                "[bold]i[/]         Set mode: Idle\n"
-                "[bold]x[/]         Set mode: Discharge\n"
-                "[bold]g[/]         Set mode: Debug\n"
-                "[bold]1-4[/]       Debug: toggle P1 / P2 / N1 / N2\n"
-                "[bold]* / /[/]     Sensor rate +/- (0.5-20 Hz)\n"
-                "[bold]v[/]         Cycle plot mode (line/dot/bar)\n"
-                "[bold]l[/]         Start/stop recording\n"
-                "[bold][ / ][/]     Recording duration -/+\n"
-                "[bold]r[/]         Reconnect to Pi\n"
-                "[bold]?[/]         Toggle this help\n"
-                "[bold]q[/]         Quit\n\n"
+                "[bold white]CONTROL[/]\n"
+                "  [bold]Space[/]     Start/Stop (idle <-> charge)\n"
+                "  [bold]m[/]         Cycle mode\n\n"
+                "[bold white]MODE[/]\n"
+                "  [bold]c[/]  Charge    [bold]i[/]  Idle      [bold]x[/]  Discharge\n"
+                "  [bold]p[/]  Pulse     [bold]g[/]  Debug     [bold]a[/]  Auto\n\n"
+                "[bold white]AUTO MODE[/]  [dim](press [bold]a[/] to load schedule)[/]\n"
+                "  [bold]n[/]         Skip to next step\n"
+                "  [bold]Space[/]     Pause / resume auto\n"
+                "  [bold]i[/]         Stop auto, return to idle\n\n"
+                "[bold white]FREQUENCY[/]\n"
+                "  [bold]= / -[/]     +/- 0.1 Hz    [bold]w / s[/]  +/- 0.1 Hz\n"
+                "  [bold]e / d[/]     +/- 1.0 Hz    [bold]W / S[/]  +/- 10 Hz\n\n"
+                "[bold white]SEQUENCE[/]\n"
+                "  [bold]1-8[/]       Select switching sequence\n"
+                "  [bold]1-4[/]       [dim](Debug mode: toggle P1/P2/N1/N2)[/]\n\n"
+                "[bold white]SENSORS & PLOT[/]\n"
+                "  [bold]* / /[/]     Sensor rate +/- (0.5-20 Hz)\n"
+                "  [bold]v[/]         Cycle plot mode (line/dot/bar)\n\n"
+                "[bold white]RECORDING[/]\n"
+                "  [bold]l[/]         Start / stop recording\n"
+                "  [bold][ / ][/]     Recording duration -/+\n\n"
+                "[bold white]OTHER[/]\n"
+                "  [bold]r[/]  Reconnect    [bold]?[/]  This help    [bold]q[/]  Quit\n\n"
                 "[dim]Press Escape or ? to close[/]"
             )
 
     def action_close(self) -> None:
         self.dismiss(None)
+
 
 
 # ---------------------------------------------------------------------------
@@ -199,6 +210,10 @@ class SwitchingCircuitApp(App):
 
     TITLE = "Switching Circuit V2"
     SUB_TITLE = "H-Bridge Controller"
+
+    # Width threshold: if the center column is wider than this, show
+    # the sensor plot to the right of the circuit; otherwise below it.
+    WIDE_THRESHOLD = 130
 
     CSS = """
     Screen {
@@ -232,14 +247,39 @@ class SwitchingCircuitApp(App):
     CircuitDiagram {
         width: auto;
     }
+
+    /* Default: sensor plot below circuit (narrow) */
+    #center-inner {
+        width: 100%;
+        height: auto;
+    }
     SensorPlot {
         width: 100%;
         height: auto;
         border-top: solid $accent;
         margin-top: 1;
     }
+
+    /* Wide layout: sensor plot beside circuit */
+    #center-inner.wide-layout {
+        layout: horizontal;
+    }
+    #center-inner.wide-layout SensorPlot {
+        width: 1fr;
+        border-top: none;
+        border-left: solid $accent;
+        margin-top: 0;
+        margin-left: 1;
+    }
+    #center-inner.wide-layout CircuitDiagram {
+        width: auto;
+    }
+
     Mascot {
         height: auto;
+    }
+    .hidden {
+        display: none;
     }
     """
 
@@ -276,7 +316,14 @@ class SwitchingCircuitApp(App):
         Binding("l", "toggle_log", "Log", show=False),
         Binding("[", "log_duration_down", "Dur-", show=False),
         Binding("]", "log_duration_up", "Dur+", show=False),
+        Binding("a", "mode_auto", "Auto", show=False),
+        Binding("n", "auto_skip", "Skip Step", show=False),
+        Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
     ]
+
+    # During startup, limit state updates to let the layout stabilize.
+    _WARMUP_S = 0.8       # seconds of reduced update rate after first data
+    _WARMUP_FPS = 3       # max frames/sec during warmup
 
     def __init__(self, host: str = "", port: int = 5555):
         super().__init__()
@@ -287,6 +334,10 @@ class SwitchingCircuitApp(App):
         self._current_freq = 1.0
         self._current_seq = 0
         self._data_logger = DataLogger()
+        self._first_state_time = 0.0     # monotonic time of first state update
+        self._last_apply_time = 0.0      # last time _apply_state ran
+        self._showing_auto_panel = False  # right column: status vs auto panel
+        self._prev_mode = "idle"         # track mode changes for panel auto-switch
 
     # -- Compose -------------------------------------------------------------
 
@@ -298,13 +349,41 @@ class SwitchingCircuitApp(App):
                 yield LeftPanel(id="left-panel")
                 yield Mascot(id="mascot")
             with Vertical(id="center-col"):
-                yield CircuitDiagram(id="circuit")
-                yield SensorPlot(id="sensor-plot")
+                with Container(id="center-inner"):
+                    yield CircuitDiagram(id="circuit")
+                    yield SensorPlot(id="sensor-plot")
             with Vertical(id="right-col"):
                 yield RightPanel(id="right-panel")
+                yield AutoPanel(id="auto-panel", classes="hidden")
         yield Footer()
 
     # -- Lifecycle -----------------------------------------------------------
+
+    def on_resize(self, event: Resize) -> None:
+        """Toggle wide/narrow layout and expanded sensor plots based on terminal size."""
+        try:
+            inner = self.query_one("#center-inner", Container)
+            plot = self.query_one("#sensor-plot", SensorPlot)
+            # Total width minus left (32) and right (36) columns and borders
+            center_width = event.size.width - 32 - 36
+            wide = center_width >= self.WIDE_THRESHOLD
+            if wide:
+                inner.add_class("wide-layout")
+            else:
+                inner.remove_class("wide-layout")
+            # Expand sensor plots to 8 individual plots when there's room
+            plot.expanded = wide
+            if wide:
+                # In wide layout the circuit takes ~60 cols; rest goes to plots
+                plot_width = center_width - 62
+                plot.available_width = max(60, plot_width)
+                # Full terminal height minus header(1), conn bar(1), footer(1)
+                plot.available_height = max(20, event.size.height - 3)
+            else:
+                plot.available_width = max(60, center_width - 4)
+                plot.available_height = max(20, event.size.height // 2)
+        except Exception:
+            pass
 
     def on_mount(self) -> None:
         """Initialize client and connect."""
@@ -388,11 +467,26 @@ class SwitchingCircuitApp(App):
     # -- State stream callback (called from background thread) ---------------
 
     def _on_state_update(self, data: dict) -> None:
-        """Called from the PiClient recv thread with each state event."""
+        """Called from the PiClient recv thread with each state event.
+        Rate-limited during startup warmup so layout can stabilize."""
+        from time import monotonic
+        now = monotonic()
+        if self._first_state_time == 0.0:
+            self._first_state_time = now
+        # During warmup, drop frames to let Textual settle layout caches
+        if now - self._first_state_time < self._WARMUP_S:
+            interval = 1.0 / self._WARMUP_FPS
+            if now - self._last_apply_time < interval:
+                return  # skip this frame
+        self._last_apply_time = now
         self.call_from_thread(self._apply_state, data)
 
     def _apply_state(self, data: dict) -> None:
-        """Apply a state update to all widgets (runs on the UI thread)."""
+        """Apply a state update to all widgets (runs on the UI thread).
+
+        Uses batch_update() to coalesce all property changes into a single
+        render pass instead of triggering 6+ separate refreshes.
+        """
         mode = data.get("mode", "idle")
         seq = data.get("sequence", 0)
         step = data.get("step", 0)
@@ -404,47 +498,68 @@ class SwitchingCircuitApp(App):
         self._current_seq = seq
         self._last_fets = fets
 
-        # Determine state index from FET states
         state_idx = self._fets_to_state_index(fets)
 
-        # Update widgets
-        circuit = self.query_one("#circuit", CircuitDiagram)
-        circuit.update_from_server(fets, state_idx, mode=mode)
+        with self.batch_update():
+            circuit = self.query_one("#circuit", CircuitDiagram)
+            circuit.update_from_server(fets, state_idx, mode=mode)
 
-        rpanel = self.query_one("#right-panel", RightPanel)
-        rpanel.mode = mode
-        rpanel.sequence = seq
-        rpanel.frequency = freq
-        rpanel.step = step
-        rpanel.current_path = STATE_PATHS[state_idx] if 0 <= state_idx <= 5 else ""
+            rpanel = self.query_one("#right-panel", RightPanel)
+            rpanel.mode = mode
+            rpanel.sequence = seq
+            rpanel.frequency = freq
+            rpanel.step = step
+            rpanel.current_path = STATE_PATHS[state_idx] if 0 <= state_idx <= 5 else ""
 
-        sensors = data.get("sensors", {})
-        plot = self.query_one("#sensor-plot", SensorPlot)
-        plot.push_data(sensors)
+            sensors = data.get("sensors", {})
+            plot = self.query_one("#sensor-plot", SensorPlot)
+            plot.push_data(sensors)
 
-        # Data logging
-        if self._data_logger.is_logging and self._data_logger.tier:
-            from tui.data_logger import RecordTier
-            tier = self._data_logger.tier
-
-            if tier == RecordTier.MAC:
-                still_going = self._data_logger.record(data)
-                if not still_going:
-                    self._on_recording_done()
-                    return
-            elif tier == RecordTier.PI:
-                if self._data_logger.check_pi_done():
-                    self._on_recording_done()
-                    return
-
+            auto_panel = self.query_one("#auto-panel", AutoPanel)
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
-            elapsed = self._data_logger.elapsed
-            dur = self._data_logger.duration_s
-            remaining = max(0, dur - elapsed)
-            conn_bar.conn_label = f"\u25cf REC [{tier.value}] {remaining:.0f}s left"
+            auto_data = data.get("auto", {})
 
-        mascot = self.query_one("#mascot", Mascot)
-        mascot.circuit_mode = mode
+            if mode == "auto":
+                if auto_data:
+                    auto_panel.auto_data = auto_data
+                conn_bar.update_auto_status(auto_data)
+                # Auto-switch to auto panel when ENTERING auto mode
+                if self._prev_mode != "auto" and not self._showing_auto_panel:
+                    self._showing_auto_panel = True
+                    rpanel.add_class("hidden")
+                    auto_panel.remove_class("hidden")
+            else:
+                conn_bar.update_auto_status({})
+                # Auto-switch back only when LEAVING auto mode
+                if self._prev_mode == "auto" and self._showing_auto_panel:
+                    self._showing_auto_panel = False
+                    auto_panel.add_class("hidden")
+                    rpanel.remove_class("hidden")
+
+            self._prev_mode = mode
+
+            # Data logging (pure computation — widget touches stay in batch)
+            if self._data_logger.is_logging and self._data_logger.tier:
+                from tui.data_logger import RecordTier
+                tier = self._data_logger.tier
+
+                if tier == RecordTier.MAC:
+                    still_going = self._data_logger.record(data)
+                    if not still_going:
+                        self._on_recording_done()
+                        return
+                elif tier == RecordTier.PI:
+                    if self._data_logger.check_pi_done():
+                        self._on_recording_done()
+                        return
+
+                elapsed = self._data_logger.elapsed
+                dur = self._data_logger.duration_s
+                remaining = max(0, dur - elapsed)
+                conn_bar.conn_label = f"\u25cf REC [{tier.value}] {remaining:.0f}s left"
+
+            mascot = self.query_one("#mascot", Mascot)
+            mascot.circuit_mode = mode
 
     @staticmethod
     def _fets_to_state_index(fets: list[bool]) -> int:
@@ -493,6 +608,16 @@ class SwitchingCircuitApp(App):
             self._client.set_mode(mode)
 
     def action_toggle_run(self) -> None:
+        if self._circuit_mode == "auto":
+            # In auto mode, space toggles pause/resume
+            if self._client:
+                auto_panel = self.query_one("#auto-panel", AutoPanel)
+                is_paused = auto_panel.auto_data.get("paused", False)
+                if is_paused:
+                    self._client.auto_resume()
+                else:
+                    self._client.auto_pause()
+            return
         new_mode = "charge" if self._circuit_mode == "idle" else "idle"
         self._send_mode(new_mode)
 
@@ -518,6 +643,93 @@ class SwitchingCircuitApp(App):
 
     def action_mode_debug(self) -> None:
         self._send_mode("debug")
+
+    def action_mode_auto(self) -> None:
+        """Enter auto mode, or show current schedule if already running."""
+        if self._circuit_mode == "auto":
+            # Show current schedule as read-only preview
+            auto_panel = self.query_one("#auto-panel", AutoPanel)
+            ad = auto_panel.auto_data
+            if ad and ad.get("steps"):
+                # Reconstruct a schedule dict from the broadcast data
+                current = {
+                    "name": ad.get("schedule_name", "?"),
+                    "steps": ad.get("steps", []),
+                    "repeat": ad.get("total_cycles", 1),
+                    "description": f"Currently running — cycle {ad.get('cycle', 0) + 1}/{ad.get('total_cycles', 1)}",
+                }
+                self.push_screen(
+                    SchedulePreviewScreen(current, path="(running)"),
+                    lambda _: None,  # dismiss does nothing — can't restart while running
+                )
+            else:
+                self.notify("Auto mode active. Press [space] to pause, [i] to stop.", title="Auto")
+            return
+        self.push_screen(SchedulePickerScreen(), self._on_schedule_file_picked)
+
+    def _on_schedule_file_picked(self, path: str) -> None:
+        """Stage 1 callback: file selected, load JSON and show preview."""
+        if not path:
+            return
+        try:
+            import json
+            from pathlib import Path as P
+            with open(P(path)) as f:
+                raw = json.load(f)
+        except Exception as e:
+            self.notify(f"Failed to read {path}: {e}", title="Error", severity="error")
+            return
+
+        # Run semantic validation for warnings
+        from server.schedule import _parse_schedule, validate_schedule, validate_schedule_semantics
+        try:
+            sched = _parse_schedule(raw)
+            errors = validate_schedule(sched)
+            if errors:
+                self.notify("\n".join(errors), title="Invalid Schedule", severity="error")
+                return
+            warnings = validate_schedule_semantics(sched)
+        except Exception as e:
+            self.notify(f"Invalid schedule: {e}", title="Error", severity="error")
+            return
+
+        self.push_screen(
+            SchedulePreviewScreen(raw, path=path, warnings=warnings),
+            self._on_schedule_confirmed,
+        )
+
+    def _on_schedule_confirmed(self, result) -> None:
+        """Stage 2 callback: user confirmed (with possible edits) or cancelled."""
+        if result is None or not self._client:
+            return
+        # Send the (possibly edited) schedule inline to the server
+        resp = self._client.send_command({"cmd": "load_schedule", "schedule": result})
+        if resp and resp.get("ok"):
+            warnings = resp.get("warnings", [])
+            for w in warnings:
+                self.notify(w, title="Schedule Warning", severity="warning")
+            self._send_mode("auto")
+        else:
+            err = resp.get("error", "Unknown error") if resp else "No response"
+            self.notify(f"Failed to load schedule: {err}", title="Error", severity="error")
+
+    def action_auto_skip(self) -> None:
+        """Skip to the next step in auto mode."""
+        if self._circuit_mode == "auto" and self._client:
+            self._client.auto_skip_step()
+
+    def action_toggle_right_panel(self) -> None:
+        """Toggle between Status and Auto panel in the right column."""
+        rpanel = self.query_one("#right-panel", RightPanel)
+        auto_panel = self.query_one("#auto-panel", AutoPanel)
+
+        self._showing_auto_panel = not self._showing_auto_panel
+        if self._showing_auto_panel:
+            rpanel.add_class("hidden")
+            auto_panel.remove_class("hidden")
+        else:
+            auto_panel.add_class("hidden")
+            rpanel.remove_class("hidden")
 
     # -- Actions: Debug FET control ------------------------------------------
 

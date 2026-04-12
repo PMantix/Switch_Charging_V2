@@ -1,0 +1,90 @@
+{
+  "name": "multistage_formation",
+  "description": "Multi-stage formation cycle: low-rate CC, high-rate CC, CV taper, rest, pulse discharge, rest, CC discharge, rest, repeat",
+  "default_on_timeout": "advance",
+  "default_timeout_grace_s": 30,
+  "detection_thresholds": {
+    "rest_threshold": 0.005,
+    "charge_min": 0.008,
+    "discharge_min": 0.008,
+    "cv_current_drop_ratio": 0.25,
+    "debounce_count": 4
+  },
+  "steps": [
+    {
+      "name": "Low-Rate CC Charge",
+      "expected_state": "cc_charge",
+      "circuit_action": "charge",
+      "sequence": 1,
+      "frequency": 5.0,
+      "timeout_s": 3600
+    },
+    {
+      "name": "High-Rate CC Charge",
+      "expected_state": "cc_charge",
+      "circuit_action": "charge",
+      "sequence": 2,
+      "frequency": 20.0,
+      "timeout_s": 1800
+    },
+    {
+      "name": "CV Taper",
+      "expected_state": "cv_charge",
+      "circuit_action": "discharge",
+      "timeout_s": 2400
+    },
+    {
+      "name": "Post-Charge Rest",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 1800
+    },
+    {
+      "name": "Pulse Discharge",
+      "expected_state": "discharge",
+      "circuit_action": "discharge",
+      "timeout_s": 600,
+      "on_timeout": "advance",
+      "timeout_grace_s": 10
+    },
+    {
+      "name": "Mid Rest",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 300
+    },
+    {
+      "name": "CC Discharge",
+      "expected_state": "discharge",
+      "circuit_action": "discharge",
+      "timeout_s": 3600
+    },
+    {
+      "name": "Deep Rest",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 3600
+    },
+    {
+      "name": "Recovery CC Charge",
+      "expected_state": "cc_charge",
+      "circuit_action": "charge",
+      "sequence": 3,
+      "frequency": 10.0,
+      "timeout_s": 1800
+    },
+    {
+      "name": "Recovery CV Taper",
+      "expected_state": "cv_charge",
+      "circuit_action": "discharge",
+      "timeout_s": 1200
+    },
+    {
+      "name": "Final Rest",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 600
+    }
+  ],
+  "repeat": 5
+}

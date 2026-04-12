@@ -12,8 +12,11 @@ import socket
 import threading
 from time import sleep
 
-from server.config import SERVER_HOST, SERVER_PORT
+from pathlib import Path
+
+from server.config import SERVER_HOST, SERVER_PORT, AUTO_SCHEDULE_DIR
 from server.recorder import PiRecorder
+from server.schedule import load_schedule, load_schedule_inline, validate_schedule_semantics
 
 log = logging.getLogger(__name__)
 
@@ -244,6 +247,63 @@ class CommandServer:
                 log.info("Client subscribed to state updates")
                 return {"ok": True, "subscribed": True}
 
+            # -- auto mode commands ------------------------------------------
+
+            elif cmd == "load_schedule":
+                path = msg.get("path")
+                inline = msg.get("schedule")
+                if inline:
+                    sched = load_schedule_inline(inline)
+                elif path:
+                    sched = load_schedule(path)
+                else:
+                    return {"ok": False, "error": "Provide 'path' or 'schedule'"}
+                self._mc.load_schedule(sched)
+                warnings = validate_schedule_semantics(sched)
+                return {
+                    "ok": True,
+                    "schedule_name": sched.name,
+                    "steps": sched.total_steps_per_cycle,
+                    "repeat": sched.repeat,
+                    "warnings": warnings,
+                }
+
+            elif cmd == "list_schedules":
+                sched_dir = Path(AUTO_SCHEDULE_DIR)
+                files = []
+                if sched_dir.is_dir():
+                    files = sorted(
+                        str(p) for p in sched_dir.glob("*.json")
+                    )
+                return {"ok": True, "schedules": files}
+
+            elif cmd == "auto_status":
+                ae = self._mc.get_auto_engine()
+                if ae:
+                    return {"ok": True, "auto": ae.get_status()}
+                return {"ok": True, "auto": None}
+
+            elif cmd == "auto_pause":
+                ae = self._mc.get_auto_engine()
+                if not ae:
+                    return {"ok": False, "error": "Auto mode not active"}
+                ae.pause()
+                return {"ok": True}
+
+            elif cmd == "auto_resume":
+                ae = self._mc.get_auto_engine()
+                if not ae:
+                    return {"ok": False, "error": "Auto mode not active"}
+                ae.resume()
+                return {"ok": True}
+
+            elif cmd == "auto_skip_step":
+                ae = self._mc.get_auto_engine()
+                if not ae:
+                    return {"ok": False, "error": "Auto mode not active"}
+                ae.skip_step()
+                return {"ok": True, "auto": ae.get_status()}
+
             else:
                 return {"ok": False, "error": f"Unknown command: {cmd!r}"}
 
@@ -289,10 +349,15 @@ class CommandServer:
             payload = {"event": "state", **status}
 
             dead = []
+            line = json.dumps(payload, separators=(",", ":")) + "\n"
+            line_bytes = line.encode("utf-8")
             for sock in subscribers:
                 try:
-                    self._send_line(sock, payload)
-                except (OSError, BrokenPipeError):
+                    # Non-blocking send with short timeout so a slow client
+                    # can't stall the entire broadcast loop.
+                    sock.settimeout(0.05)
+                    sock.sendall(line_bytes)
+                except (OSError, BrokenPipeError, socket.timeout):
                     dead.append(sock)
 
             if dead:

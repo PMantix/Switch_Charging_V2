@@ -76,7 +76,21 @@ class CircuitDiagram(Widget):
     state_index: reactive[int] = reactive(5)
     circuit_mode: reactive[str] = reactive("idle")
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._text_cache = None      # cached Text output
+        self._text_cache_key = None  # (fet_states, state_index, circuit_mode)
+
     def render(self) -> Text:
+        key = (self.fet_states, self.state_index, self.circuit_mode)
+        if key == self._text_cache_key and self._text_cache is not None:
+            return self._text_cache
+        t = self._render_impl()
+        self._text_cache = t
+        self._text_cache_key = key
+        return t
+
+    def _render_impl(self) -> Text:
         p1, p2, n1, n2 = self.fet_states
         idx = self.state_index
         is_pulse = self.circuit_mode == "pulse_charge"
@@ -565,11 +579,12 @@ class CircuitDiagram(Widget):
 
     def update_from_server(self, fet_states: list[bool], state_index: int,
                            mode: str = "idle") -> None:
-        """Convenience method to set values from a server state update."""
-        self.circuit_mode = mode
+        """Set values from server state. Only refreshes if something changed."""
         new_fets = tuple(fet_states)
+        if (new_fets == self.fet_states and
+                state_index == self.state_index and
+                mode == self.circuit_mode):
+            return  # nothing changed, skip entirely
+        self.circuit_mode = mode
         self.state_index = state_index
-        if new_fets == self.fet_states:
-            self.refresh()
-        else:
-            self.fet_states = new_fets
+        self.fet_states = new_fets

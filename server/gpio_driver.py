@@ -43,7 +43,11 @@ class GPIODriver:
         self._mock = True
 
         # Sensor data (updated by reader thread from stream)
-        self._sensor_data = {}
+        # Initialize with zero readings so mock mode returns valid data
+        self._sensor_data = {
+            name: {"voltage": 0.0, "current": 0.0}
+            for name in SENSOR_ORDER
+        }
         self._sensor_lock = threading.Lock()
         self._sensor_hz = 0.0
         self._sensor_new = threading.Event()  # set when fresh data arrives

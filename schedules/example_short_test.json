@@ -1,0 +1,41 @@
+{
+  "name": "short_bench_test",
+  "description": "Short schedule for bench testing auto mode (1-minute steps)",
+  "detection_thresholds": {
+    "rest_threshold": 0.005,
+    "charge_min": 0.008,
+    "discharge_min": 0.008,
+    "debounce_count": 3
+  },
+  "steps": [
+    {
+      "name": "CC Charge",
+      "expected_state": "cc_charge",
+      "circuit_action": "charge",
+      "sequence": 1,
+      "frequency": 10.0,
+      "timeout_s": 60
+    },
+    {
+      "name": "Rest",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 30
+    },
+    {
+      "name": "CC Discharge",
+      "expected_state": "discharge",
+      "circuit_action": "discharge",
+      "timeout_s": 60
+    },
+    {
+      "name": "Rest 2",
+      "expected_state": "rest",
+      "circuit_action": "idle",
+      "timeout_s": 30
+    }
+  ],
+  "repeat": 3,
+  "default_on_timeout": "advance",
+  "default_timeout_grace_s": 5
+}
