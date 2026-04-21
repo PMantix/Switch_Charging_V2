@@ -1,0 +1,4 @@
+(sym_lib_table
+	(version 7)
+	(lib (name "switching_circuit_v2")(type "KiCad")(uri "${KIPRJMOD}/../lib/switching_circuit_v2.kicad_sym")(options "")(descr "Custom symbols for Switching Circuit V2"))
+)

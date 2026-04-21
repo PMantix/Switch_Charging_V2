@@ -1,0 +1,29 @@
+# macOS
+.DS_Store
+
+# Claude Code local settings
+.claude/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# Logs / data
+*.log
+logs/
+data/
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# KiCad auto-backups and history (git handles versioning)
+pcb/switching_circuit_v2/.history/
+pcb/switching_circuit_v2/switching_circuit_v2-backups/
+*-backups/
+*.kicad_prl

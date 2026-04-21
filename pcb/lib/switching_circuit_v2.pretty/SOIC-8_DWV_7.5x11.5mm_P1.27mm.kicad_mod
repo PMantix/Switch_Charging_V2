@@ -1,0 +1,223 @@
+(footprint "SOIC-8_DWV_7.5x11.5mm_P1.27mm"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "SOIC-8 DWV wide-body package, 7.5x11.5mm body, 1.27mm pitch. For TI UCC5304DWV isolated gate driver. Based on SOIC-16W_7.5 land pattern scaled to 8 pins.")
+	(tags "SOIC DWV wide-body isolated driver")
+	(property "Reference" "U**"
+		(at 0 -7.5 0)
+		(layer "F.SilkS")
+		(uuid "61f66b8f-b143-4c5e-9f74-cf6799f36532")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "SOIC-8_DWV"
+		(at 0 7.5 0)
+		(layer "F.Fab")
+		(uuid "46676302-6e8e-4e91-9fd9-01437436c473")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "9888be29-e9ad-4bab-b34e-e6dd04b04117")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "2f0b64c8-3ca8-4b03-8755-786d29f18332")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -3.86 -5.85)
+		(end 3.86 -5.85)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "c8289b73-5bf9-4a9e-9420-d98919a10661")
+	)
+	(fp_line
+		(start -3.86 5.85)
+		(end -3.86 -5.85)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "f7fb09ee-4010-424b-9bbc-a0c4abe638d3")
+	)
+	(fp_line
+		(start 3.86 -5.85)
+		(end 3.86 5.85)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "5a54ec47-68bc-4910-9404-1032f448cdc4")
+	)
+	(fp_line
+		(start 3.86 5.85)
+		(end -3.86 5.85)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "faf5e343-00db-41f3-a82d-b86b89b8edc3")
+	)
+	(fp_circle
+		(center -5.9 -1.905)
+		(end -5.6 -1.905)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(fill yes)
+		(layer "F.SilkS")
+		(uuid "e089c7be-d8bd-4bbf-9914-f152bf275edf")
+	)
+	(fp_rect
+		(start -5.9 -6.2)
+		(end 5.9 6.2)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "42d4c586-9d4b-45ca-94e7-2d63837430ae")
+	)
+	(fp_line
+		(start -3.75 -5.75)
+		(end 3.75 -5.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "8e15f63e-5589-498e-8869-19bbb34b7311")
+	)
+	(fp_line
+		(start -3.75 -4.75)
+		(end -2.75 -5.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "8ccf0631-bf97-4af2-aa06-869891a81925")
+	)
+	(fp_line
+		(start -3.75 5.75)
+		(end -3.75 -4.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "2693d9eb-879b-4441-92c2-592ceab7e12d")
+	)
+	(fp_line
+		(start 3.75 -5.75)
+		(end 3.75 5.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "b810ca78-1d9f-46cc-a6bb-8a8ca9472400")
+	)
+	(fp_line
+		(start 3.75 5.75)
+		(end -3.75 5.75)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "9cfaf0e8-b83d-4de5-82ce-af8d9ab8d068")
+	)
+	(pad "1" smd roundrect
+		(at -4.65 -1.905)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "e90f9b35-49cf-40a1-86f6-cea4ef005a5e")
+	)
+	(pad "2" smd roundrect
+		(at -4.65 -0.635)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "d0466c31-126c-4915-922d-7c6bc6c57cb3")
+	)
+	(pad "3" smd roundrect
+		(at -4.65 0.635)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "2cd30c30-1067-48c1-abdf-810732adc79f")
+	)
+	(pad "4" smd roundrect
+		(at -4.65 1.905)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "440b5cef-a359-46e3-8983-aba27224c124")
+	)
+	(pad "5" smd roundrect
+		(at 4.65 1.905)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "68a73f0c-16c4-4d4c-bc5b-4e42960d9ce4")
+	)
+	(pad "6" smd roundrect
+		(at 4.65 0.635)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "a7594087-8929-4915-93df-0033e9e371f7")
+	)
+	(pad "7" smd roundrect
+		(at 4.65 -0.635)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "02a4f60c-5275-422b-97f3-501a912fcded")
+	)
+	(pad "8" smd roundrect
+		(at 4.65 -1.905)
+		(size 2.05 0.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(roundrect_rratio 0.25)
+		(uuid "08113773-3eee-4176-a1d0-3b17ecb3959e")
+	)
+	(embedded_fonts no)
+)
