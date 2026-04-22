@@ -140,6 +140,16 @@ class PiClient:
         t = threading.Thread(target=_retry_loop, daemon=True, name="pi-connect")
         t.start()
 
+    def reconnect_to(self, host: str, port: int = 5555) -> None:
+        """Disconnect any current socket, then retarget the client at host:port.
+
+        Used by the AP-flip flow: after sending `set_network_mode`, the Pi's
+        current socket will die within a second, so we tear ours down
+        proactively and start the retry loop against the new address.
+        """
+        self.disconnect()
+        self.connect_with_retry(host, port)
+
     # -- Commands ------------------------------------------------------------
 
     def send_command(self, cmd_dict: dict) -> Optional[dict]:

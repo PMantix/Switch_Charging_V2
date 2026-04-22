@@ -1,11 +1,14 @@
 """
 Switching Circuit V2 - Pi Server Discovery.
 
-Finds the Pi server on the local network using:
-1. localhost when running on the Pi itself (e.g. via Pi Connect)
-2. Last-known IP (cached in ~/.switching-circuit-host)
-3. mDNS (raspberrypi.local)
-4. Link-local subnet scan on active ethernet interfaces
+Finds the Pi server on the local network using, in order:
+
+    1. localhost              (running on the Pi itself, e.g. via Pi Connect)
+    2. Last-known IP          (cached in ~/.switching-circuit-host)
+    3. AP gateway             (10.42.0.1 — the Pi when laptop is on any pi_SW# AP)
+    4. Fleet mDNS             (pi-SW1.local … pi-SW8.local, resolved in parallel)
+    5. Legacy mDNS            (raspberrypi.local — for un-renamed Pis)
+    6. Link-local subnet scan (169.254.x.x — for direct ethernet fallback)
 """
 
 import logging
@@ -23,6 +26,15 @@ log = logging.getLogger(__name__)
 SERVER_PORT = 5555
 CACHE_FILE = Path.home() / ".switching-circuit-host"
 CONNECT_TIMEOUT = 1.5  # seconds per probe
+
+# NM ipv4.method=shared gateway — deterministic when laptop is on any pi_SW# AP.
+AP_GATEWAY = "10.42.0.1"
+
+# Fleet hostnames probed in parallel. Extend this when the fleet grows past 8.
+FLEET_HOSTNAMES = [f"pi-SW{i}.local" for i in range(1, 9)]
+
+# Legacy name — tried last before link-local scan so un-renamed Pis still work.
+LEGACY_HOSTNAME = "raspberrypi.local"
 
 
 def _probe(host: str, port: int = SERVER_PORT) -> bool:
@@ -60,15 +72,45 @@ def _is_raspberry_pi() -> bool:
         return False
 
 
-def _try_mdns() -> Optional[str]:
-    """Resolve raspberrypi.local via mDNS."""
+def _resolve(hostname: str) -> Optional[str]:
+    """Resolve a hostname (mDNS or otherwise) to an IPv4 address."""
     try:
-        ip = socket.getaddrinfo(
-            "raspberrypi.local", None, socket.AF_INET, socket.SOCK_STREAM
+        return socket.getaddrinfo(
+            hostname, None, socket.AF_INET, socket.SOCK_STREAM
         )[0][4][0]
-        return ip
     except (socket.gaierror, OSError, IndexError):
         return None
+
+
+def _try_fleet_mdns(port: int = SERVER_PORT) -> Optional[str]:
+    """Resolve fleet hostnames in parallel and return the first one with a live server.
+
+    Returns the hostname itself on success (not the IP) so the cache survives
+    DHCP churn — Avahi will re-resolve it next time.
+    """
+    def check(hostname: str) -> Optional[str]:
+        ip = _resolve(hostname)
+        if ip and _probe(ip, port):
+            return hostname
+        return None
+
+    with ThreadPoolExecutor(max_workers=len(FLEET_HOSTNAMES)) as pool:
+        futures = {pool.submit(check, h): h for h in FLEET_HOSTNAMES}
+        for fut in as_completed(futures):
+            hit = fut.result()
+            if hit:
+                for f in futures:
+                    f.cancel()
+                return hit
+    return None
+
+
+def _try_legacy_mdns(port: int = SERVER_PORT) -> Optional[str]:
+    """Resolve the legacy raspberrypi.local hostname and probe it."""
+    ip = _resolve(LEGACY_HOSTNAME)
+    if ip and _probe(ip, port):
+        return LEGACY_HOSTNAME
+    return None
 
 
 def _get_link_local_interfaces() -> list[str]:
@@ -149,7 +191,7 @@ def discover(
 ) -> Optional[str]:
     """
     Try to find the Pi server. Calls on_status(message) with progress updates.
-    Returns the IP address or None.
+    Returns a host (IP or hostname) or None.
     """
     def status(msg):
         log.info("Discovery: %s", msg)
@@ -171,17 +213,30 @@ def discover(
             status(f"Found server at {cached} (cached)")
             return cached
 
-    # 2. mDNS
-    status("Trying mDNS (raspberrypi.local)...")
-    mdns_ip = _try_mdns()
-    if mdns_ip:
-        status(f"Resolved raspberrypi.local -> {mdns_ip}, probing...")
-        if _probe(mdns_ip, port):
-            save_host(mdns_ip)
-            status(f"Found server at {mdns_ip} (mDNS)")
-            return mdns_ip
+    # 2. AP gateway — deterministic when laptop is on a pi_SW# AP
+    status(f"Trying AP gateway {AP_GATEWAY}...")
+    if _probe(AP_GATEWAY, port):
+        save_host(AP_GATEWAY)
+        status(f"Found server at {AP_GATEWAY} (AP gateway)")
+        return AP_GATEWAY
 
-    # 3. Link-local scan
+    # 3. Fleet mDNS — pi-SW1.local through pi-SW8.local in parallel
+    status(f"Trying fleet mDNS ({FLEET_HOSTNAMES[0]}..{FLEET_HOSTNAMES[-1]})...")
+    fleet_hit = _try_fleet_mdns(port)
+    if fleet_hit:
+        save_host(fleet_hit)
+        status(f"Found server at {fleet_hit} (fleet mDNS)")
+        return fleet_hit
+
+    # 4. Legacy mDNS fallback
+    status(f"Trying legacy mDNS ({LEGACY_HOSTNAME})...")
+    legacy = _try_legacy_mdns(port)
+    if legacy:
+        save_host(legacy)
+        status(f"Found server at {legacy} (legacy mDNS)")
+        return legacy
+
+    # 5. Link-local scan (direct-ethernet fallback)
     ll_addrs = _get_link_local_interfaces()
     for local_ip in ll_addrs:
         status(f"Scanning link-local subnet {local_ip.rsplit('.', 1)[0]}.0/24...")

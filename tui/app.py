@@ -19,8 +19,10 @@ from textual.worker import Worker
 
 from tui.client import PiClient, ConnectionState
 from tui.data_logger import DataLogger
-from tui.discovery import discover_async, save_host
+from tui.discovery import discover_async, save_host, FLEET_HOSTNAMES, AP_GATEWAY
+from tui import wifi_scan
 from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
+from tui.widgets.fleet_list import FleetList, FleetEntry
 from tui.widgets.left_panel import LeftPanel
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
@@ -41,10 +43,14 @@ CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug", "auto"]
 # Connection dialog
 # ---------------------------------------------------------------------------
 class ConnectDialog(ModalScreen[str]):
-    """Modal dialog that auto-discovers the Pi or accepts a manual IP."""
+    """Modal dialog that auto-discovers the Pi, shows the AP fleet, and
+    accepts a manual IP."""
 
     BINDINGS = [
         Binding("escape", "cancel", "Cancel"),
+        Binding("r", "rescan", "Rescan APs", show=False),
+        Binding("j", "join_selected", "Join AP", show=False),
+        *[Binding(str(n), f"select_{n}", show=False) for n in range(1, 9)],
     ]
 
     DEFAULT_CSS = """
@@ -52,8 +58,8 @@ class ConnectDialog(ModalScreen[str]):
         align: center middle;
     }
     #connect-box {
-        width: 56;
-        height: 12;
+        width: 68;
+        height: auto;
         border: thick $accent;
         background: $surface;
         padding: 1 2;
@@ -66,6 +72,7 @@ class ConnectDialog(ModalScreen[str]):
     #connect-status {
         text-align: center;
         width: 100%;
+        margin-top: 1;
         margin-bottom: 1;
         color: $text-muted;
     }
@@ -73,6 +80,10 @@ class ConnectDialog(ModalScreen[str]):
         text-align: center;
         width: 100%;
         margin-top: 1;
+        color: $text-muted;
+    }
+    #fleet-title {
+        width: 100%;
         color: $text-muted;
     }
     """
@@ -84,13 +95,21 @@ class ConnectDialog(ModalScreen[str]):
     def compose(self) -> ComposeResult:
         with Vertical(id="connect-box"):
             yield Label("Connect to Raspberry Pi", id="connect-title")
+            yield Label("Visible Pi APs:", id="fleet-title")
+            yield FleetList(id="fleet-list")
             yield Label("", id="connect-status")
             yield Input(placeholder="IP address or Enter to auto-discover", id="ip-input")
-            yield Label("Enter=connect, blank=scan, Escape=cancel", id="connect-hint")
+            yield Label(
+                "↑↓ select  1-8 jump  J join AP  r rescan  Enter connect  Esc cancel",
+                id="connect-hint",
+            )
 
     def on_mount(self) -> None:
         if self._auto_discover:
             self._start_discovery()
+        self._start_wifi_scan()
+
+    # -- auto discovery ------------------------------------------------------
 
     def _start_discovery(self) -> None:
         status = self.query_one("#connect-status", Label)
@@ -126,7 +145,100 @@ class ConnectDialog(ModalScreen[str]):
             self.dismiss(ip)
         else:
             status = self.query_one("#connect-status", Label)
-            status.update("[bold red]Auto-discovery failed[/] — enter IP manually")
+            status.update("[bold red]Auto-discovery failed[/] — enter IP or pick an AP")
+
+    # -- WiFi AP scan --------------------------------------------------------
+
+    def _start_wifi_scan(self) -> None:
+        import threading
+        threading.Thread(
+            target=self._wifi_scan_worker, daemon=True, name="wifi-scan"
+        ).start()
+
+    def _wifi_scan_worker(self) -> None:
+        try:
+            aps = wifi_scan.scan_pi_aps()
+        except Exception:
+            log.exception("WiFi scan failed")
+            aps = []
+        entries = self._build_entries(aps)
+        try:
+            self.app.call_from_thread(self._apply_fleet_entries, entries)
+        except Exception:
+            pass
+
+    def _build_entries(self, aps) -> list[FleetEntry]:
+        seen = {ap.ssid: ap for ap in aps}
+        entries: list[FleetEntry] = []
+        # Online first (already sorted by signal in wifi_scan)
+        for ap in aps:
+            entries.append(FleetEntry(
+                ssid=ap.ssid, signal_dbm=ap.signal_dbm,
+                is_current=ap.is_current, online=True,
+            ))
+        # Known fleet hostnames that didn't appear in the scan — dimmed as offline
+        known_ssids = [h.replace(".local", "").replace("-", "_") for h in FLEET_HOSTNAMES]
+        for ssid in known_ssids:
+            if ssid not in seen:
+                entries.append(FleetEntry(
+                    ssid=ssid, signal_dbm=None, is_current=False, online=False,
+                ))
+        return entries
+
+    def _apply_fleet_entries(self, entries: list[FleetEntry]) -> None:
+        try:
+            self.query_one("#fleet-list", FleetList).set_entries(entries)
+        except Exception:
+            pass
+
+    # -- actions -------------------------------------------------------------
+
+    def action_cancel(self) -> None:
+        self.dismiss("")
+
+    def action_rescan(self) -> None:
+        self._update_status("Rescanning APs...")
+        self._start_wifi_scan()
+
+    def action_join_selected(self) -> None:
+        fleet = self.query_one("#fleet-list", FleetList)
+        entry = fleet.selected_entry()
+        if not entry or not entry.online:
+            self._update_status("No online AP selected to join")
+            return
+        self._update_status(f"[bold cyan]Joining {entry.ssid}...[/]")
+        import threading
+        threading.Thread(
+            target=self._join_worker, args=(entry.ssid,),
+            daemon=True, name="wifi-join",
+        ).start()
+
+    def _join_worker(self, ssid: str) -> None:
+        result = wifi_scan.join_ap(ssid)
+        try:
+            self.app.call_from_thread(self._handle_join_result, ssid, result)
+        except Exception:
+            pass
+
+    def _handle_join_result(self, ssid: str, result) -> None:
+        if result.ok:
+            self._update_status(f"[bold green]Joined {ssid}; connecting to {AP_GATEWAY}...[/]")
+            self.dismiss(AP_GATEWAY)
+        else:
+            self._update_status(f"[bold red]Join failed:[/] {result.error or 'unknown'}")
+
+    def _select(self, idx: int) -> None:
+        self.query_one("#fleet-list", FleetList).set_selected(idx)
+
+    # Number-key jump bindings (1-8) — installed dynamically in BINDINGS above.
+    def action_select_1(self) -> None: self._select(0)
+    def action_select_2(self) -> None: self._select(1)
+    def action_select_3(self) -> None: self._select(2)
+    def action_select_4(self) -> None: self._select(3)
+    def action_select_5(self) -> None: self._select(4)
+    def action_select_6(self) -> None: self._select(5)
+    def action_select_7(self) -> None: self._select(6)
+    def action_select_8(self) -> None: self._select(7)
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
         value = event.value.strip()
@@ -135,9 +247,6 @@ class ConnectDialog(ModalScreen[str]):
         else:
             # Re-run discovery
             self._start_discovery()
-
-    def action_cancel(self) -> None:
-        self.dismiss("")
 
 
 # ---------------------------------------------------------------------------
@@ -192,6 +301,8 @@ class HelpScreen(ModalScreen[None]):
                 "[bold white]RECORDING[/]\n"
                 "  [bold]l[/]         Start / stop recording\n"
                 "  [bold][ / ][/]     Recording duration -/+\n\n"
+                "[bold white]NETWORK[/]\n"
+                "  [bold]A[/]  Pi to AP mode (pi_SW#)     [bold]C[/]  Pi back to client WiFi\n\n"
                 "[bold white]OTHER[/]\n"
                 "  [bold]r[/]  Reconnect    [bold]?[/]  This help    [bold]q[/]  Quit\n\n"
                 "[dim]Press Escape or ? to close[/]"
@@ -200,6 +311,51 @@ class HelpScreen(ModalScreen[None]):
     def action_close(self) -> None:
         self.dismiss(None)
 
+
+# ---------------------------------------------------------------------------
+# Network-mode confirmation modal
+# ---------------------------------------------------------------------------
+class NetworkModeConfirm(ModalScreen[Optional[str]]):
+    """Confirmation dialog for AP <-> Client flips. Dismisses with the
+    chosen mode string on confirm, or None on cancel."""
+
+    BINDINGS = [
+        Binding("escape", "cancel", "Cancel"),
+        Binding("y", "confirm", "Confirm"),
+        Binding("enter", "confirm", "Confirm"),
+        Binding("n", "cancel", "Cancel"),
+    ]
+
+    DEFAULT_CSS = """
+    NetworkModeConfirm { align: center middle; }
+    #nmc-box {
+        width: 64;
+        height: auto;
+        border: thick $warning;
+        background: $surface;
+        padding: 1 2;
+    }
+    #nmc-title { text-align: center; width: 100%; margin-bottom: 1; }
+    #nmc-hint { text-align: center; width: 100%; margin-top: 1; color: $text-muted; }
+    """
+
+    def __init__(self, mode: str, message: str):
+        super().__init__()
+        self._mode = mode
+        self._message = message
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="nmc-box"):
+            title = "Flip to AP Mode" if self._mode == "ap" else "Return to Client Mode"
+            yield Label(f"[bold yellow]{title}[/]", id="nmc-title")
+            yield Static(self._message)
+            yield Label("[y / Enter] Confirm   [n / Esc] Cancel", id="nmc-hint")
+
+    def action_confirm(self) -> None:
+        self.dismiss(self._mode)
+
+    def action_cancel(self) -> None:
+        self.dismiss(None)
 
 
 # ---------------------------------------------------------------------------
@@ -319,6 +475,8 @@ class SwitchingCircuitApp(App):
         Binding("a", "mode_auto", "Auto", show=False),
         Binding("n", "auto_skip", "Skip Step", show=False),
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
+        Binding("A", "ap_mode", "AP Mode", show=False),
+        Binding("C", "client_mode", "Client Mode", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -387,9 +545,13 @@ class SwitchingCircuitApp(App):
 
     def on_mount(self) -> None:
         """Initialize client and connect."""
+        # retry_delay=2.0, max_retries=30 -> ~60s window to survive a network
+        # flip (AP activation, WiFi reassociation, etc.) before giving up.
         self._client = PiClient(
             on_state=self._on_state_update,
             on_connection_change=self._on_connection_change,
+            retry_delay=2.0,
+            max_retries=30,
         )
 
         if self._initial_host:
@@ -898,3 +1060,71 @@ class SwitchingCircuitApp(App):
         if self._client:
             self._client.disconnect()
         self.push_screen(ConnectDialog(), self._on_connect_dialog_result)
+
+    # -- Network mode (client <-> AP) ---------------------------------------
+
+    def action_ap_mode(self) -> None:
+        """Ask the Pi to flip to AP mode. Confirms, sends the command, and
+        retargets the client at 10.42.0.1 so the TUI reconnects once the
+        MacBook is moved onto the new SSID."""
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            return
+        self.push_screen(
+            NetworkModeConfirm(
+                mode="ap",
+                message=(
+                    "Flip Pi to AP mode?\n\n"
+                    f"The Pi will drop its current WiFi and broadcast its own\n"
+                    f"AP. Your MacBook will lose connection. To continue:\n\n"
+                    f"   1. Join WiFi '[bold]pi_SW#[/]' (password: switching)\n"
+                    f"   2. TUI will reconnect at [bold]{AP_GATEWAY}:5555[/]\n"
+                ),
+            ),
+            self._on_network_mode_confirm,
+        )
+
+    def action_client_mode(self) -> None:
+        """Ask the Pi to drop AP mode and return to client WiFi."""
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            return
+        self.push_screen(
+            NetworkModeConfirm(
+                mode="client",
+                message=(
+                    "Return Pi to client WiFi?\n\n"
+                    "The Pi will deactivate its AP and autoconnect to a known\n"
+                    "WiFi (iPhone / Aquino). Both MacBook and Pi need to be on\n"
+                    "the same WiFi for the TUI to reconnect — rediscovery runs\n"
+                    "automatically via mDNS once you move your MacBook too.\n"
+                ),
+            ),
+            self._on_network_mode_confirm,
+        )
+
+    def _on_network_mode_confirm(self, result: Optional[str]) -> None:
+        if result not in ("ap", "client"):
+            return  # user cancelled
+        assert self._client is not None
+        resp = self._client.send_command({"cmd": "set_network_mode", "mode": result})
+        if not resp or not resp.get("ok"):
+            err = (resp or {}).get("error", "no response")
+            self._update_status_connection(
+                self._client.connection_state == ConnectionState.CONNECTED,
+                f"Network flip rejected: {err}",
+            )
+            return
+
+        conn_bar = self.query_one("#conn-bar", ConnectionBar)
+        if result == "ap":
+            conn_bar.conn_label = f"Flipping to AP — join pi_SW#, then reconnecting at {AP_GATEWAY}..."
+            # Point the client at 10.42.0.1; retry loop will patiently wait
+            # for the MacBook to move to the new SSID.
+            self._client.reconnect_to(AP_GATEWAY, self._initial_port)
+        else:
+            conn_bar.conn_label = "Flipping to client WiFi — rediscovering Pi..."
+            # The Pi's AP-side address goes away; rediscover on shared WiFi.
+            self._client.disconnect()
+            discover_async(
+                callback=self._on_auto_discover_result,
+                on_status=self._on_auto_discover_status,
+            )
