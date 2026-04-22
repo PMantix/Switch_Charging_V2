@@ -156,14 +156,17 @@ class ConnectDialog(ModalScreen[str]):
         ).start()
 
     def _wifi_scan_worker(self) -> None:
+        warning: Optional[str] = None
         try:
-            aps = wifi_scan.scan_pi_aps()
+            scan = wifi_scan.scan_pi_aps()
+            aps = scan.aps
+            warning = scan.warning
         except Exception:
             log.exception("WiFi scan failed")
             aps = []
         entries = self._build_entries(aps)
         try:
-            self.app.call_from_thread(self._apply_fleet_entries, entries)
+            self.app.call_from_thread(self._apply_fleet_entries, entries, warning)
         except Exception:
             pass
 
@@ -185,9 +188,16 @@ class ConnectDialog(ModalScreen[str]):
                 ))
         return entries
 
-    def _apply_fleet_entries(self, entries: list[FleetEntry]) -> None:
+    def _apply_fleet_entries(
+        self, entries: list[FleetEntry], warning: Optional[str] = None
+    ) -> None:
         try:
             self.query_one("#fleet-list", FleetList).set_entries(entries)
+            title = self.query_one("#fleet-title", Label)
+            if warning:
+                title.update(f"Visible Pi APs — [yellow]{warning}[/]")
+            else:
+                title.update("Visible Pi APs:")
         except Exception:
             pass
 

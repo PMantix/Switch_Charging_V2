@@ -54,6 +54,12 @@ class JoinResult:
     error: Optional[str] = None
 
 
+@dataclass(frozen=True)
+class ScanResult:
+    aps: list[PiAP]
+    warning: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Platform detection
 # ---------------------------------------------------------------------------
@@ -115,23 +121,30 @@ def _current_ssid_linux() -> Optional[str]:
 # Scan
 # ---------------------------------------------------------------------------
 
-def scan_pi_aps() -> list[PiAP]:
-    """Return visible pi_SW# access points, sorted by signal strength desc."""
+def scan_pi_aps() -> ScanResult:
+    """Return visible pi_SW# access points, sorted by signal strength desc.
+
+    The `warning` field carries a human-readable hint for cases where the
+    scan ran but couldn't actually see SSIDs (e.g. macOS Location Services
+    disabled for the host Terminal app — the OS returns the JSON shape but
+    with empty `_name` fields).
+    """
     if _is_macos():
-        aps = _scan_macos()
+        aps, warning = _scan_macos()
     elif _is_linux():
-        aps = _scan_linux()
+        aps, warning = _scan_linux(), None
     else:
         log.warning("wifi_scan: unsupported platform %s", sys.platform)
-        aps = []
-    return sorted(
+        aps, warning = [], None
+    aps = sorted(
         aps,
         key=lambda a: (a.signal_dbm if a.signal_dbm is not None else -999),
         reverse=True,
     )
+    return ScanResult(aps=aps, warning=warning)
 
 
-def _scan_macos() -> list[PiAP]:
+def _scan_macos() -> tuple[list[PiAP], Optional[str]]:
     """Use system_profiler — returns rich JSON including the current SSID."""
     try:
         result = subprocess.run(
@@ -140,14 +153,16 @@ def _scan_macos() -> list[PiAP]:
         )
         if result.returncode != 0:
             log.warning("system_profiler failed: %s", result.stderr.strip())
-            return []
+            return [], None
         data = json.loads(result.stdout)
     except (subprocess.SubprocessError, OSError, json.JSONDecodeError) as exc:
         log.warning("macOS scan failed: %s", exc)
-        return []
+        return [], None
 
     current = _current_ssid_macos()
     found: dict[str, PiAP] = {}
+    saw_entries = False
+    saw_any_ssid = False
 
     # Structure: SPAirPortDataType -> [ { spairport_airport_interfaces: [ { spairport_airport_other_local_wireless_networks: [ {...} ] } ] } ]
     for root in data.get("SPAirPortDataType", []):
@@ -157,7 +172,10 @@ def _scan_macos() -> list[PiAP]:
                 "spairport_airport_local_wireless_networks",
             ):
                 for net in iface.get(key, []) or []:
+                    saw_entries = True
                     ssid = net.get("_name")
+                    if ssid:
+                        saw_any_ssid = True
                     if not ssid or not SSID_PATTERN.match(ssid):
                         continue
                     signal = _parse_macos_signal(net.get("spairport_signal_noise"))
@@ -174,7 +192,16 @@ def _scan_macos() -> list[PiAP]:
     if current and SSID_PATTERN.match(current) and current not in found:
         found[current] = PiAP(ssid=current, signal_dbm=None, is_current=True)
 
-    return list(found.values())
+    # Location Services off for the host app: system_profiler still emits
+    # network entries but every `_name` is an empty string.
+    warning: Optional[str] = None
+    if saw_entries and not saw_any_ssid:
+        warning = (
+            "macOS returned no SSIDs — enable Location Services for this "
+            "Terminal in System Settings → Privacy & Security, then rescan."
+        )
+
+    return list(found.values()), warning
 
 
 def _parse_macos_signal(field) -> Optional[int]:
