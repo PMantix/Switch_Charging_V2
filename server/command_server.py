@@ -14,7 +14,9 @@ from time import sleep
 
 from pathlib import Path
 
+from server import network_mode
 from server.config import SERVER_HOST, SERVER_PORT, AUTO_SCHEDULE_DIR
+from server.fleet import AP_GATEWAY, my_ap_profile
 from server.recorder import PiRecorder
 from server.schedule import load_schedule, load_schedule_inline, validate_schedule_semantics
 
@@ -303,6 +305,30 @@ class CommandServer:
                     return {"ok": False, "error": "Auto mode not active"}
                 ae.skip_step()
                 return {"ok": True, "auto": ae.get_status()}
+
+            # -- network mode (client <-> AP) --------------------------------
+
+            elif cmd == "set_network_mode":
+                target = msg.get("mode")
+                if target not in ("ap", "client"):
+                    return {"ok": False, "error": "mode must be 'ap' or 'client'"}
+                ack = {
+                    "ok": True,
+                    "mode": target,
+                    "profile": my_ap_profile(),
+                    "ap_address": AP_GATEWAY if target == "ap" else None,
+                }
+                # Defer the nmcli call — sending the ack happens synchronously
+                # when we return from _dispatch, and activating the AP tears
+                # down this socket. 0.5s is plenty for the TCP ack to flush.
+                def _flip():
+                    try:
+                        result = network_mode.set_mode(target)
+                        log.info("network mode flip to %s: %s", target, result)
+                    except Exception:
+                        log.exception("network mode flip to %s failed", target)
+                threading.Timer(0.5, _flip).start()
+                return ack
 
             else:
                 return {"ok": False, "error": f"Unknown command: {cmd!r}"}
