@@ -2,15 +2,17 @@
 Switching Circuit V2 - Pi Server Discovery.
 
 Finds the Pi server on the local network using:
-1. Last-known IP (cached in ~/.switching-circuit-host)
-2. mDNS (raspberrypi.local)
-3. Link-local subnet scan on active ethernet interfaces
+1. localhost when running on the Pi itself (e.g. via Pi Connect)
+2. Last-known IP (cached in ~/.switching-circuit-host)
+3. mDNS (raspberrypi.local)
+4. Link-local subnet scan on active ethernet interfaces
 """
 
 import logging
 import os
 import socket
 import subprocess
+import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -50,6 +52,14 @@ def save_host(host: str) -> None:
         pass
 
 
+def _is_raspberry_pi() -> bool:
+    """True when running on a Raspberry Pi (checked via device-tree model)."""
+    try:
+        return Path("/proc/device-tree/model").read_bytes().startswith(b"Raspberry Pi")
+    except (OSError, FileNotFoundError):
+        return False
+
+
 def _try_mdns() -> Optional[str]:
     """Resolve raspberrypi.local via mDNS."""
     try:
@@ -63,19 +73,45 @@ def _try_mdns() -> Optional[str]:
 
 def _get_link_local_interfaces() -> list[str]:
     """Return link-local 169.254.x.x addresses from this machine's interfaces."""
-    addrs = []
+    # Try stdlib first — reliable on Windows, sometimes works elsewhere.
     try:
-        result = subprocess.run(
-            ["ifconfig"], capture_output=True, text=True, timeout=5
-        )
-        for line in result.stdout.splitlines():
-            line = line.strip()
-            if line.startswith("inet ") and "169.254." in line:
-                parts = line.split()
-                addr = parts[1]
-                addrs.append(addr)
-    except (subprocess.SubprocessError, OSError):
+        _, _, all_ips = socket.gethostbyname_ex(socket.gethostname())
+        ll = [ip for ip in all_ips if ip.startswith("169.254.")]
+        if ll:
+            return ll
+    except (socket.gaierror, OSError):
         pass
+
+    addrs: list[str] = []
+    if sys.platform == "win32":
+        try:
+            result = subprocess.run(
+                ["ipconfig"], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                # Matches "IPv4 Address. . . : 169.254.x.y" and the
+                # "Autoconfiguration IPv4 Address" variant.
+                if "IPv4" in line and "169.254." in line:
+                    addr = line.split(":")[-1].strip()
+                    # Strip any "(Preferred)" suffix Windows appends.
+                    addr = addr.split("(")[0].strip()
+                    if addr.startswith("169.254."):
+                        addrs.append(addr)
+        except (subprocess.SubprocessError, OSError):
+            pass
+    else:
+        try:
+            result = subprocess.run(
+                ["ifconfig"], capture_output=True, text=True, timeout=5
+            )
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("inet ") and "169.254." in line:
+                    parts = line.split()
+                    addrs.append(parts[1])
+        except (subprocess.SubprocessError, OSError):
+            pass
     return addrs
 
 
@@ -119,6 +155,13 @@ def discover(
         log.info("Discovery: %s", msg)
         if on_status:
             on_status(msg)
+
+    # 0. Running on the Pi itself (e.g. via Pi Connect remote shell)
+    if _is_raspberry_pi():
+        status("Running on Raspberry Pi, trying localhost...")
+        if _probe("localhost", port):
+            status("Found server at localhost (running on Pi)")
+            return "localhost"
 
     # 1. Cached host
     cached = _load_cached_host()
