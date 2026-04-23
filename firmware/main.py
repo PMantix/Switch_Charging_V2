@@ -40,7 +40,7 @@ Serial protocol (USB CDC, line-delimited):
 import sys
 import select
 import json
-from machine import Pin, I2C
+from machine import Pin, I2C, Timer
 import neopixel
 import time
 
@@ -105,14 +105,16 @@ burst_buffer = None   # list of (timestamp_us, readings) or None
 burst_target = 0      # target sample count
 burst_active = False
 
-# In-loop switching timer state. The main loop polls ticks_us() so we get
-# microsecond-resolution switching without the ISR-context constraints of
-# machine.Timer. A step is applied whenever (now - _last_tick) >= _period_us.
+# Switching timer state. A machine.Timer drives the tick callback in IRQ
+# context so switching timing is independent of main-loop overhead (stdin
+# polling, sensor reads, GC pauses). Stack: keep the Python tick callback
+# allocation-free — no string formatting, no list/dict creation, just
+# pin writes and integer arithmetic.
 _seq = bytearray()     # packed states, each byte 0-15
 _seq_idx = 0           # current position; preserved across F/G/H
 _period_us = 0         # 0 until F is received
-_last_tick = 0
 _running = False
+_timer = None          # machine.Timer instance while running
 
 
 # ---------------------------------------------------------------------------
@@ -148,25 +150,49 @@ def all_off():
 
 
 def _apply_packed(b):
-    """Apply a 4-bit packed FET state. Bit order: P1<<3 | P2<<2 | N1<<1 | N2."""
+    """Apply a 4-bit packed FET state. Bit order: P1<<3 | P2<<2 | N1<<1 | N2.
+    Safe to call from IRQ context — no allocation."""
     fets[0].value((b >> 3) & 1)
     fets[1].value((b >> 2) & 1)
     fets[2].value((b >> 1) & 1)
     fets[3].value(b & 1)
 
 
+def _tick(t):
+    """Timer IRQ callback. Caches _seq locally so a concurrent reassign
+    from the main thread (C command) can't land us with a stale index
+    into a shorter sequence mid-tick."""
+    global _seq_idx
+    seq = _seq
+    n = len(seq)
+    if n == 0:
+        return
+    _seq_idx = (_seq_idx + 1) % n
+    _apply_packed(seq[_seq_idx])
+
+
 def _switching_start():
-    global _running, _last_tick
+    global _running, _timer
     if len(_seq) == 0 or _period_us <= 0:
         return False
     _apply_packed(_seq[_seq_idx])
-    _last_tick = time.ticks_us()
+    if _timer is not None:
+        _timer.deinit()
+    _timer = Timer(-1)
+    _timer.init(
+        freq=1_000_000.0 / _period_us,
+        mode=Timer.PERIODIC,
+        callback=_tick,
+    )
     _running = True
     return True
 
 
 def _switching_halt():
-    global _running
+    global _running, _timer
+    if _timer is not None:
+        _timer.deinit()
+        _timer = None
     _running = False
     all_off()
 
@@ -270,7 +296,7 @@ def emit_stream_line():
 # ---------------------------------------------------------------------------
 def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
-    global _seq, _seq_idx, _period_us, _last_tick, _running
+    global _seq, _seq_idx, _period_us, _running, _timer
     line = line.strip()
     if not line:
         return None
@@ -404,9 +430,12 @@ def handle_command(line):
             if us < 50:
                 return "ERR F period_us must be >= 50"
             _period_us = us
-            # Preserve _seq_idx and _last_tick deliberately: a frequency
-            # change during switching cuts the current step short or
-            # extends it based on elapsed time, per design.
+            # If switching is active, re-arm the timer with the new period.
+            # _seq_idx is preserved, so the cycle continues where it was;
+            # the step that was in flight is effectively truncated or
+            # extended to the new period (the timing-bias behavior).
+            if _running:
+                _switching_start()
             return f"OK F {us}"
 
         elif cmd == "G":
@@ -456,17 +485,11 @@ def main():
     buf = ""
     last_stream = time.ticks_us()
 
-    global _seq_idx, _last_tick
-
     while True:
         now = time.ticks_us()
 
-        # --- Switching tick (highest priority, cheap) ---
-        if _running and len(_seq) > 0:
-            if time.ticks_diff(now, _last_tick) >= _period_us:
-                _seq_idx = (_seq_idx + 1) % len(_seq)
-                _apply_packed(_seq[_seq_idx])
-                _last_tick = now
+        # Switching runs on machine.Timer in IRQ context — no main-loop
+        # tick here; this loop just services commands, bursts, and streams.
 
         # --- Handle incoming commands (non-blocking) ---
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
@@ -506,8 +529,9 @@ def main():
             if elapsed >= stream_interval * 1_000_000:
                 emit_stream_line()
                 last_stream = now
-        elif not _running:
-            # Idle — sleep briefly to avoid busy-wait
+        else:
+            # Idle (switching is IRQ-driven so it's fine to sleep here) —
+            # short sleep to avoid busy-looping on stdin polling.
             time.sleep_us(100)
 
 
