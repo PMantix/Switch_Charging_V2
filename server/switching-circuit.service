@@ -5,7 +5,7 @@ After=network.target
 [Service]
 Type=simple
 User=pi
-WorkingDirectory=/home/pi/SwitchingCircuitV2
+WorkingDirectory=/home/pi/Code/Switch_Charging_V2
 ExecStart=/usr/bin/python3 -m server
 Restart=on-failure
 RestartSec=5
