@@ -5,6 +5,8 @@ Displays schedule progress, step list with current step highlighted,
 detected vs expected cycler state, recent events log, and timeout warnings.
 """
 
+import json
+
 from textual.reactive import reactive
 from textual.widget import Widget
 from rich.text import Text
@@ -53,7 +55,28 @@ class AutoPanel(Widget):
 
     auto_data: reactive[dict] = reactive({}, layout=True)
 
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._text_cache: Text | None = None
+        self._text_cache_key: str | None = None
+
     def render(self) -> Text:
+        # Most auto ticks don't change auto_data (or only change step_elapsed_s
+        # while the rest of the dict is stable). Cache by a JSON snapshot so
+        # the large Text build only runs when something real changed.
+        try:
+            key = json.dumps(self.auto_data, sort_keys=True, default=str)
+        except (TypeError, ValueError):
+            key = None
+        if key is not None and key == self._text_cache_key and self._text_cache is not None:
+            return self._text_cache
+        t = self._render_impl()
+        if key is not None:
+            self._text_cache = t
+            self._text_cache_key = key
+        return t
+
+    def _render_impl(self) -> Text:
         t = Text()
         t.append(" Tab", style="bold white on dark_blue")
         t.append(" \u2192 Status panel\n\n", style="dim")

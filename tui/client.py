@@ -49,6 +49,15 @@ class PiClient:
         self._subscribed = False
         self._latency: float = 0.0
 
+        # Latency-probe ping slot. Only one ping in flight at a time; the
+        # recv loop fills in t_server_ns and the receive time, then fires
+        # the event so ping_server() can compute offset.
+        self._ping_lock = threading.Lock()
+        self._ping_event: Optional[threading.Event] = None
+        self._ping_token: int = 0
+        self._ping_t_server_ns: int = 0
+        self._ping_t_recv_ns: int = 0
+
     # -- Properties ----------------------------------------------------------
 
     @property
@@ -233,16 +242,74 @@ class PiClient:
                 if not self._rfile:
                     break
                 line = self._rfile.readline()
+                t_recv_ns = time.monotonic_ns()
                 if not line:
                     raise ConnectionError("Server closed connection")
                 data = json.loads(line)
-                if data.get("event") == "state" and self._on_state:
+                event = data.get("event")
+                if event == "state" and self._on_state:
+                    # Inject mac-side receive timestamp so the app can
+                    # measure queue and net latency without a second dict.
+                    data["_t_recv_ns"] = t_recv_ns
                     self._on_state(data)
+                elif event == "pong":
+                    self._handle_pong(data, t_recv_ns)
             except (OSError, ConnectionError, json.JSONDecodeError) as exc:
                 if not self._stop_event.is_set():
                     log.warning("Receive loop error: %s", exc)
                     self._handle_disconnect()
                 break
+
+    def _handle_pong(self, data: dict, t_recv_ns: int) -> None:
+        with self._ping_lock:
+            ev = self._ping_event
+            if ev is None or data.get("t_client_ns") != self._ping_token:
+                return  # stale or unexpected pong
+            self._ping_t_server_ns = int(data.get("t_server_ns", 0))
+            self._ping_t_recv_ns = t_recv_ns
+        ev.set()
+
+    def ping_server(self, timeout: float = 1.0) -> Optional[int]:
+        """Measure clock offset (mac_ns - pi_ns) via one ping round-trip.
+
+        Returns the offset in nanoseconds, or None on timeout / failure.
+        Uses min-RTT/2 under the assumption of symmetric latency.
+        """
+        if self._state != ConnectionState.CONNECTED or not self._sock:
+            return None
+        ev = threading.Event()
+        t_send_ns = time.monotonic_ns()
+        with self._ping_lock:
+            self._ping_event = ev
+            self._ping_token = t_send_ns
+            self._ping_t_server_ns = 0
+            self._ping_t_recv_ns = 0
+        try:
+            line = json.dumps({"cmd": "ping", "t_client_ns": t_send_ns}) + "\n"
+            with self._wlock:
+                self._sock.sendall(line.encode("utf-8"))
+        except (OSError, ConnectionError) as exc:
+            log.warning("ping send failed: %s", exc)
+            with self._ping_lock:
+                self._ping_event = None
+            return None
+
+        if not ev.wait(timeout):
+            with self._ping_lock:
+                self._ping_event = None
+            return None
+
+        with self._ping_lock:
+            t_server = self._ping_t_server_ns
+            t_recv = self._ping_t_recv_ns
+            self._ping_event = None
+
+        if t_server == 0:
+            return None
+        # rtt/2 offset: mac_time_at_server_response ≈ t_send + rtt/2
+        rtt = t_recv - t_send_ns
+        offset = (t_send_ns + rtt // 2) - t_server  # mac_ns - pi_ns
+        return offset
 
     def _handle_disconnect(self) -> None:
         """Handle an unexpected disconnect; attempt auto-reconnect."""

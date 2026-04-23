@@ -20,6 +20,7 @@ from textual.worker import Worker
 from tui.client import PiClient, ConnectionState
 from tui.data_logger import DataLogger
 from tui.discovery import discover_async, save_host, FLEET_HOSTNAMES, AP_GATEWAY
+from tui.latency_probe import LatencyProbe
 from tui import wifi_scan
 from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
 from tui.widgets.fleet_list import FleetList, FleetEntry
@@ -487,10 +488,14 @@ class SwitchingCircuitApp(App):
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
         Binding("A", "ap_mode", "AP Mode", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
+        Binding("D", "toggle_probe", "Latency", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
-    _WARMUP_S = 0.8       # seconds of reduced update rate after first data
+    # 0.8s was overcautious — it drops ~12 frames/sec for most of a second
+    # before anything useful can appear. 0.2s is enough for Textual to
+    # settle layout without a visible freeze; raise if flicker returns.
+    _WARMUP_S = 0.2       # seconds of reduced update rate after first data
     _WARMUP_FPS = 3       # max frames/sec during warmup
 
     def __init__(self, host: str = "", port: int = 5555):
@@ -506,6 +511,8 @@ class SwitchingCircuitApp(App):
         self._last_apply_time = 0.0      # last time _apply_state ran
         self._showing_auto_panel = False  # right column: status vs auto panel
         self._prev_mode = "idle"         # track mode changes for panel auto-switch
+        self._probe = LatencyProbe()
+        self._offset_worker_started = False
 
     # -- Compose -------------------------------------------------------------
 
@@ -645,6 +652,9 @@ class SwitchingCircuitApp(App):
         now = monotonic()
         if self._first_state_time == 0.0:
             self._first_state_time = now
+            if not self._offset_worker_started:
+                self._offset_worker_started = True
+                self._start_offset_worker()
         # During warmup, drop frames to let Textual settle layout caches
         if now - self._first_state_time < self._WARMUP_S:
             interval = 1.0 / self._WARMUP_FPS
@@ -653,12 +663,46 @@ class SwitchingCircuitApp(App):
         self._last_apply_time = now
         self.call_from_thread(self._apply_state, data)
 
+    def _start_offset_worker(self) -> None:
+        """Background thread that re-measures Pi↔Mac clock offset every 60s
+        to keep the latency probe's `net` timer honest against clock drift."""
+        import threading
+        from time import monotonic_ns, sleep
+
+        def _loop() -> None:
+            # First measurement: take the min of several quick pings for a
+            # tighter estimate; later re-measures are single pings.
+            if self._client is None:
+                return
+            sleep(0.5)  # let the subscription settle
+            best = None
+            for _ in range(5):
+                off = self._client.ping_server(timeout=1.0)
+                if off is not None and (best is None or abs(off) < abs(best)):
+                    best = off
+                sleep(0.05)
+            if best is not None:
+                self._probe.set_offset(best)
+            while self._client is not None:
+                sleep(60.0)
+                if self._client is None:
+                    break
+                off = self._client.ping_server(timeout=1.0)
+                if off is not None:
+                    self._probe.set_offset(off)
+
+        t = threading.Thread(target=_loop, name="latency-offset", daemon=True)
+        t.start()
+
     def _apply_state(self, data: dict) -> None:
         """Apply a state update to all widgets (runs on the UI thread).
 
         Uses batch_update() to coalesce all property changes into a single
         render pass instead of triggering 6+ separate refreshes.
         """
+        from time import monotonic_ns
+        t_apply_start_ns = monotonic_ns()
+
         mode = data.get("mode", "idle")
         seq = data.get("sequence", 0)
         step = data.get("step", 0)
@@ -685,7 +729,10 @@ class SwitchingCircuitApp(App):
 
             sensors = data.get("sensors", {})
             plot = self.query_one("#sensor-plot", SensorPlot)
-            plot.push_data(sensors)
+            t_plot0 = monotonic_ns()
+            plot.append_data(sensors)
+            plot.commit()  # refresh inside batch_update so it coalesces
+            t_plot_ns = monotonic_ns() - t_plot0
 
             auto_panel = self.query_one("#auto-panel", AutoPanel)
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
@@ -732,6 +779,50 @@ class SwitchingCircuitApp(App):
 
             mascot = self.query_one("#mascot", Mascot)
             mascot.circuit_mode = mode
+
+        if self._probe.enabled:
+            t_apply_end_ns = monotonic_ns()
+            self._probe.record(
+                t_emit_pi_ns=int(data.get("t_emit_ns", 0)),
+                t_recv_mac_ns=int(data.get("_t_recv_ns", t_apply_start_ns)),
+                t_apply_start_ns=t_apply_start_ns,
+                t_apply_end_ns=t_apply_end_ns,
+                t_plot_ns=t_plot_ns,
+            )
+            self._update_probe_display()
+
+    def _update_probe_display(self) -> None:
+        """Refresh the compact probe readout in the ConnectionBar."""
+        s = self._probe.summary()
+        if not s or s.get("_count", 0) == 0:
+            return
+        net_p95 = s["net"][1]
+        q_p95 = s["queue"][1]
+        apply_p95 = s["apply"][1]
+        total_p95 = s["total"][1]
+        ready = s.get("_offset_ready", False)
+        net_str = f"{net_p95:.1f}" if ready else "—"
+        text = (
+            f"p95 {net_str}/{q_p95:.1f}/{apply_p95:.1f}ms "
+            f"(net/q/apply) tot {total_p95:.1f}ms"
+        )
+        try:
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            conn_bar.probe_text = text
+        except Exception:
+            pass
+
+    def action_toggle_probe(self) -> None:
+        """Toggle the E2E latency probe display (D key)."""
+        on = self._probe.toggle()
+        try:
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            if on:
+                conn_bar.probe_text = "probe: sampling…"
+            else:
+                conn_bar.probe_text = ""
+        except Exception:
+            pass
 
     @staticmethod
     def _fets_to_state_index(fets: list[bool]) -> int:

@@ -10,6 +10,7 @@ import json
 import logging
 import socket
 import threading
+import time
 from time import sleep
 
 from pathlib import Path
@@ -249,6 +250,28 @@ class CommandServer:
                 log.info("Client subscribed to state updates")
                 return {"ok": True, "subscribed": True}
 
+            elif cmd == "ping":
+                # Latency-probe clock-offset round-trip. Echoes the client
+                # timestamp and returns the server's monotonic_ns so the TUI
+                # can compute offset = mac_ns - pi_ns. Sent inline on the
+                # subscriber socket as event=pong so it flows through the
+                # recv loop alongside state frames.
+                t_client_ns = msg.get("t_client_ns", 0)
+                pong = {
+                    "event": "pong",
+                    "t_server_ns": time.monotonic_ns(),
+                    "t_client_ns": t_client_ns,
+                }
+                with self._sub_lock:
+                    subscribed = sock in self._subscribers
+                if subscribed:
+                    try:
+                        self._send_line(sock, pong)
+                    except (OSError, BrokenPipeError):
+                        pass
+                    return None  # already sent
+                return {"ok": True, **pong}
+
             # -- auto mode commands ------------------------------------------
 
             elif cmd == "load_schedule":
@@ -372,7 +395,7 @@ class CommandServer:
                 if not still_going:
                     log.info("Pi recording auto-stopped at %d samples", self._recorder.sample_count)
 
-            payload = {"event": "state", **status}
+            payload = {"event": "state", "t_emit_ns": time.monotonic_ns(), **status}
 
             dead = []
             line = json.dumps(payload, separators=(",", ":")) + "\n"

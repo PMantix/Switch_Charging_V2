@@ -33,6 +33,7 @@ class ConnectionBar(Widget):
     host: reactive[str] = reactive("")
     latency_ms: reactive[float] = reactive(0.0)
     conn_label: reactive[str] = reactive("Disconnected")
+    probe_text: reactive[str] = reactive("")
     _auto_data: dict = {}
 
     def render(self) -> Text:
@@ -76,6 +77,10 @@ class ConnectionBar(Widget):
             if ad.get("in_timeout"):
                 t.append("  TIMEOUT", style="bold red reverse")
 
+        if self.probe_text:
+            t.append("  │ ", style="dim")
+            t.append(self.probe_text, style="bold cyan")
+
         return t
 
     def update_auto_status(self, auto_data: dict) -> None:
@@ -95,4 +100,7 @@ class ConnectionBar(Widget):
         self.refresh()
 
     def watch_conn_label(self, _: str) -> None:
+        self.refresh()
+
+    def watch_probe_text(self, _: str) -> None:
         self.refresh()

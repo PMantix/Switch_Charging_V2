@@ -86,8 +86,16 @@ class SensorPlot(Widget):
         self._min_render_interval = 1.0 / 15  # cap plot redraws at ~15 fps
 
     def push_data(self, sensors: dict) -> None:
-        """Ingest sensor data. Rate-limited refresh — coalesces with batch_update
-        when called from _apply_state."""
+        """Compat shim: ingest + rate-limited refresh in one call.
+
+        Prefer append_data() + commit() from inside the app's batch_update()
+        so the plot's refresh is coalesced with the other widget updates.
+        """
+        self.append_data(sensors)
+        self.commit()
+
+    def append_data(self, sensors: dict) -> None:
+        """Ingest sensor data only. No refresh — pure deque append."""
         if not sensors:
             return
         now = monotonic()
@@ -98,6 +106,11 @@ class SensorPlot(Widget):
                 i = data.get("current", 0.0)
                 self._history[name].append((now, v, i))
         self._last_update = now
+
+    def commit(self) -> None:
+        """Rate-limited refresh. Call inside batch_update() to coalesce with
+        other widget updates in the same tick."""
+        now = monotonic()
         if now - self._last_render_time >= self._min_render_interval:
             self._last_render_time = now
             self.refresh()
