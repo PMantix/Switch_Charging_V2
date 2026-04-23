@@ -6,7 +6,7 @@ and drives the H-bridge gate signals via UCC5304 drivers.
 
 Serial protocol (USB CDC, line-delimited):
   Commands (Pi → RP2040):
-    S <P1> <P2> <N1> <N2>   Set FET states (0 or 1 each)
+    S <P1> <P2> <N1> <N2>   Set FET states directly (auto-halts switching)
     Q                        Query current FET states
     I                        Read INA226 sensors (one-shot)
     T <hz>                   Start streaming sensors at <hz> (0 = stop)
@@ -14,6 +14,12 @@ Serial protocol (USB CDC, line-delimited):
     P                        Ping (heartbeat)
     R                        Re-scan INA226 sensors
     X                        Soft reset
+    C <n> <s1> ... <sn>      Program switching Cycle: n packed states
+                             (each 0-15, bits P1<<3|P2<<2|N1<<1|N2)
+    F <period_us>            Step period in microseconds (preserves index)
+    G                        Go — start periodic switching
+    H                        Halt — stop switching, all FETs off
+    K                        tick once (advance one step, for debug)
 
   Responses (RP2040 → Pi):
     OK S <P1> <P2> <N1> <N2>     FET state confirmation
@@ -23,6 +29,11 @@ Serial protocol (USB CDC, line-delimited):
     D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data
     OK L                          LED set
     OK P                          Pong
+    OK C <n>                      Sequence programmed (n states)
+    OK F <us>                     Period set
+    OK G <us> <n>                 Switching started
+    OK H                          Switching halted
+    OK K <idx>                    Stepped to idx
     ERR <message>                 Error
 """
 
@@ -94,6 +105,15 @@ burst_buffer = None   # list of (timestamp_us, readings) or None
 burst_target = 0      # target sample count
 burst_active = False
 
+# In-loop switching timer state. The main loop polls ticks_us() so we get
+# microsecond-resolution switching without the ISR-context constraints of
+# machine.Timer. A step is applied whenever (now - _last_tick) >= _period_us.
+_seq = bytearray()     # packed states, each byte 0-15
+_seq_idx = 0           # current position; preserved across F/G/H
+_period_us = 0         # 0 until F is received
+_last_tick = 0
+_running = False
+
 
 # ---------------------------------------------------------------------------
 # NeoPixel helpers
@@ -125,6 +145,30 @@ def get_fets():
 
 def all_off():
     set_fets(0, 0, 0, 0)
+
+
+def _apply_packed(b):
+    """Apply a 4-bit packed FET state. Bit order: P1<<3 | P2<<2 | N1<<1 | N2."""
+    fets[0].value((b >> 3) & 1)
+    fets[1].value((b >> 2) & 1)
+    fets[2].value((b >> 1) & 1)
+    fets[3].value(b & 1)
+
+
+def _switching_start():
+    global _running, _last_tick
+    if len(_seq) == 0 or _period_us <= 0:
+        return False
+    _apply_packed(_seq[_seq_idx])
+    _last_tick = time.ticks_us()
+    _running = True
+    return True
+
+
+def _switching_halt():
+    global _running
+    _running = False
+    all_off()
 
 
 # ---------------------------------------------------------------------------
@@ -226,6 +270,7 @@ def emit_stream_line():
 # ---------------------------------------------------------------------------
 def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
+    global _seq, _seq_idx, _period_us, _last_tick, _running
     line = line.strip()
     if not line:
         return None
@@ -237,6 +282,10 @@ def handle_command(line):
         if cmd == "S":
             if len(parts) != 5:
                 return "ERR S requires 4 args: S <P1> <P2> <N1> <N2>"
+            # Direct FET control and periodic switching must not fight, so
+            # auto-halt the timer whenever S lands.
+            if _running:
+                _switching_halt()
             vals = [int(x) & 1 for x in parts[1:5]]
             set_fets(*vals)
             if any(vals):
@@ -326,6 +375,58 @@ def handle_command(line):
             import machine
             machine.reset()
 
+        elif cmd == "C":
+            # C <n> <s1> ... <sn> — program packed-state cycle
+            if len(parts) < 2:
+                return "ERR C requires count: C <n> <s1> ... <sn>"
+            n = int(parts[1])
+            if n < 1 or n > 64:
+                return "ERR C count must be 1..64"
+            if len(parts) != 2 + n:
+                return f"ERR C expected {n} states, got {len(parts) - 2}"
+            new_seq = bytearray(n)
+            for i in range(n):
+                v = int(parts[2 + i])
+                if v < 0 or v > 15:
+                    return f"ERR C state {i} out of range 0..15"
+                new_seq[i] = v
+            _seq = new_seq
+            # Reset index on a sequence change — preserving it across a
+            # different-length cycle is ambiguous; F preserves within the
+            # same cycle, which is what the timing-bias requirement asks for.
+            _seq_idx = 0
+            return f"OK C {n}"
+
+        elif cmd == "F":
+            if len(parts) != 2:
+                return "ERR F requires 1 arg: F <period_us>"
+            us = int(parts[1])
+            if us < 50:
+                return "ERR F period_us must be >= 50"
+            _period_us = us
+            # Preserve _seq_idx and _last_tick deliberately: a frequency
+            # change during switching cuts the current step short or
+            # extends it based on elapsed time, per design.
+            return f"OK F {us}"
+
+        elif cmd == "G":
+            if _switching_start():
+                set_led(4, 0, 4)  # magenta = switching active
+                return f"OK G {_period_us} {len(_seq)}"
+            return "ERR G requires C and F first"
+
+        elif cmd == "H":
+            _switching_halt()
+            set_led(0, 0, 2)
+            return "OK H"
+
+        elif cmd == "K":
+            if len(_seq) == 0:
+                return "ERR K requires C first"
+            _seq_idx = (_seq_idx + 1) % len(_seq)
+            _apply_packed(_seq[_seq_idx])
+            return f"OK K {_seq_idx}"
+
         else:
             return f"ERR unknown command: {cmd}"
 
@@ -355,8 +456,17 @@ def main():
     buf = ""
     last_stream = time.ticks_us()
 
+    global _seq_idx, _last_tick
+
     while True:
         now = time.ticks_us()
+
+        # --- Switching tick (highest priority, cheap) ---
+        if _running and len(_seq) > 0:
+            if time.ticks_diff(now, _last_tick) >= _period_us:
+                _seq_idx = (_seq_idx + 1) % len(_seq)
+                _apply_packed(_seq[_seq_idx])
+                _last_tick = now
 
         # --- Handle incoming commands (non-blocking) ---
         if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
@@ -364,7 +474,7 @@ def main():
             if not byte:
                 pass
             elif byte == b'\x03':
-                all_off()
+                _switching_halt()
                 stream_hz = 0
                 set_led(10, 0, 0)
                 print("STOPPED")
@@ -396,8 +506,8 @@ def main():
             if elapsed >= stream_interval * 1_000_000:
                 emit_stream_line()
                 last_stream = now
-        else:
-            # When not streaming, sleep briefly to avoid busy-wait
+        elif not _running:
+            # Idle — sleep briefly to avoid busy-wait
             time.sleep_us(100)
 
 
