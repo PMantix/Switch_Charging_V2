@@ -402,11 +402,23 @@ class CommandServer:
             line_bytes = line.encode("utf-8")
             for sock in subscribers:
                 try:
-                    # Non-blocking send with short timeout so a slow client
-                    # can't stall the entire broadcast loop.
-                    sock.settimeout(0.05)
+                    # Send with a generous timeout: transient WiFi stalls or
+                    # Mac-side render blips of 100-500ms are normal and
+                    # shouldn't murder the TCP stream. 50ms was killing
+                    # healthy connections on any brief hiccup. If a client
+                    # really is hung for >2s, we do want to evict it — so
+                    # keep the timeout as a kill signal, just not a
+                    # hair-trigger one. (We can't retry on timeout: sendall
+                    # may have partially written, which would corrupt the
+                    # JSON framing on the next send.)
+                    sock.settimeout(2.0)
                     sock.sendall(line_bytes)
-                except (OSError, BrokenPipeError, socket.timeout):
+                except socket.timeout:
+                    log.warning(
+                        "broadcast sendall timed out >2s — dropping subscriber"
+                    )
+                    dead.append(sock)
+                except (OSError, BrokenPipeError):
                     dead.append(sock)
 
             if dead:
