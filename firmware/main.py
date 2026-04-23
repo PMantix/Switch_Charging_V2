@@ -503,7 +503,9 @@ def main():
         # tick here; this loop just services commands, bursts, and streams.
 
         # --- Handle incoming commands (non-blocking) ---
-        if poller.poll(0):
+        # ipoll returns a reusable iterator (vs poll() which allocates a
+        # fresh list every call) — keeps the hot path allocation-free.
+        for _ in poller.ipoll(0):
             byte = sys.stdin.buffer.read(1)
             if not byte:
                 pass
@@ -522,6 +524,7 @@ def main():
                         resp = handle_command(line)
                         if resp:
                             print(resp)
+            break  # only one fd is registered; stop after servicing it
 
         # --- Burst recording: capture as fast as possible ---
         if burst_active and burst_buffer is not None:
