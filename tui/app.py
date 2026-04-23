@@ -544,6 +544,7 @@ class SwitchingCircuitApp(App):
         self._prev_mode = "idle"         # track mode changes for panel auto-switch
         self._probe = LatencyProbe()
         self._offset_worker_started = False
+        self._last_probe_display_ns = 0
         # Launch-time WiFi prescan: overlaps with auto-discovery so the
         # ConnectDialog can show nearby pi_SW# APs the moment it opens.
         import threading as _threading
@@ -863,7 +864,13 @@ class SwitchingCircuitApp(App):
                 t_apply_end_ns=t_apply_end_ns,
                 t_plot_ns=t_plot_ns,
             )
-            self._update_probe_display()
+            # Refresh the probe readout at most twice a second. Setting
+            # probe_text fires a reactive watcher which triggers an extra
+            # render pass per state event, making things worse when the
+            # probe is on at high broadcast rates.
+            if t_apply_end_ns - self._last_probe_display_ns >= 500_000_000:
+                self._last_probe_display_ns = t_apply_end_ns
+                self._update_probe_display()
 
     def _update_probe_display(self) -> None:
         """Refresh the compact probe readout in the ConnectionBar."""

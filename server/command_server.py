@@ -23,8 +23,13 @@ from server.schedule import load_schedule, load_schedule_inline, validate_schedu
 
 log = logging.getLogger(__name__)
 
-# Broadcast rate bounds (Hz) — caps TUI update rate regardless of sensor rate
-_DEFAULT_SUBSCRIBE_HZ = 15
+# Broadcast rate bounds (Hz) — caps TUI update rate regardless of sensor rate.
+# 15 Hz was too aggressive for a Textual TUI on Mac: each frame drives a
+# full render pass, and at 15 Hz the Mac couldn't sustain consumption,
+# letting TCP buffers accumulate until sendall timed out and the
+# connection died. 5 Hz is visually smooth for cycler monitoring and
+# leaves plenty of headroom. Can be overridden upward via set_sensor_rate.
+_DEFAULT_SUBSCRIBE_HZ = 5
 _MAX_SUBSCRIBE_HZ = 30
 
 
@@ -106,6 +111,14 @@ class CommandServer:
                 break
 
             log.info("Client connected: %s:%d", *addr)
+            try:
+                # Disable Nagle — our broadcast writes are small state-frame
+                # JSON lines; with Nagle on they sit for ~200ms waiting for
+                # the next write, and combine with delayed ACKs to produce
+                # multi-100ms pseudo-latency that looks like a stall.
+                client_sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+            except OSError as exc:
+                log.warning("TCP_NODELAY setsockopt failed: %s", exc)
             t = threading.Thread(
                 target=self._handle_client,
                 args=(client_sock, addr),
