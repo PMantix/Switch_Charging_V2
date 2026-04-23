@@ -4,11 +4,18 @@ Switching Circuit V2 - Data Logger.
 Two recording tiers:
   - Pi (≤ 10min): Records on Pi SD card at full stream rate, SCPs to Mac when done
   - Mac (> 10min): Records directly on Mac from TUI state stream
+
+Mac-tier CSV writes happen on a dedicated daemon thread so the UI
+thread's _apply_state is never blocked by file I/O. Queue is unbounded;
+at 15 Hz × ~120 B per row, a multi-minute disk stall is still only a
+few MB. We log one warning if queue depth ever exceeds the threshold.
 """
 
 import csv
 import logging
+import queue
 import subprocess
+import threading
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -18,6 +25,9 @@ log = logging.getLogger(__name__)
 
 DEFAULT_LOG_DIR = Path.home() / "SwitchingCircuitV2_logs"
 PI_MAX_SECONDS = 600  # 10 minutes
+_DEPTH_WARN_THRESHOLD = 1000
+_STOP_SENTINEL = object()
+_STOP_JOIN_TIMEOUT = 5.0
 
 
 class RecordTier(Enum):
@@ -38,12 +48,16 @@ class DataLogger:
         self._duration_s: float = 10.0
 
         # Mac-side state
-        self._file = None
-        self._writer = None
         self._path: Optional[Path] = None
         self._sample_count = 0
         self._max_samples = 0
         self._start_time: Optional[datetime] = None
+
+        # Writer thread + queue (Mac tier)
+        self._mac_active = False
+        self._queue: "queue.Queue" = queue.Queue()
+        self._writer_thread: Optional[threading.Thread] = None
+        self._warned_backpressure = False
 
         # Pi recording state
         self._pi_recording = False
@@ -52,7 +66,7 @@ class DataLogger:
 
     @property
     def is_logging(self) -> bool:
-        return self._file is not None or self._pi_recording
+        return self._mac_active or self._pi_recording
 
     @property
     def file_path(self) -> Optional[Path]:
@@ -130,24 +144,26 @@ class DataLogger:
         freq_str = f"{freq:.1f}Hz".replace(".", "p")
         sensor_str = f"{sensor_hz:.0f}sps"
         self._path = self._log_dir / f"{mode}_seq{seq+1}_{freq_str}_{sensor_str}_{ts}.csv"
-
-        self._file = open(self._path, "w", newline="")
-        self._writer = csv.writer(self._file)
-        self._writer.writerow([
-            "timestamp", "elapsed_s",
-            "mode", "sequence", "step", "frequency_hz",
-            "p1_on", "p2_on", "n1_on", "n2_on",
-            "p1_voltage", "p1_current_a",
-            "p2_voltage", "p2_current_a",
-            "n1_voltage", "n1_current_a",
-            "n2_voltage", "n2_current_a",
-        ])
         self._max_samples = count
+        self._warned_backpressure = False
+        self._queue = queue.Queue()
+        self._mac_active = True
+        self._writer_thread = threading.Thread(
+            target=self._writer_loop,
+            args=(self._path, self._queue),
+            name="DataLogger-Writer",
+            daemon=True,
+        )
+        self._writer_thread.start()
         return RecordTier.MAC, f"Mac: {count} samples -> {self._path.name}"
 
     def record(self, data: dict) -> bool:
-        """Record one sample (Mac-side only). Returns False if auto-stopped."""
-        if not self._writer:
+        """Record one sample (Mac-side only). Returns False if auto-stopped.
+
+        Producer-side only: builds the row and enqueues it. All file I/O
+        happens on the writer thread.
+        """
+        if not self._mac_active:
             return True
 
         now = datetime.now()
@@ -159,7 +175,7 @@ class DataLogger:
             return s.get(field, 0.0) if isinstance(s, dict) and "error" not in s else 0.0
 
         fets = data.get("fet_states", [False] * 4)
-        self._writer.writerow([
+        row = [
             now.isoformat(timespec="milliseconds"),
             f"{elapsed:.3f}",
             data.get("mode", ""), data.get("sequence", 0),
@@ -169,10 +185,17 @@ class DataLogger:
             f"{_sv('P2', 'voltage'):.6f}", f"{_sv('P2', 'current'):.8f}",
             f"{_sv('N1', 'voltage'):.6f}", f"{_sv('N1', 'current'):.8f}",
             f"{_sv('N2', 'voltage'):.6f}", f"{_sv('N2', 'current'):.8f}",
-        ])
+        ]
+        self._queue.put_nowait(row)
         self._sample_count += 1
-        if self._sample_count % 50 == 0:
-            self._file.flush()
+
+        depth = self._queue.qsize()
+        if depth > _DEPTH_WARN_THRESHOLD and not self._warned_backpressure:
+            log.warning(
+                "DataLogger writer backlog at %d rows — disk may be slow; "
+                "no samples dropped", depth,
+            )
+            self._warned_backpressure = True
 
         if self._max_samples > 0 and self._sample_count >= self._max_samples:
             return False
@@ -189,7 +212,7 @@ class DataLogger:
 
         if tier == RecordTier.PI and self._pi_recording:
             desc = self._stop_pi()
-        elif self._file:
+        elif self._mac_active:
             desc = self._stop_mac()
         else:
             desc = "Not recording"
@@ -251,9 +274,58 @@ class DataLogger:
     def _stop_mac(self) -> str:
         path = self._path
         count = self._sample_count
-        if self._file:
-            self._file.flush()
-            self._file.close()
-        self._file = None
-        self._writer = None
+        thread = self._writer_thread
+        self._writer_thread = None
+        self._mac_active = False
+        self._queue.put(_STOP_SENTINEL)
+        if thread is not None:
+            thread.join(timeout=_STOP_JOIN_TIMEOUT)
+            if thread.is_alive():
+                log.warning(
+                    "DataLogger writer did not drain within %ss", _STOP_JOIN_TIMEOUT,
+                )
         return f"{count} samples -> {path.name}" if path else "No data"
+
+    def _writer_loop(self, path: Path, q: "queue.Queue") -> None:
+        try:
+            f = open(path, "w", newline="")
+        except OSError as exc:
+            log.error("DataLogger failed to open %s: %s", path, exc)
+            while True:
+                item = q.get()
+                if item is _STOP_SENTINEL:
+                    return
+        try:
+            w = csv.writer(f)
+            w.writerow([
+                "timestamp", "elapsed_s",
+                "mode", "sequence", "step", "frequency_hz",
+                "p1_on", "p2_on", "n1_on", "n2_on",
+                "p1_voltage", "p1_current_a",
+                "p2_voltage", "p2_current_a",
+                "n1_voltage", "n1_current_a",
+                "n2_voltage", "n2_current_a",
+            ])
+            rows_since_flush = 0
+            while True:
+                item = q.get()
+                if item is _STOP_SENTINEL:
+                    break
+                try:
+                    w.writerow(item)
+                except (OSError, ValueError) as exc:
+                    log.warning("DataLogger write error (row dropped): %s", exc)
+                    continue
+                rows_since_flush += 1
+                if rows_since_flush >= 50:
+                    try:
+                        f.flush()
+                    except OSError as exc:
+                        log.warning("DataLogger flush error: %s", exc)
+                    rows_since_flush = 0
+        finally:
+            try:
+                f.flush()
+                f.close()
+            except OSError:
+                pass
