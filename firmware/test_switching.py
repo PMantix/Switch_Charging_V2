@@ -46,12 +46,18 @@ def run(port: str = "/dev/ttyACM0", baud: int = 115200) -> None:
     cmd("K")              # advance idx by one
     cmd("S 0 0 0 0")      # manual override (auto-halts first)
 
-    print("\n=== fast switching (1666 us/step ≈ 300 Hz per-FET) — LEDs should look solid ===")
+    print("\n=== fast switching (1666 us/step ≈ 300 Hz per-FET) ===")
     cmd("C 2 9 6")
     cmd("F 1666")
+    print("\n    >>> LOOK AT THE LEDs NOW — should appear SOLID (no blink).")
+    print("    >>> 10 seconds starting in 3...")
+    time.sleep(1); print("    >>> 2...")
+    time.sleep(1); print("    >>> 1...")
+    time.sleep(1); print("    >>> GO!\n")
     cmd("G")
-    time.sleep(4)
+    time.sleep(10)
     cmd("H")
+    print("    >>> done — LEDs should now be off.")
 
     print("\n=== error paths ===")
     cmd("F 10")           # expect ERR (below 50 us floor)
