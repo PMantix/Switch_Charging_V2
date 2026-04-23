@@ -89,9 +89,13 @@ class ConnectDialog(ModalScreen[str]):
     }
     """
 
-    def __init__(self, auto_discover: bool = True):
+    def __init__(self, auto_discover: bool = True, prescan: Optional[object] = None):
         super().__init__()
         self._auto_discover = auto_discover
+        # Optional wifi_scan.ScanResult captured at app launch so the dialog
+        # can show nearby pi_SW# APs the moment it opens instead of waiting
+        # another ~10s for system_profiler.
+        self._prescan = prescan
 
     def compose(self) -> ComposeResult:
         with Vertical(id="connect-box"):
@@ -151,6 +155,14 @@ class ConnectDialog(ModalScreen[str]):
     # -- WiFi AP scan --------------------------------------------------------
 
     def _start_wifi_scan(self) -> None:
+        # If the app already ran a scan at launch (overlapped with discovery),
+        # surface those results immediately — the user pressed `r` or the
+        # scan just finished. Fall through to a fresh scan if no prescan.
+        if self._prescan is not None:
+            entries = self._build_entries(self._prescan.aps)
+            self._apply_fleet_entries(entries, self._prescan.warning)
+            self._prescan = None  # single-shot; rescan-via-r still works
+            return
         import threading
         threading.Thread(
             target=self._wifi_scan_worker, daemon=True, name="wifi-scan"
@@ -214,10 +226,19 @@ class ConnectDialog(ModalScreen[str]):
     def action_join_selected(self) -> None:
         fleet = self.query_one("#fleet-list", FleetList)
         entry = fleet.selected_entry()
-        if not entry or not entry.online:
-            self._update_status("No online AP selected to join")
+        if not entry:
+            self._update_status("No AP selected")
             return
-        self._update_status(f"[bold cyan]Joining {entry.ssid}...[/]")
+        # macOS system_profiler serves a stale cache, so a fleet SSID may be
+        # broadcasting but not appear in the scan. Let the user attempt to
+        # join any known fleet entry — networksetup will error in a few
+        # seconds if the AP really isn't in range.
+        if entry.online:
+            self._update_status(f"[bold cyan]Joining {entry.ssid}...[/]")
+        else:
+            self._update_status(
+                f"[bold cyan]Trying {entry.ssid}[/] [dim](not in recent scan — may not be in range)[/]"
+            )
         import threading
         threading.Thread(
             target=self._join_worker, args=(entry.ssid,),
@@ -513,6 +534,12 @@ class SwitchingCircuitApp(App):
         self._prev_mode = "idle"         # track mode changes for panel auto-switch
         self._probe = LatencyProbe()
         self._offset_worker_started = False
+        # Launch-time WiFi prescan: overlaps with auto-discovery so the
+        # ConnectDialog can show nearby pi_SW# APs the moment it opens.
+        import threading as _threading
+        self._prescan_lock = _threading.Lock()
+        self._prescan_result = None
+        self._prescan_at = 0.0
 
     # -- Compose -------------------------------------------------------------
 
@@ -578,10 +605,42 @@ class SwitchingCircuitApp(App):
             self._update_status_connection(False, "Discovering Pi...")
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             conn_bar.conn_label = "Scanning..."
+            self._start_wifi_prescan()
             discover_async(
                 callback=self._on_auto_discover_result,
                 on_status=self._on_auto_discover_status,
             )
+
+    def _start_wifi_prescan(self) -> None:
+        """Kick off a WiFi scan in parallel with discovery so the dialog
+        has pi_SW# APs ready the moment it opens."""
+        import threading
+        from time import monotonic
+
+        def _run() -> None:
+            try:
+                scan = wifi_scan.scan_pi_aps()
+            except Exception:
+                log.exception("prescan failed")
+                scan = None
+            with self._prescan_lock:
+                self._prescan_result = scan
+                self._prescan_at = monotonic()
+
+        threading.Thread(target=_run, daemon=True, name="wifi-prescan").start()
+
+    def _take_prescan(self, max_age_s: float = 60.0):
+        """Return the prescan result if fresh, else None. Single-consumer."""
+        from time import monotonic
+        with self._prescan_lock:
+            if self._prescan_result is None:
+                return None
+            if monotonic() - self._prescan_at > max_age_s:
+                self._prescan_result = None
+                return None
+            result = self._prescan_result
+            self._prescan_result = None  # single-consumer
+            return result
 
     def _on_auto_discover_status(self, msg: str) -> None:
         try:
@@ -606,8 +665,13 @@ class SwitchingCircuitApp(App):
         if ip:
             self._do_connect(ip, self._initial_port)
         else:
-            # Auto-discovery failed, show manual dialog
-            self.push_screen(ConnectDialog(auto_discover=False), self._on_connect_dialog_result)
+            # Auto-discovery failed, show manual dialog. Pass the launch-time
+            # WiFi prescan so the dialog can populate the fleet list instantly.
+            prescan = self._take_prescan()
+            self.push_screen(
+                ConnectDialog(auto_discover=False, prescan=prescan),
+                self._on_connect_dialog_result,
+            )
 
     def _on_connect_dialog_result(self, result: str) -> None:
         if result:
@@ -1160,7 +1224,15 @@ class SwitchingCircuitApp(App):
     def action_reconnect(self) -> None:
         if self._client:
             self._client.disconnect()
-        self.push_screen(ConnectDialog(), self._on_connect_dialog_result)
+        # Kick off a fresh prescan; if an earlier one is still fresh the
+        # dialog will pick it up immediately, otherwise the dialog falls
+        # back to its own scan and the new prescan becomes useful on the
+        # next pass.
+        self._start_wifi_prescan()
+        self.push_screen(
+            ConnectDialog(prescan=self._take_prescan()),
+            self._on_connect_dialog_result,
+        )
 
     # -- Network mode (client <-> AP) ---------------------------------------
 
