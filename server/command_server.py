@@ -29,9 +29,9 @@ log = logging.getLogger(__name__)
 # congestion window collapse; each new frame then pays a wake-up and
 # slow-start penalty measured in tens-to-hundreds of ms, which
 # accumulates into the TCP buffer and eventually kills the connection.
-# A steady 15 Hz keeps the radio and TCP window fully open and is
+# A steady 30 Hz keeps the radio and TCP window fully open and is
 # actually cheaper per-frame. Do not lower this without measuring.
-_DEFAULT_SUBSCRIBE_HZ = 15
+_DEFAULT_SUBSCRIBE_HZ = 30
 _MAX_SUBSCRIBE_HZ = 30
 
 
