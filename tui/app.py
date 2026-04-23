@@ -246,7 +246,15 @@ class ConnectDialog(ModalScreen[str]):
         ).start()
 
     def _join_worker(self, ssid: str) -> None:
-        result = wifi_scan.join_ap(ssid)
+        def status(msg: str) -> None:
+            try:
+                self.app.call_from_thread(
+                    self._update_status, f"[bold cyan]{msg}[/]"
+                )
+            except Exception:
+                pass
+
+        result = wifi_scan.join_ap(ssid, status_cb=status)
         try:
             self.app.call_from_thread(self._handle_join_result, ssid, result)
         except Exception:
@@ -254,7 +262,9 @@ class ConnectDialog(ModalScreen[str]):
 
     def _handle_join_result(self, ssid: str, result) -> None:
         if result.ok:
-            self._update_status(f"[bold green]Joined {ssid}; connecting to {AP_GATEWAY}...[/]")
+            self._update_status(
+                f"[bold green]Joined {ssid} and reached Pi at {AP_GATEWAY}[/]"
+            )
             self.dismiss(AP_GATEWAY)
         else:
             self._update_status(f"[bold red]Join failed:[/] {result.error or 'unknown'}")

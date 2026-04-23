@@ -19,12 +19,16 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import shutil
+import socket
 import subprocess
 import sys
+import tempfile
 import time
 from dataclasses import dataclass
-from typing import Optional
+from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -33,10 +37,14 @@ AP_PORT = 5555
 SSID_PATTERN = re.compile(r"^pi_SW\d+$")
 DEFAULT_AP_PASSWORD = "switching"
 
-SCAN_TIMEOUT = 8.0     # seconds — WiFi scans can be slow on macOS
-JOIN_TIMEOUT = 15.0    # seconds — networksetup blocks until associated
-SSID_POLL_INTERVAL = 0.5
-SSID_POLL_DEADLINE = 10.0
+# system_profiler's cache is fast to read but frequently stale on recent macOS,
+# so we prefer CoreWLAN (via a tiny Swift helper) which does a real live scan.
+# The CoreWLAN scan sweeps all channels and can take 20-30s on dual-band radios.
+SCAN_TIMEOUT = 8.0            # system_profiler fallback — returns cached data
+SCAN_TIMEOUT_CORE = 35.0      # Swift + CoreWLAN live scan
+JOIN_TIMEOUT = 45.0           # networksetup can take a while on a cold first join
+GATEWAY_POLL_INTERVAL = 0.5
+GATEWAY_POLL_DEADLINE = 20.0  # how long to wait for AP_GATEWAY:AP_PORT TCP
 
 
 @dataclass(frozen=True)
@@ -145,7 +153,122 @@ def scan_pi_aps() -> ScanResult:
 
 
 def _scan_macos() -> tuple[list[PiAP], Optional[str]]:
-    """Use system_profiler — returns rich JSON including the current SSID."""
+    """macOS scan. Prefers CoreWLAN live scan via Swift (what the menu bar
+    uses) so newly-broadcasting APs actually appear. Falls back to
+    system_profiler when Swift isn't available."""
+    aps, warning = _scan_macos_corewlan()
+    if aps is not None:
+        return aps, warning
+    return _scan_macos_system_profiler()
+
+
+_SWIFT_CHECKED = False
+_SWIFT_OK = False
+
+
+def _swift_available() -> bool:
+    global _SWIFT_CHECKED, _SWIFT_OK
+    if _SWIFT_CHECKED:
+        return _SWIFT_OK
+    _SWIFT_CHECKED = True
+    if not shutil.which("swift"):
+        return False
+    try:
+        r = subprocess.run(
+            ["swift", "--version"], capture_output=True, text=True, timeout=3,
+        )
+        _SWIFT_OK = r.returncode == 0
+    except (subprocess.SubprocessError, OSError):
+        _SWIFT_OK = False
+    return _SWIFT_OK
+
+
+_COREWLAN_SCRIPT = r"""
+import CoreWLAN
+import Foundation
+
+guard let iface = CWWiFiClient.shared().interface() else {
+    print("ERR\tno_interface")
+    exit(1)
+}
+print("CURRENT\t\(iface.ssid() ?? "")")
+do {
+    let networks = try iface.scanForNetworks(withName: nil)
+    for n in networks {
+        if let s = n.ssid {
+            // Filter happens on the Python side; we keep this simple so
+            // callers can repurpose the helper later if needed.
+            print("HIT\t\(s)\t\(n.rssiValue)")
+        }
+    }
+} catch {
+    print("ERR\t\(error)")
+    exit(2)
+}
+"""
+
+
+def _scan_macos_corewlan() -> tuple[Optional[list[PiAP]], Optional[str]]:
+    """Return (aps, warning) using Swift + CoreWLAN for a real live scan.
+    Returns (None, _) if the Swift path is unavailable — caller falls back."""
+    if not _swift_available():
+        return None, None
+
+    path: Optional[str] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".swift", delete=False, encoding="utf-8",
+        ) as f:
+            f.write(_COREWLAN_SCRIPT)
+            path = f.name
+        result = subprocess.run(
+            ["swift", path],
+            capture_output=True, text=True, timeout=SCAN_TIMEOUT_CORE,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        log.warning("CoreWLAN scan failed: %s", exc)
+        return None, None
+    finally:
+        if path:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    if result.returncode != 0:
+        log.warning("CoreWLAN scan returncode %d: %s",
+                    result.returncode, result.stderr.strip()[:200])
+        return None, None
+
+    current = ""
+    aps: dict[str, PiAP] = {}
+    for line in result.stdout.splitlines():
+        parts = line.split("\t")
+        if not parts:
+            continue
+        tag = parts[0]
+        if tag == "CURRENT" and len(parts) >= 2:
+            current = parts[1]
+        elif tag == "HIT" and len(parts) >= 3:
+            ssid = parts[1]
+            if not SSID_PATTERN.match(ssid):
+                continue
+            try:
+                rssi = int(parts[2])
+            except ValueError:
+                rssi = None
+            is_current = (ssid == current)
+            existing = aps.get(ssid)
+            if existing is None or (rssi is not None and (
+                existing.signal_dbm is None or rssi > existing.signal_dbm
+            )):
+                aps[ssid] = PiAP(ssid=ssid, signal_dbm=rssi, is_current=is_current)
+    return list(aps.values()), None
+
+
+def _scan_macos_system_profiler() -> tuple[list[PiAP], Optional[str]]:
+    """Use system_profiler — returns rich JSON including the current SSID.
+    Serves a cached list; kept as a fallback when Swift isn't available."""
     try:
         result = subprocess.run(
             ["system_profiler", "-json", "SPAirPortDataType"],
@@ -258,16 +381,36 @@ def _scan_linux() -> list[PiAP]:
 # Join
 # ---------------------------------------------------------------------------
 
-def join_ap(ssid: str, password: str = DEFAULT_AP_PASSWORD) -> JoinResult:
-    """Drive the laptop onto <ssid>. Blocks up to ~25 s.
+def join_ap(
+    ssid: str,
+    password: str = DEFAULT_AP_PASSWORD,
+    verify_host: str = AP_GATEWAY,
+    verify_port: int = AP_PORT,
+    status_cb: Optional[Callable[[str], None]] = None,
+) -> JoinResult:
+    """Drive the laptop onto <ssid> and verify the server is reachable.
 
-    Returns a JoinResult; on success joined_ssid == ssid. On macOS the OS
-    may prompt for admin credentials — that prompt is the user's consent
-    surface, we don't try to suppress or pre-auth it.
+    Chain: networksetup/nmcli associate → wait for TCP :verify_port on
+    verify_host. We validate by reachability rather than by SSID name
+    because `networksetup -getairportnetwork` on recent macOS lies — it
+    reports "not associated" even when the Mac genuinely has an IP on
+    the new network. A successful TCP connect to 10.42.0.1:5555 proves
+    the whole chain worked end to end.
+
+    `status_cb` receives short progress strings so the UI can show what
+    step is currently running.
     """
     if not SSID_PATTERN.match(ssid):
         return JoinResult(False, ssid, None, f"refusing to join non-fleet SSID {ssid!r}")
 
+    def _say(msg: str) -> None:
+        if status_cb is not None:
+            try:
+                status_cb(msg)
+            except Exception:
+                pass
+
+    _say(f"associating to {ssid}…")
     if _is_macos():
         err = _join_macos(ssid, password)
     elif _is_linux():
@@ -276,18 +419,32 @@ def join_ap(ssid: str, password: str = DEFAULT_AP_PASSWORD) -> JoinResult:
         return JoinResult(False, ssid, None, f"unsupported platform {sys.platform}")
 
     if err:
-        return JoinResult(False, ssid, current_ssid(), err)
+        return JoinResult(False, ssid, current_ssid(),
+                          f"associate: {err}")
 
-    # Poll for the SSID switch to land — networksetup returns before the
-    # association finalises.
-    deadline = time.monotonic() + SSID_POLL_DEADLINE
+    _say(f"contacting {verify_host}:{verify_port}…")
+    if not _wait_for_tcp(verify_host, verify_port, GATEWAY_POLL_DEADLINE):
+        return JoinResult(
+            False, ssid, current_ssid(),
+            f"associated but no server at {verify_host}:{verify_port}",
+        )
+
+    return JoinResult(True, ssid, ssid)
+
+
+def _wait_for_tcp(host: str, port: int, timeout_s: float) -> bool:
+    """Poll a TCP endpoint until it accepts a connect or timeout elapses.
+    Each probe uses a short connect timeout so we don't block the full
+    deadline on a single attempt."""
+    deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        now_ssid = current_ssid()
-        if now_ssid == ssid:
-            return JoinResult(True, ssid, now_ssid)
-        time.sleep(SSID_POLL_INTERVAL)
-
-    return JoinResult(False, ssid, current_ssid(), "join timed out waiting for SSID")
+        try:
+            with socket.create_connection((host, port), timeout=1.5):
+                return True
+        except OSError:
+            pass
+        time.sleep(GATEWAY_POLL_INTERVAL)
+    return False
 
 
 def _join_macos(ssid: str, password: str) -> Optional[str]:
