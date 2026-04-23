@@ -228,6 +228,54 @@ class GPIODriver:
         resp = self._send("P")
         return resp == "OK P"
 
+    # -- Firmware-resident switching cycle (C/F/G/H/K) ----------------------
+    # The RP2040 owns periodic switching via machine.Timer. Pi-side code
+    # just programs the cycle and period, then starts/stops the timer.
+
+    def program_sequence(self, packed_states):
+        """Program the RP2040's switching cycle.
+
+        `packed_states` is an iterable of ints (each 0-15) where bits are
+        P1<<3 | P2<<2 | N1<<1 | N2. Firmware resets its step index to 0
+        on receipt.
+        """
+        parts = [str(int(s) & 0xF) for s in packed_states]
+        if not parts:
+            raise ValueError("program_sequence requires at least one state")
+        cmd = "C " + str(len(parts)) + " " + " ".join(parts)
+        resp = self._send(cmd)
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 C error: %s", resp)
+
+    def set_step_period_us(self, period_us):
+        """Set the per-step period in microseconds. If switching is running,
+        firmware re-arms the timer preserving its current step index."""
+        period_us = max(50, int(period_us))
+        resp = self._send(f"F {period_us}")
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 F error: %s", resp)
+
+    def start_switching(self):
+        """Start periodic switching. Requires program_sequence() and
+        set_step_period_us() to have been called first."""
+        resp = self._send("G")
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 G error: %s", resp)
+
+    def stop_switching(self):
+        """Halt switching and set all FETs off."""
+        resp = self._send("H")
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 H error: %s", resp)
+        # Firmware turns everything off; mirror that in our cache.
+        self._fet_states = [False, False, False, False]
+
+    def debug_step_cycle(self):
+        """Advance one step in the programmed cycle (for DEBUG stepping)."""
+        resp = self._send("K")
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 K error: %s", resp)
+
     def cleanup(self):
         self._stop_event.set()
         # Stop streaming
