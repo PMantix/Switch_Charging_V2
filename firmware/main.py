@@ -38,7 +38,8 @@ Serial protocol (USB CDC, line-delimited):
 """
 
 import sys
-import select
+import uselect
+import gc
 import json
 from machine import Pin, I2C, Timer
 import neopixel
@@ -485,6 +486,16 @@ def main():
     buf = ""
     last_stream = time.ticks_us()
 
+    # Pre-allocated stdin poller: select.select in a hot loop allocates
+    # fresh lists every call, and that garbage triggers GC pauses that
+    # delay Timer callbacks — visible as a ~4 Hz stutter at 300 Hz
+    # switching. poll objects are reused so the hot path allocates nothing.
+    poller = uselect.poll()
+    poller.register(sys.stdin, uselect.POLLIN)
+
+    # Clean slate before entering the steady-state loop.
+    gc.collect()
+
     while True:
         now = time.ticks_us()
 
@@ -492,7 +503,7 @@ def main():
         # tick here; this loop just services commands, bursts, and streams.
 
         # --- Handle incoming commands (non-blocking) ---
-        if sys.stdin in select.select([sys.stdin], [], [], 0)[0]:
+        if poller.poll(0):
             byte = sys.stdin.buffer.read(1)
             if not byte:
                 pass
