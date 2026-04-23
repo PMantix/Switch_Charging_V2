@@ -23,13 +23,15 @@ from server.schedule import load_schedule, load_schedule_inline, validate_schedu
 
 log = logging.getLogger(__name__)
 
-# Broadcast rate bounds (Hz) — caps TUI update rate regardless of sensor rate.
-# 15 Hz was too aggressive for a Textual TUI on Mac: each frame drives a
-# full render pass, and at 15 Hz the Mac couldn't sustain consumption,
-# letting TCP buffers accumulate until sendall timed out and the
-# connection died. 5 Hz is visually smooth for cycler monitoring and
-# leaves plenty of headroom. Can be overridden upward via set_sensor_rate.
-_DEFAULT_SUBSCRIBE_HZ = 5
+# Broadcast rate bounds (Hz). Counter-intuitive tuning note: lower is
+# NOT gentler over WiFi. Sparse traffic (5 Hz → 200 ms gaps) lets the
+# Mac WiFi radio drop into power-save between packets and lets the TCP
+# congestion window collapse; each new frame then pays a wake-up and
+# slow-start penalty measured in tens-to-hundreds of ms, which
+# accumulates into the TCP buffer and eventually kills the connection.
+# A steady 15 Hz keeps the radio and TCP window fully open and is
+# actually cheaper per-frame. Do not lower this without measuring.
+_DEFAULT_SUBSCRIBE_HZ = 15
 _MAX_SUBSCRIBE_HZ = 30
 
 
