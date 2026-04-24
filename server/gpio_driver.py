@@ -52,6 +52,11 @@ class GPIODriver:
         self._sensor_hz = 0.0
         self._sensor_new = threading.Event()  # set when fresh data arrives
 
+        # Optional callback fired in the reader thread after each fresh
+        # sensor frame is cached. Used by command_server to drive Pi-side
+        # recording at the true sensor rate, independent of broadcast cadence.
+        self.on_sensor_tick = None  # type: ignore[assignment]
+
         # Response queue for command replies
         self._response_q = queue.Queue()
 
@@ -143,6 +148,15 @@ class GPIODriver:
             with self._sensor_lock:
                 self._sensor_data = data
             self._sensor_new.set()
+            # Fire the optional per-frame callback (used by command_server
+            # for Pi-side recording at the sensor rate). Kept tolerant of
+            # callback errors so a bad recorder state can't kill the reader.
+            cb = self.on_sensor_tick
+            if cb is not None:
+                try:
+                    cb(data)
+                except Exception:
+                    log.exception("on_sensor_tick callback failed")
         except (ValueError, IndexError):
             pass
 

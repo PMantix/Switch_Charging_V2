@@ -58,6 +58,11 @@ class CommandServer:
 
         self._threads = []
 
+        # Drive Pi-side recording from the serial reader thread so the
+        # recording rate equals the RP2040's sensor stream rate — not the
+        # TUI broadcast rate, which used to cap everything at 30 Hz.
+        self._mc._gpio.on_sensor_tick = self._on_sensor_tick
+
     # -- lifecycle ----------------------------------------------------------
 
     def start(self):
@@ -377,6 +382,31 @@ class CommandServer:
             log.exception("Error processing command %r", cmd)
             return {"ok": False, "error": f"Internal error: {exc}"}
 
+    # -- sensor-driven recording --------------------------------------------
+
+    def _on_sensor_tick(self, sensor_data):
+        """Called from the GPIO reader thread after each fresh sensor frame
+        is cached. Records one CSV row per frame (bounded by the queue in
+        PiRecorder itself) so recording runs at the sensor stream rate,
+        not at broadcast cadence.
+
+        `sensor_data` is the freshly-parsed dict but we pull full status via
+        mode_controller to pick up mode / sequence / step / fet_states,
+        which change independently of the sensor cadence.
+        """
+        if not self._recorder.is_recording:
+            return
+        try:
+            status = self._mc.get_status()
+            still_going = self._recorder.record(status)
+            if not still_going:
+                log.info(
+                    "Pi recording auto-stopped at %d samples",
+                    self._recorder.sample_count,
+                )
+        except Exception:
+            log.exception("recording tick failed")
+
     # -- subscription broadcast ---------------------------------------------
 
     def _broadcast_loop(self):
@@ -397,22 +427,15 @@ class CommandServer:
                 continue
             last_broadcast = now
 
-            # Build status once per tick. Pi-side recording runs every
-            # tick regardless of whether any subscribers are connected —
-            # scripted command-only clients (recording_doe.py, etc.) need
-            # recordings to happen even though they never subscribe.
-            status = self._mc.get_status()
-
-            if self._recorder.is_recording:
-                still_going = self._recorder.record(status)
-                if not still_going:
-                    log.info("Pi recording auto-stopped at %d samples", self._recorder.sample_count)
-
             with self._sub_lock:
                 if not self._subscribers:
                     continue
                 subscribers = list(self._subscribers)
 
+            # Pi-side recording is driven from _on_sensor_tick (reader
+            # thread) at the full sensor rate — not here. The broadcast
+            # loop is purely for pushing state to TUI subscribers.
+            status = self._mc.get_status()
             payload = {"event": "state", "t_emit_ns": time.monotonic_ns(), **status}
 
             dead = []
