@@ -271,17 +271,21 @@ class SensorPlot(Widget):
 
         # Header with legend
         t.append(" SENSORS ", style="bold cyan underline")
-        t.append(f"[{self.sensor_rate:.0f}Hz]", style="dim")
-        t.append(f"[max {self.max_hz:.0f}]", style="dim")
-        t.append(f"[avg={self.ina_avg}]", style="dim")
+        t.append(f"[{self.sensor_rate:.0f}/{self.max_hz:.0f}Hz] ", style="dim")
+        t.append(f"avg={self.ina_avg}", style="bold yellow")
+        t.append(" ", style="dim")
         bus_tag = "v=off" if self.bus_every == 0 else f"v÷{self.bus_every}"
-        t.append(f"[{bus_tag}]", style="dim")
-        t.append(f" [{mode}]", style="dim cyan")
+        t.append(bus_tag, style="bold yellow")
+        t.append(f"  [{mode}]", style="dim cyan")
         t.append("  ")
         t.append("/", style="bold white on dark_blue")
         t.append("- ", style="dim")
         t.append("*", style="bold white on dark_blue")
         t.append("+ ", style="dim")
+        t.append("j", style="bold white on dark_blue")
+        t.append("avg ", style="dim")
+        t.append("k", style="bold white on dark_blue")
+        t.append("vdec ", style="dim")
         t.append("v", style="bold white on dark_blue")
         t.append("viz  ", style="dim")
         for name in ["P1", "P2", "N1", "N2"]:
@@ -353,13 +357,17 @@ class SensorPlot(Widget):
 
         # Header
         t.append(" SENSORS ", style="bold cyan underline")
-        t.append(f"[{self.sensor_rate:.0f}Hz]", style="dim")
-        t.append(f"[max {self.max_hz:.0f}]", style="dim")
-        t.append(f"[avg={self.ina_avg}]", style="dim")
+        t.append(f"[{self.sensor_rate:.0f}/{self.max_hz:.0f}Hz] ", style="dim")
+        t.append(f"avg={self.ina_avg}", style="bold yellow")
+        t.append(" ", style="dim")
         bus_tag = "v=off" if self.bus_every == 0 else f"v÷{self.bus_every}"
-        t.append(f"[{bus_tag}]", style="dim")
-        t.append(f" [{mode}]", style="dim cyan")
+        t.append(bus_tag, style="bold yellow")
+        t.append(f"  [{mode}]", style="dim cyan")
         t.append("  ")
+        t.append("j", style="bold white on dark_blue")
+        t.append("avg ", style="dim")
+        t.append("k", style="bold white on dark_blue")
+        t.append("vdec ", style="dim")
         t.append("v", style="bold white on dark_blue")
         t.append("viz\n", style="dim")
 

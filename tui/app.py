@@ -339,6 +339,8 @@ class HelpScreen(ModalScreen[None]):
                 "  [bold]1-4[/]       [dim](Debug mode: toggle P1/P2/N1/N2)[/]\n\n"
                 "[bold white]SENSORS & PLOT[/]\n"
                 "  [bold]* / /[/]     Sensor rate +/- (0.5-20 Hz)\n"
+                "  [bold]j[/]         Cycle INA226 averaging (1/4/16/64)\n"
+                "  [bold]k[/]         Cycle bus-voltage decimation (1/5/20/off)\n"
                 "  [bold]v[/]         Cycle plot mode (line/dot/bar)\n\n"
                 "[bold white]RECORDING[/]\n"
                 "  [bold]l[/]         Start / stop recording\n"
@@ -1219,6 +1221,10 @@ class SwitchingCircuitApp(App):
         sensor_rate = reply.get("sensor_rate")
         if sensor_rate is not None and sensor_rate > 0:
             plot.sensor_rate = float(sensor_rate)
+        # Force an immediate redraw. The sensor stream triggers a rate-
+        # limited render on its own, but that can be up to ~70 ms away
+        # at 15 fps — this way the header ticks as soon as the user taps.
+        plot.refresh()
 
     def action_cycle_ina_avg(self) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
