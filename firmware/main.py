@@ -281,15 +281,21 @@ def ina226_read_all_json():
     return results
 
 
+_STREAM_FMT = "D %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
+
+
 def emit_stream_line():
-    """Read all sensors and print a compact D line."""
-    readings = ina226_read_all_fast()
-    # Format: D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>
-    parts = []
-    for bus_v, current_a in readings:
-        parts.append(f"{bus_v:.4f}")
-        parts.append(f"{current_a:.6f}")
-    sys.stdout.write("D " + " ".join(parts) + "\n")
+    """Read all sensors and print a compact D line.
+    One %-format call = one string allocation instead of the 9 that a
+    list-of-f-strings + join produces. Matters at 200 Hz sensor rate where
+    the list-build path triggers GC ~1×/sec and visibly stutters switching."""
+    r = ina226_read_all_fast()
+    sys.stdout.write(_STREAM_FMT % (
+        r[0][0], r[0][1],
+        r[1][0], r[1][1],
+        r[2][0], r[2][1],
+        r[3][0], r[3][1],
+    ))
 
 
 # ---------------------------------------------------------------------------
