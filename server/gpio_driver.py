@@ -142,18 +142,38 @@ class GPIODriver:
                 break
 
     def _handle_stream_line(self, line):
-        """Parse a D line: D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>"""
+        """Parse a D line: D <t_us> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>
+
+        The leading ``t_us`` is the firmware ``time.ticks_us()`` snapshot
+        taken at sample-capture time (just before the INA226 sweep). We
+        translate it into the Pi's monotonic clock via ``_clock_offset_s``
+        (set by ``sync_firmware_clock()``) and pass it through the
+        ``on_sensor_tick`` callback so downstream consumers (recorder,
+        sequence engine) can anchor the row in the firmware clock instead
+        of stamping it at line-receive time. With ~4.5 ms of emit latency
+        between capture and stdout, the receive-time anchor lags reality
+        by up to a full step at 100 Hz switching, inverting the labels.
+        """
         try:
             parts = line.split()
-            if len(parts) != 9:  # "D" + 8 values
+            if len(parts) != 10:  # "D" + t_us + 8 values
                 return
-            vals = [float(x) for x in parts[1:]]
+            fw_ts_us = int(parts[1])
+            vals = [float(x) for x in parts[2:]]
             data = {}
             for i, name in enumerate(SENSOR_ORDER):
                 data[name] = {
                     "voltage": round(vals[i * 2], 4),
                     "current": round(vals[i * 2 + 1], 6),
                 }
+            # Convert firmware ticks_us → Pi monotonic seconds when we have
+            # an offset; otherwise fall back to monotonic() at receive time
+            # (the legacy behaviour, which is wrong by ~4.5 ms but better
+            # than dropping the row before sync_firmware_clock has run).
+            if self._clock_offset_s is not None:
+                sample_pi_s = fw_ts_us / 1_000_000.0 - self._clock_offset_s
+            else:
+                sample_pi_s = time.monotonic()
             with self._sensor_lock:
                 self._sensor_data = data
             self._sensor_new.set()
@@ -163,7 +183,7 @@ class GPIODriver:
             cb = self.on_sensor_tick
             if cb is not None:
                 try:
-                    cb(data)
+                    cb(data, sample_pi_s)
                 except Exception:
                     log.exception("on_sensor_tick callback failed")
         except (ValueError, IndexError):

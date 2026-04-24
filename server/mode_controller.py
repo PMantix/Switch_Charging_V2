@@ -190,11 +190,23 @@ class ModeController:
             return step
 
     def get_status(self):
-        """Return full system state dict."""
+        """Return full system state dict (engine step labelled at
+        ``monotonic()`` — fine for live broadcasts/TUI)."""
+        return self._build_status(self._engine.get_state())
+
+    def get_status_at(self, sample_pi_s):
+        """Return a status dict whose engine fields (step, fet_states) are
+        labelled at ``sample_pi_s`` instead of ``monotonic()``. Used by
+        the recorder so each captured row carries the step that was live
+        at sample-capture time, not D-line receive time. Critical at
+        higher switching freqs (100 Hz+) where the ~4.5 ms emit latency
+        becomes a meaningful fraction of a step."""
+        return self._build_status(self._engine.get_state_at(sample_pi_s))
+
+    def _build_status(self, engine_state):
         with self._lock:
             mode = self._mode
             debug_step = getattr(self, "_debug_step", -1)
-        engine_state = self._engine.get_state()
         status = {
             "mode": mode.value,
             "sequence": engine_state["sequence"],

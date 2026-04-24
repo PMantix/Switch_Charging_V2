@@ -39,7 +39,18 @@ Serial protocol (USB CDC, line-delimited):
     OK M <avg> <every> <max_hz>   Current sensor profile snapshot
     OK Z <n> <avg_us> <max_hz>    Emit profile: n loops averaged to avg_us per
                                   emit; max_hz recomputed from that measurement
-    D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data
+    D <t_us> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data.
+                                  t_us is the firmware time.ticks_us() captured
+                                  at the moment the INA226 sweep began (i.e.
+                                  the sample-capture timestamp). The Pi
+                                  converts it to its own monotonic clock via
+                                  the offset learned from P, so each D row
+                                  can be anchored in the firmware clock and
+                                  the engine can compute the step that was
+                                  actually live when the sample was captured
+                                  (eliminates a one-step label lag at high
+                                  switching frequencies caused by ~4.5 ms
+                                  emit latency between sweep and stdout).
     OK L                          LED set
     OK P <t_us>                   Pong; t_us is firmware time.ticks_us() at
                                    reply-build time. Pi pairs it with its own
@@ -422,7 +433,7 @@ def ina226_read_all_json():
     return results
 
 
-_STREAM_FMT = "D %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
+_STREAM_FMT = "D %d %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
 
 
 def emit_stream_line():
@@ -444,8 +455,14 @@ def emit_stream_line():
             read_bus = True
         else:
             read_bus = False
+    # Stamp the line with ticks_us BEFORE the I2C sweep starts. This is the
+    # sample-capture timestamp the Pi anchors the recorded row to. Stamping
+    # AFTER the sweep would fold the I2C read time into the row's apparent
+    # capture moment and re-introduce a fraction of the lag we're fixing.
+    t_us = time.ticks_us()
     r = ina226_read_all_streaming(read_bus)
     sys.stdout.write(_STREAM_FMT % (
+        t_us,
         r[0][0], r[0][1],
         r[1][0], r[1][1],
         r[2][0], r[2][1],

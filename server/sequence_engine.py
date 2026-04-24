@@ -163,6 +163,19 @@ class SequenceEngine:
         live sequence + estimated step while running; during pause we report
         whatever the GPIO cache says (mode controller may have set them
         directly, e.g. all-on during DISCHARGE)."""
+        return self._get_state_at(None)
+
+    def get_state_at(self, sample_pi_s):
+        """Like ``get_state`` but uses ``sample_pi_s`` (a Pi-monotonic
+        timestamp) as the "now" for step estimation. Used by the recorder
+        to label each captured row with the step that was *actually live*
+        at sample-capture time, rather than at D-line receive time. With
+        ~4.5 ms emit latency, ``monotonic()``-based labelling lags reality
+        by up to a full step at 100 Hz, inverting the labels.
+        """
+        return self._get_state_at(sample_pi_s)
+
+    def _get_state_at(self, sample_pi_s):
         with self._lock:
             paused = self._paused
             sequence_idx = self._sequence_index
@@ -172,7 +185,7 @@ class SequenceEngine:
                 fet_tuple = None  # signal: pull from gpio below
             else:
                 packed_seq = self._current_packed_sequence_locked()
-                step = self._estimate_step_locked()
+                step = self._estimate_step_locked(now=sample_pi_s)
                 fet_tuple = _unpack(packed_seq[step])
         if fet_tuple is None:
             fet_states = self._gpio.get_fet_states()
@@ -203,14 +216,22 @@ class SequenceEngine:
             indices = SEQUENCES[self._sequence_index]
         return [_pack_state(STATE_DEFS[i]) for i in indices]
 
-    def _estimate_step_locked(self):
+    def _estimate_step_locked(self, now=None):
         """Compute current step index from elapsed time since the last
-        resume/freq-change. Not exact, but good enough for TUI display."""
+        resume/freq-change. Not exact, but good enough for TUI display.
+
+        ``now`` defaults to ``monotonic()`` (status broadcasts, debug
+        queries). The recorder passes the per-row sample-capture time
+        (translated from the firmware's ticks_us stamp) so each CSV row
+        gets the step that was live when the INA226s actually sampled,
+        not when the D line landed on the Pi (~4.5 ms later)."""
         packed = self._current_packed_sequence_locked()
         n = len(packed)
         if n == 0 or self._period_us <= 0:
             return 0
-        elapsed_us = int((monotonic() - self._resume_time) * 1_000_000)
+        if now is None:
+            now = monotonic()
+        elapsed_us = int((now - self._resume_time) * 1_000_000)
         ticks = elapsed_us // self._period_us if elapsed_us > 0 else 0
         return (self._step_at_resume + ticks) % n
 

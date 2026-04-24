@@ -411,20 +411,27 @@ class CommandServer:
 
     # -- sensor-driven recording --------------------------------------------
 
-    def _on_sensor_tick(self, sensor_data):
+    def _on_sensor_tick(self, sensor_data, sample_pi_s):
         """Called from the GPIO reader thread after each fresh sensor frame
         is cached. Records one CSV row per frame (bounded by the queue in
         PiRecorder itself) so recording runs at the sensor stream rate,
         not at broadcast cadence.
 
-        `sensor_data` is the freshly-parsed dict but we pull full status via
-        mode_controller to pick up mode / sequence / step / fet_states,
+        ``sample_pi_s`` is the Pi-monotonic translation of the firmware's
+        sample-capture ticks_us, so we ask mode_controller for the status
+        as it was at *that* moment rather than now — otherwise the ~4.5 ms
+        emit latency between INA capture and D-line receive shows up as
+        step labels lagging reality by up to a full step at 100 Hz, which
+        inverts the recorded labels relative to the actual current sign.
+
+        ``sensor_data`` is the freshly-parsed dict but we pull full status
+        via mode_controller to pick up mode / sequence / step / fet_states,
         which change independently of the sensor cadence.
         """
         if not self._recorder.is_recording:
             return
         try:
-            status = self._mc.get_status()
+            status = self._mc.get_status_at(sample_pi_s)
             still_going = self._recorder.record(status)
             if not still_going:
                 log.info(
