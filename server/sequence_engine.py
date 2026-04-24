@@ -253,40 +253,33 @@ class SequenceEngine:
         self._pending_cycle = False
 
     def _flush(self):
-        """Fires after the debounce window. Sends whichever RP2040 commands
-        are pending, using the latest state. If a cycle change is pending
-        it supersedes a period-only change (C+F+G covers both)."""
+        """Fires after the debounce window. Both cycle and period changes
+        route through _program_and_go (C+F+G) so firmware _seq_idx resets
+        to 0 and _step_at_resume latches to 0 at the moment G lands.
+
+        A period-only F update latches a drift of
+            debounce × (1/new_period − 1/old_period)
+        step-ticks — during the debounce the Pi estimates with the new
+        period while firmware is still at the old one, and that error gets
+        written into _step_at_resume at flush time. On a 2-step pulse
+        sequence, odd drift shows up as phase-inverted labels in the DOE
+        (5/10 Hz inversion seen on 2026-04-24). Always C+F+G avoids it at
+        the cost of a <20 ms restart glitch per freq change, which the
+        150 ms debounce already hides for rapid tweaks."""
         with self._lock:
             if self._paused:
                 self._pending_period = False
                 self._pending_cycle = False
                 self._flush_timer = None
                 return
-            cycle = self._pending_cycle
-            period = self._pending_period
+            pending = self._pending_cycle or self._pending_period
             self._pending_period = False
             self._pending_cycle = False
             self._flush_timer = None
-            packed = self._current_packed_sequence_locked() if cycle else None
-            period_us = self._period_us
+        if not pending:
+            return
         try:
-            if cycle:
-                self._gpio.program_sequence(packed)
-                self._gpio.set_step_period_us(period_us)
-                self._gpio.start_switching()
-                # Firmware just reset _seq_idx to 0 via C and started fresh.
-                with self._lock:
-                    self._step_at_resume = 0
-                    self._resume_time = monotonic()
-            elif period:
-                self._gpio.set_step_period_us(period_us)
-                # Firmware re-armed its timer with the new period but kept
-                # its _seq_idx. Best we can do is re-snapshot from our own
-                # estimate and align the clock to now — any small drift
-                # accumulated during the debounce window gets absorbed.
-                with self._lock:
-                    self._step_at_resume = self._estimate_step_locked()
-                    self._resume_time = monotonic()
+            self._program_and_go()
         except Exception:
             log.exception("debounced flush failed")
 
