@@ -111,6 +111,11 @@ def run_doe(
                       f" (≈{actual_cycles:.1f} cycles) ===")
                 print(c.send({"cmd": "set_frequency", "frequency": sw_hz}))
                 print(c.send({"cmd": "set_sensor_rate", "rate": sp_hz}))
+                # Wait past the engine's 150ms debounce so the F command
+                # actually lands on the RP2040 (and _resume_time gets re-
+                # synced) before recording begins — otherwise the recording
+                # captures the tail end of the previous frequency.
+                time.sleep(0.25)
                 max_samples = int(cond_duration * sp_hz) + 50
                 resp = c.send({
                     "cmd": "pi_record_start",
