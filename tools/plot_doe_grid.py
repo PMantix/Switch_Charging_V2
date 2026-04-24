@@ -58,22 +58,43 @@ def fidelity(df: pd.DataFrame, fet: str = "p1") -> tuple[float, float, float]:
     return samples_per_cycle, float(i_on), float(i_off)
 
 
-def plot_tile(ax, df: pd.DataFrame, sw: float, sp: int, fet: str) -> None:
-    t = df["elapsed_s"].to_numpy()
+def plot_tile(
+    ax, df: pd.DataFrame, sw: float, sp: int, fet: str,
+    x_mode: str = "seconds", max_cycles: float | None = None,
+) -> None:
+    t_sec = df["elapsed_s"].to_numpy()
     on = df[f"{fet}_on"].astype(int).to_numpy()
     i = df[f"{fet}_current_a"].to_numpy()
 
+    # Convert to the requested x axis. "cycles" normalizes by switching freq
+    # so each tile has the same number of cycles per unit — making tiles
+    # across rows directly comparable.
+    if x_mode == "cycles" and sw > 0:
+        x = t_sec * sw
+        x_label = "cycles"
+    else:
+        x = t_sec
+        x_label = "time (s)"
+
+    if max_cycles is not None and sw > 0:
+        keep = x <= max_cycles * (1 if x_mode == "cycles" else 1.0 / sw)
+        x = x[keep]
+        on = on[keep]
+        i = i[keep]
+        t_sec = t_sec[keep]
+
     # Scale the commanded trace to the current's range so both share the axis
-    i_max = max(i.max(), 1e-6)
+    i_max = max(i.max() if len(i) else 0, 1e-6)
     scaled_on = on * i_max
 
-    ax.fill_between(t, 0, scaled_on, step="post", alpha=0.15, color="black",
+    ax.fill_between(x, 0, scaled_on, step="post", alpha=0.15, color="black",
                     label="commanded ON" if ax.get_subplotspec().is_first_col()
                     and ax.get_subplotspec().is_first_row() else None)
-    ax.plot(t, i, color="tab:red", linewidth=0.6,
+    ax.plot(x, i, color="tab:red", linewidth=0.6,
             label=f"sensed {fet.upper()} I"
             if ax.get_subplotspec().is_first_col()
             and ax.get_subplotspec().is_first_row() else None)
+    ax.set_xlabel(x_label, fontsize=6)
 
     spc, i_on, i_off = fidelity(df, fet)
     discrim = (i_on - i_off) / i_max if i_max > 0 else 0
@@ -92,7 +113,10 @@ def plot_tile(ax, df: pd.DataFrame, sw: float, sp: int, fet: str) -> None:
     ax.grid(True, alpha=0.3)
 
 
-def build_grid(files: list[Path], fet: str, save: Path | None) -> None:
+def build_grid(
+    files: list[Path], fet: str, save: Path | None,
+    x_mode: str = "seconds", max_cycles: float | None = None,
+) -> None:
     cells: dict[tuple[float, int], Path] = {}
     for f in files:
         parsed = parse_rates(f)
@@ -131,7 +155,7 @@ def build_grid(files: list[Path], fet: str, save: Path | None) -> None:
                             ha="center", va="center")
                     ax.set_xticks([]); ax.set_yticks([])
                     continue
-                plot_tile(ax, df, sw, sp, fet)
+                plot_tile(ax, df, sw, sp, fet, x_mode=x_mode, max_cycles=max_cycles)
             except Exception as exc:
                 ax.text(0.5, 0.5, f"err\n{exc}", transform=ax.transAxes,
                         ha="center", va="center", fontsize=7)
@@ -168,6 +192,16 @@ def main() -> None:
                         help="which sensor to compare against (default p1)")
     parser.add_argument("--save", type=Path, default=None,
                         help="save PNG instead of opening window")
+    parser.add_argument(
+        "--x-axis", default="seconds", choices=["seconds", "cycles"],
+        help="x-axis units: 'cycles' (time × switching_hz) aligns tiles"
+             " across switching rates for direct comparison",
+    )
+    parser.add_argument(
+        "--max-cycles", type=float, default=None,
+        help="clip each tile to N switching cycles so all tiles show the"
+             " same window width when viewed in cycles-mode",
+    )
     args = parser.parse_args()
 
     files: list[Path] = []
@@ -179,7 +213,8 @@ def main() -> None:
     if not files:
         print("no files matched", file=sys.stderr)
         sys.exit(1)
-    build_grid(files, args.fet, args.save)
+    build_grid(files, args.fet, args.save, x_mode=args.x_axis,
+               max_cycles=args.max_cycles)
 
 
 if __name__ == "__main__":

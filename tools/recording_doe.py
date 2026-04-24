@@ -72,6 +72,8 @@ def run_doe(
     sampling_hz: list[float],
     duration_s: float,
     sequence_idx: int,
+    cycles: float = 0,
+    min_duration_s: float = 1.0,
 ) -> list[Path]:
     c = Client(host)
     print(f"connected to {host}:{AP_PORT}")
@@ -90,13 +92,22 @@ def run_doe(
         pi_paths: list[str] = []
         for sw_hz in switching_hz:
             for sp_hz in sampling_hz:
+                # Per-condition duration: when --cycles is used, duration
+                # scales inversely with switching freq so every recording
+                # captures the same number of switching cycles. A minimum
+                # floor prevents nonsensically short captures at high
+                # switching rates.
+                if cycles > 0:
+                    cond_duration = max(cycles / sw_hz, min_duration_s)
+                else:
+                    cond_duration = duration_s
                 print()
-                print(f"=== switching={sw_hz} Hz, sampling={sp_hz} Hz ===")
+                print(f"=== switching={sw_hz} Hz, sampling={sp_hz} Hz,"
+                      f" duration={cond_duration:.2f}s"
+                      f" (≈{cond_duration * sw_hz:.1f} cycles) ===")
                 print(c.send({"cmd": "set_frequency", "frequency": sw_hz}))
                 print(c.send({"cmd": "set_sensor_rate", "rate": sp_hz}))
-                # At the sensor rate, recording caps at max_samples so give
-                # it a generous cap even if the rate is high.
-                max_samples = int(duration_s * sp_hz) + 50
+                max_samples = int(cond_duration * sp_hz) + 50
                 resp = c.send({
                     "cmd": "pi_record_start",
                     "max_samples": max_samples,
@@ -109,7 +120,7 @@ def run_doe(
                 path = resp.get("path")
                 if path:
                     pi_paths.append(path)
-                time.sleep(duration_s + 0.3)
+                time.sleep(cond_duration + 0.3)
                 print(c.send({"cmd": "pi_record_stop"}))
                 # Small gap between runs so Pi flush + engine settle.
                 time.sleep(0.3)
@@ -164,7 +175,17 @@ def main() -> None:
     )
     parser.add_argument(
         "--duration", type=float, default=10.0,
-        help="seconds to record per combination",
+        help="seconds to record per combination (ignored if --cycles is set)",
+    )
+    parser.add_argument(
+        "--cycles", type=float, default=0,
+        help="record N switching cycles per condition instead of fixed time;"
+             " actual duration varies with switching rate (0 disables)",
+    )
+    parser.add_argument(
+        "--min-duration", type=float, default=1.0,
+        help="floor on per-condition duration when --cycles is used,"
+             " so high-frequency switching doesn't produce useless short captures",
     )
     parser.add_argument(
         "--sequence", type=int, default=1,
@@ -175,14 +196,25 @@ def main() -> None:
     sw = [float(x) for x in args.switching.split(",") if x.strip()]
     sp = [float(x) for x in args.sampling.split(",") if x.strip()]
 
-    total = len(sw) * len(sp) * args.duration
-    print(f"DOE: {len(sw)}×{len(sp)} = {len(sw) * len(sp)} conditions,"
-          f" {args.duration}s each, ~{total:.0f}s total before transfer")
+    if args.cycles > 0:
+        total = sum(
+            max(args.cycles / s, args.min_duration) for s in sw
+        ) * len(sp)
+        print(f"DOE: {len(sw)}×{len(sp)} = {len(sw) * len(sp)} conditions,"
+              f" {args.cycles:g} cycles each (min {args.min_duration}s),"
+              f" ~{total:.0f}s total before transfer")
+    else:
+        total = len(sw) * len(sp) * args.duration
+        print(f"DOE: {len(sw)}×{len(sp)} = {len(sw) * len(sp)} conditions,"
+              f" {args.duration}s each, ~{total:.0f}s total before transfer")
     print(f"switching rates: {sw}")
     print(f"sampling rates:  {sp}")
     print()
 
-    paths = run_doe(args.host, sw, sp, args.duration, args.sequence)
+    paths = run_doe(
+        args.host, sw, sp, args.duration, args.sequence,
+        cycles=args.cycles, min_duration_s=args.min_duration,
+    )
 
     print()
     print(f"done. {len(paths)} files in {DEFAULT_LOG_DIR}")
