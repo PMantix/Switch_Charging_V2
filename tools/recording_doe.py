@@ -74,6 +74,7 @@ def run_doe(
     sequence_idx: int,
     cycles: float = 0,
     min_duration_s: float = 1.0,
+    mode: str = "charge",
 ) -> list[Path]:
     c = Client(host)
     print(f"connected to {host}:{AP_PORT}")
@@ -84,9 +85,8 @@ def run_doe(
         print(c.send({"cmd": "set_mode", "mode": "idle"}))
         print(f"→ set_sequence {sequence_idx}")
         print(c.send({"cmd": "set_sequence", "sequence": sequence_idx}))
-        # Enter charge so switching runs during the recording.
-        print("→ set_mode charge")
-        print(c.send({"cmd": "set_mode", "mode": "charge"}))
+        print(f"→ set_mode {mode}")
+        print(c.send({"cmd": "set_mode", "mode": mode}))
         time.sleep(0.5)  # let the engine programme C+F+G
 
         pi_paths: list[str] = []
@@ -96,26 +96,26 @@ def run_doe(
         # for minutes at a time while only the sample rate changed.
         for sp_hz in sampling_hz:
             for sw_hz in switching_hz:
-                # Per-condition duration: when --cycles is used, duration
-                # scales inversely with switching freq so every recording
-                # captures the same number of switching cycles. A minimum
-                # floor prevents nonsensically short captures at high
-                # switching rates.
+                # One full sequence cycle spans two step_times at the current
+                # step_time formula ((1/f)/2 for 4-step, doubled for 2-step),
+                # so actual cycle period = 2/f seconds regardless of mode.
+                # Multiply by 2 so --cycles N produces N real cycles.
                 if cycles > 0:
-                    cond_duration = max(cycles / sw_hz, min_duration_s)
+                    cond_duration = max(2.0 * cycles / sw_hz, min_duration_s)
                 else:
                     cond_duration = duration_s
                 print()
+                actual_cycles = cond_duration * sw_hz / 2.0
                 print(f"=== switching={sw_hz} Hz, sampling={sp_hz} Hz,"
-                      f" duration={cond_duration:.2f}s"
-                      f" (≈{cond_duration * sw_hz:.1f} cycles) ===")
+                      f" mode={mode}, duration={cond_duration:.2f}s"
+                      f" (≈{actual_cycles:.1f} cycles) ===")
                 print(c.send({"cmd": "set_frequency", "frequency": sw_hz}))
                 print(c.send({"cmd": "set_sensor_rate", "rate": sp_hz}))
                 max_samples = int(cond_duration * sp_hz) + 50
                 resp = c.send({
                     "cmd": "pi_record_start",
                     "max_samples": max_samples,
-                    "rec_mode": "charge",
+                    "rec_mode": mode,
                     "rec_freq": sw_hz,
                     "rec_seq": sequence_idx,
                     "rec_sensor_hz": sp_hz,
@@ -195,6 +195,12 @@ def main() -> None:
         "--sequence", type=int, default=1,
         help="sequence index (0=all-off idle, 1=[0,1,2,3] standard)",
     )
+    parser.add_argument(
+        "--mode", default="charge",
+        choices=["charge", "discharge", "pulse_charge"],
+        help="circuit mode during the DOE (default charge; use"
+             " pulse_charge to exercise PULSE_CHARGE_SEQUENCE)",
+    )
     args = parser.parse_args()
 
     sw = [float(x) for x in args.switching.split(",") if x.strip()]
@@ -218,6 +224,7 @@ def main() -> None:
     paths = run_doe(
         args.host, sw, sp, args.duration, args.sequence,
         cycles=args.cycles, min_duration_s=args.min_duration,
+        mode=args.mode,
     )
 
     print()
