@@ -18,7 +18,8 @@ Serial protocol (USB CDC, line-delimited):
                              default, updates _measured_emit_us and therefore
                              _max_stream_hz to reflect real firmware throughput
     L <R> <G> <B>            Set NeoPixel LED color (0-255 each)
-    P                        Ping (heartbeat)
+    P                        Ping (heartbeat) — reply includes time.ticks_us()
+                             snapshot for Pi-side clock-offset estimation
     R                        Re-scan INA226 sensors
     X                        Soft reset
     C <n> <s1> ... <sn>      Program switching Cycle: n packed states
@@ -40,7 +41,12 @@ Serial protocol (USB CDC, line-delimited):
                                   emit; max_hz recomputed from that measurement
     D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data
     OK L                          LED set
-    OK P                          Pong
+    OK P <t_us>                   Pong; t_us is firmware time.ticks_us() at
+                                   reply-build time. Pi pairs it with its own
+                                   monotonic() before send and after reply to
+                                   compute "firmware_seconds - pi_seconds"
+                                   offset so future G ticks_us values can be
+                                   converted to Pi monotonic() directly.
     OK C <n>                      Sequence programmed (n states)
     OK F <us>                     Period set
     OK G <us> <n> <t_us>          Switching started; t_us is the firmware
@@ -580,7 +586,7 @@ def handle_command(line):
             return "OK L"
 
         elif cmd == "P":
-            return "OK P"
+            return f"OK P {time.ticks_us()}"
 
         elif cmd == "B":
             # Burst recording: B <count> to start, B 0 to stop/cancel
@@ -643,10 +649,16 @@ def handle_command(line):
                 if v < 0 or v > 15:
                     return f"ERR C state {i} out of range 0..15"
                 new_seq[i] = v
+            # Halt the existing timer BEFORE touching _seq_idx. Otherwise
+            # stale ticks fire between C and G (at 1 kHz switching that's
+            # ~5-10 ticks over the C→F→G serial round-trip) and advance
+            # _seq_idx away from 0 mod 2, landing the firmware on state 1
+            # instead of state 0 when G applies _seq[_seq_idx]. That was
+            # the root cause of the 2026-04-24 DOE inversion — the Pi's
+            # _step_at_resume = 0 assumption was fine; firmware was coming
+            # up mid-cycle.
+            _switching_halt()
             _seq = new_seq
-            # Reset index on a sequence change — preserving it across a
-            # different-length cycle is ambiguous; F preserves within the
-            # same cycle, which is what the timing-bias requirement asks for.
             _seq_idx = 0
             return f"OK C {n}"
 

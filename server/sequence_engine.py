@@ -218,17 +218,25 @@ class SequenceEngine:
         """Send C + F + G to the firmware. Called outside the lock so the
         (potentially blocking) serial round-trip doesn't hold up get_state().
 
-        The G reply carries a midpoint-timestamp anchor from gpio_driver —
-        that's the Pi-monotonic time at which the firmware *most likely*
-        applied state 0 on the FET pins, corrected for symmetric one-way
-        serial latency. Without this correction, _resume_time is latched
-        to t_reply, trailing firmware by half an RTT (~5 ms), which flips
-        the step label mod-2 at >=50 Hz switching."""
+        Right before G, we re-sync the Pi↔firmware clock with a P round-trip.
+        gpio_driver.start_switching() then anchors _resume_time DIRECTLY off
+        the firmware's ticks_us stamp (translated through the freshly-measured
+        offset) instead of the Pi's midpoint estimate. Asymmetric latency in
+        the firmware's stdin-poll loop fooled the midpoint anchor — symptom
+        was 100 Hz inverting while 10/200 Hz aligned in the 2026-04-24 DOE.
+        One extra ~5–10 ms round-trip per freq change is acceptable since
+        set_frequency edits are debounced 150 ms anyway."""
         with self._lock:
             packed = self._current_packed_sequence_locked()
             period_us = self._period_us
         self._gpio.program_sequence(packed)
         self._gpio.set_step_period_us(period_us)
+        # Refresh the clock offset right before G so the anchor reflects
+        # current Pi/firmware drift, not whatever was measured minutes ago.
+        try:
+            self._gpio.sync_firmware_clock()
+        except Exception:
+            log.exception("sync_firmware_clock failed; falling back to midpoint anchor")
         anchor_pi_s, _fw_ticks = self._gpio.start_switching()
         with self._lock:
             self._step_at_resume = 0

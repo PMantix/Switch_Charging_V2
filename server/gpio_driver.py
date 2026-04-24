@@ -42,6 +42,15 @@ class GPIODriver:
         self._ser = None
         self._mock = True
 
+        # Pi↔firmware clock offset, populated by sync_firmware_clock(). Stored
+        # as "firmware_seconds - pi_seconds" so an absolute firmware ticks_us
+        # value V (in seconds) maps to Pi monotonic() via:
+        #     pi_s = V/1e6 - _clock_offset_s
+        # None until sync_firmware_clock has run successfully — callers must
+        # treat absence as "fall back to midpoint anchor".
+        self._clock_offset_s = None
+        self._clock_offset_rtt_s = None  # last measured P round-trip (for logging)
+
         # Sensor data (updated by reader thread from stream)
         # Initialize with zero readings so mock mode returns valid data
         self._sensor_data = {
@@ -295,7 +304,58 @@ class GPIODriver:
 
     def ping(self):
         resp = self._send("P")
-        return resp == "OK P"
+        return bool(resp and resp.startswith("OK P"))
+
+    def sync_firmware_clock(self):
+        """Measure the Pi↔firmware clock offset using the P command.
+
+        The firmware now replies with `OK P <ticks_us>` where ticks_us is
+        time.ticks_us() at the moment the reply is built. Under symmetric
+        serial latency the firmware stamp lands at ~midpoint of (t_send,
+        t_reply) Pi-monotonic time, so:
+            offset = firmware_seconds - pi_seconds
+                   = ticks_us/1e6 - 0.5*(t_send + t_reply)
+        Stores the offset and round-trip time on self for later use by
+        start_switching(). Returns the offset in seconds, or None on
+        failure (mock mode, malformed reply, etc.).
+
+        This sync underpins the inversion fix: with a known offset, the
+        OK G ticks_us value translates straight to Pi monotonic, removing
+        the asymmetric stdin-poll latency on the firmware side that the
+        prior midpoint-only anchor couldn't see.
+        """
+        from time import monotonic
+        if self._mock:
+            return None
+        t_send = monotonic()
+        resp = self._send("P")
+        t_reply = monotonic()
+        if not resp or not resp.startswith("OK P"):
+            log.warning("sync_firmware_clock: bad reply: %s", resp)
+            return None
+        parts = resp.split()
+        if len(parts) < 3:
+            # Old firmware that just replies "OK P" — can't sync.
+            log.warning("sync_firmware_clock: firmware reply missing ticks_us; "
+                        "old firmware? reply=%r", resp)
+            return None
+        try:
+            fw_ticks_us = int(parts[2])
+        except ValueError:
+            log.warning("sync_firmware_clock: unparseable ticks_us in %r", resp)
+            return None
+        midpoint_pi_s = 0.5 * (t_send + t_reply)
+        offset = fw_ticks_us / 1_000_000.0 - midpoint_pi_s
+        rtt = t_reply - t_send
+        self._clock_offset_s = offset
+        self._clock_offset_rtt_s = rtt
+        log.info("Firmware clock sync: offset=%.6fs rtt=%.3fms",
+                 offset, rtt * 1000.0)
+        return offset
+
+    def get_clock_offset(self):
+        """Return the most recent (offset_s, rtt_s) tuple or (None, None)."""
+        return self._clock_offset_s, self._clock_offset_rtt_s
 
     # -- Firmware-resident switching cycle (C/F/G/H/K) ----------------------
     # The RP2040 owns periodic switching via machine.Timer. Pi-side code
@@ -328,17 +388,23 @@ class GPIODriver:
         """Start periodic switching. Requires program_sequence() and
         set_step_period_us() to have been called first.
 
-        Returns (anchor_pi_s, fw_ticks_us): the midpoint of send/reply
-        monotonic times — our best estimate of when firmware actually
-        applied state 0 on the FET pins, assuming symmetric one-way
-        serial latency — plus the firmware's own ticks_us stamp from
-        the OK G reply for validation / future clock-sync work.
+        Returns (anchor_pi_s, fw_ticks_us): Pi-monotonic estimate of when
+        firmware applied state 0 on the FET pins, plus the firmware's
+        own ticks_us stamp from the OK G reply.
 
-        The midpoint matters because serial RTT can be 5-10 ms and
-        without the correction the Pi's step estimator latches
-        _resume_time to t_reply, lagging firmware by ~half an RTT.
-        At 50 Hz switching (10 ms step) that was enough to flip the
-        label mod-2 in the 2026-04-24 DOE."""
+        Anchor selection:
+        - If sync_firmware_clock() has populated self._clock_offset_s AND
+          the OK G reply included a usable ticks_us, anchor is computed
+          DIRECTLY from the firmware stamp:
+              anchor_pi_s = fw_ticks_us/1e6 - _clock_offset_s
+          This is the authoritative anchor because it removes the
+          asymmetric latency baked into _switching_start (the firmware's
+          stdin-poll loop adds variable cost that midpoint-of-RTT can't
+          model — symptom was 100 Hz inverting while 10/200 Hz aligned
+          in the 2026-04-24 DOE).
+        - Otherwise, fall back to the midpoint of send/reply monotonic
+          times. Same correction the prior version did; works under the
+          symmetric-latency assumption."""
         from time import monotonic
         t_send = monotonic()
         resp = self._send("G")
@@ -353,7 +419,10 @@ class GPIODriver:
                 fw_ticks_us = int(parts[4])
         except (ValueError, IndexError):
             pass
-        anchor_pi_s = 0.5 * (t_send + t_reply)
+        if self._clock_offset_s is not None and fw_ticks_us is not None:
+            anchor_pi_s = fw_ticks_us / 1_000_000.0 - self._clock_offset_s
+        else:
+            anchor_pi_s = 0.5 * (t_send + t_reply)
         return anchor_pi_s, fw_ticks_us
 
     def stop_switching(self):

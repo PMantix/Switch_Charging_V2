@@ -39,6 +39,15 @@ class PiRecorder:
         self._lock = threading.Lock()
         self._active = False
 
+        # Step-boundary alignment. When set to an integer N, the recorder
+        # discards frames until it has seen a step != N followed by a step
+        # == N — i.e. a transition INTO step N — so every recording begins
+        # at a consistent cycle phase. Useful for DOE analysis where the
+        # first partial step would otherwise be garbage. Set to None to
+        # disable and capture from the first frame.
+        self._align_to_step: int | None = None
+        self._saw_non_target = False
+
         # Writer thread + queue
         self._queue: "queue.Queue" = queue.Queue()
         self._writer_thread: threading.Thread | None = None
@@ -61,8 +70,15 @@ class PiRecorder:
         return self._path
 
     def start(self, max_samples: int, mode: str = "unknown",
-              freq: float = 1.0, seq: int = 0, sensor_hz: float = 15.0):
-        """Start recording. Returns the file path."""
+              freq: float = 1.0, seq: int = 0, sensor_hz: float = 15.0,
+              align_to_step: int | None = 1):
+        """Start recording. Returns the file path.
+
+        `align_to_step` (default 1) makes the recorder wait for a transition
+        into the named step before committing the first sample — every
+        recording starts at a consistent cycle phase. Pass None to disable
+        and capture from the first frame.
+        """
         # Make sure any prior writer thread has fully drained before we
         # re-open. stop() does this outside our setup lock.
         if self._active:
@@ -79,6 +95,8 @@ class PiRecorder:
             self._max_samples = max_samples
             self._start_time = monotonic()
             self._warned_backpressure = False
+            self._align_to_step = align_to_step
+            self._saw_non_target = False
             self._queue = queue.Queue()  # fresh queue per session
             self._active = True
             self._writer_thread = threading.Thread(
@@ -102,10 +120,26 @@ class PiRecorder:
             if not self._active:
                 return False
 
+            step = status.get("step", 0)
+            # Gate the first sample on a transition INTO align_to_step —
+            # this guarantees every recording starts at the same cycle
+            # phase, which makes cycle-aligned analysis straightforward.
+            if self._align_to_step is not None:
+                if step != self._align_to_step:
+                    self._saw_non_target = True
+                    return True
+                if not self._saw_non_target:
+                    # Happened to be on the target step when start() was
+                    # called; wait until step leaves, then comes back.
+                    return True
+                # Transition into target step detected — begin recording
+                # from this frame, reset elapsed clock so t=0 = first row.
+                self._align_to_step = None
+                self._start_time = monotonic()
+
             elapsed = monotonic() - self._start_time
             mode = status.get("mode", "")
             seq = status.get("sequence", 0)
-            step = status.get("step", 0)
             freq = status.get("frequency", 0.0)
             fets = status.get("fet_states", [False] * 4)
             sensors = status.get("sensors", {})
