@@ -338,9 +338,9 @@ class HelpScreen(ModalScreen[None]):
                 "  [bold]1-8[/]       Select switching sequence\n"
                 "  [bold]1-4[/]       [dim](Debug mode: toggle P1/P2/N1/N2)[/]\n\n"
                 "[bold white]SENSORS & PLOT[/]\n"
-                "  [bold]* / /[/]     Sensor rate +/- (0.5-20 Hz)\n"
+                "  [bold]* / /[/]     Sensor rate +/- (0.5-1000 Hz)\n"
                 "  [bold]j[/]         Cycle INA226 averaging (1/4/16/64)\n"
-                "  [bold]k[/]         Cycle bus-voltage decimation (1/5/20/off)\n"
+                "  [bold]k[/]         Cycle bus-voltage decimation (1/2/3/5/10/off)\n"
                 "  [bold]v[/]         Cycle plot mode (line/dot/bar)\n\n"
                 "[bold white]RECORDING[/]\n"
                 "  [bold]l[/]         Start / stop recording\n"
@@ -1170,7 +1170,10 @@ class SwitchingCircuitApp(App):
 
     # -- Actions: Sensor Rate -------------------------------------------------
 
-    SENSOR_RATES = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0]
+    # Goes well past the old 100 Hz ceiling — with AVG=1 + bus_every>=1 the
+    # firmware max_hz is ~800-1250 Hz. The TUI plot caps at 15 fps regardless,
+    # so values above ~50 Hz mostly matter for CSV recording / DOE captures.
+    SENSOR_RATES = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
 
     def _set_sensor_rate(self, rate: float) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
@@ -1204,10 +1207,11 @@ class SwitchingCircuitApp(App):
     # 1/4/16/64/128/256/512/1024 ladder. 128+ averaging is slower than the
     # typical battery timescale and rarely useful in the live TUI.
     INA_AVG_STEPS = [1, 4, 16, 64]
-    # Bus-voltage decimation cycle: "every sample" → "every 5th" → "every
-    # 20th" → "off" (never). Ordered so repeated taps step from most-data
-    # to least-data, matching the rate-vs-detail mental model.
-    BUS_EVERY_STEPS = [1, 5, 20, 0]
+    # Bus-voltage decimation cycle. Ordered most-data → least-data.
+    # Firmware accepts any integer 0..1000; this list is just the TUI
+    # shortcut. "v=off" (0) is rarely useful interactively but kept for
+    # the DOE tool; the CLI flag bypasses this list entirely.
+    BUS_EVERY_STEPS = [1, 2, 3, 5, 10, 0]
 
     def _apply_profile_reply(self, plot: "SensorPlot", reply: Optional[dict]) -> None:
         """Pull firmware-echoed max_hz and any clamped sensor_rate out of
