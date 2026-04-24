@@ -600,6 +600,19 @@ class SwitchingCircuitApp(App):
 
     def on_mount(self) -> None:
         """Initialize client and connect."""
+        # Disable terminal mouse tracking. This TUI is entirely
+        # keyboard-driven; mouse motion over the sensor plots triggers a
+        # flood of MouseMove events which compete with state updates in the
+        # event loop and produce visible stutter. Writing the ANSI disable
+        # sequence at the driver level prevents the terminal from sending
+        # them at all — cleaner than intercepting and dropping.
+        try:
+            if self._driver is not None and hasattr(
+                self._driver, "_disable_mouse_support"
+            ):
+                self._driver._disable_mouse_support()
+        except Exception:
+            log.exception("failed to disable mouse tracking")
         # retry_delay=2.0, max_retries=30 -> ~60s window to survive a network
         # flip (AP activation, WiFi reassociation, etc.) before giving up.
         self._client = PiClient(

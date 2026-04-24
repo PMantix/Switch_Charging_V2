@@ -17,6 +17,7 @@ the firmware's index without a round-trip per query.
 import logging
 import threading
 from time import monotonic
+from typing import Optional
 
 from server.config import (
     SEQUENCES, STATE_DEFS, NUM_SEQUENCES,
@@ -25,6 +26,15 @@ from server.config import (
 )
 
 log = logging.getLogger(__name__)
+
+# Debounce window: when set_frequency/set_sequence/set_pulse_mode are called
+# in rapid succession (e.g. a held `w` key on the TUI), we coalesce the
+# outbound serial commands to the RP2040 instead of firing one per call.
+# Internal state updates still happen immediately so the status broadcast
+# and TUI display reflect the new value right away; only the RP2040 wait
+# gets deferred. 150 ms is short enough to feel instant but long enough to
+# swallow typical key-repeat bursts (~30/sec).
+_DEBOUNCE_S = 0.15
 
 
 def _pack_state(state_tuple):
@@ -58,15 +68,22 @@ class SequenceEngine:
         self._resume_time = 0.0
         self._period_us = 0
 
+        # Debounce state — see _DEBOUNCE_S comment above.
+        self._flush_timer: Optional[threading.Timer] = None
+        self._pending_period = False    # F command waiting to send
+        self._pending_cycle = False     # C+F+G reprogram waiting to send
+
         log.info("SequenceEngine (RP2040-driven) initialised: freq=%.1f Hz, seq=%d",
                  self._frequency, self._sequence_index)
 
     # -- public API (thread-safe) -------------------------------------------
 
     def set_frequency(self, hz):
-        """Set switching frequency, clamped to [MIN_FREQ, MAX_FREQ]."""
+        """Set switching frequency, clamped to [MIN_FREQ, MAX_FREQ].
+
+        Internal state updates immediately; the actual F command to the
+        RP2040 is debounced so a held key doesn't saturate the serial link."""
         hz = max(MIN_FREQ, min(MAX_FREQ, float(hz)))
-        send_period = None
         with self._lock:
             if not self._paused and self._period_us > 0:
                 # Snapshot the current step before the period changes so
@@ -76,11 +93,8 @@ class SequenceEngine:
             self._frequency = hz
             self._period_us = self._compute_period_us_locked()
             if not self._paused:
-                send_period = self._period_us
-        if send_period is not None:
-            # Firmware F preserves its _seq_idx; timer is re-armed with the
-            # new period, biasing the current step short or long.
-            self._gpio.set_step_period_us(send_period)
+                self._pending_period = True
+                self._schedule_flush_locked()
         log.info("Frequency set to %.2f Hz", hz)
 
     def get_frequency(self):
@@ -89,15 +103,13 @@ class SequenceEngine:
 
     def set_sequence(self, index):
         index = max(0, min(NUM_SEQUENCES - 1, int(index)))
-        reprogram = False
         with self._lock:
             self._sequence_index = index
             self._step_at_resume = 0
             self._resume_time = monotonic()
             if not self._paused:
-                reprogram = True
-        if reprogram:
-            self._program_and_go()
+                self._pending_cycle = True
+                self._schedule_flush_locked()
         log.info("Sequence set to %d (%s)", index, SEQUENCES[index])
 
     def get_sequence(self):
@@ -107,16 +119,14 @@ class SequenceEngine:
     def set_pulse_mode(self, enabled):
         """Toggle pulse charge mode — uses the fixed 2-step PULSE_CHARGE_SEQUENCE
         with doubled step period so the overall cycle time matches."""
-        reprogram = False
         with self._lock:
             self._pulse_mode = bool(enabled)
             self._step_at_resume = 0
             self._resume_time = monotonic()
             self._period_us = self._compute_period_us_locked()
             if not self._paused:
-                reprogram = True
-        if reprogram:
-            self._program_and_go()
+                self._pending_cycle = True
+                self._schedule_flush_locked()
         log.info("Pulse mode %s", "enabled" if enabled else "disabled")
 
     def pause(self):
@@ -125,17 +135,20 @@ class SequenceEngine:
         with self._lock:
             was_running = not self._paused
             self._paused = True
+            self._cancel_flush_locked()
         if was_running:
             self._gpio.stop_switching()
         log.debug("SequenceEngine paused")
 
     def resume(self):
-        """Program the current cycle + period and start switching."""
+        """Program the current cycle + period and start switching.
+        Resume is a user-initiated action — skip debounce, fire immediately."""
         with self._lock:
             self._paused = False
             self._step_at_resume = 0
             self._resume_time = monotonic()
             self._period_us = self._compute_period_us_locked()
+            self._cancel_flush_locked()
         self._program_and_go()
         log.debug("SequenceEngine resumed")
 
@@ -209,6 +222,51 @@ class SequenceEngine:
         self._gpio.program_sequence(packed)
         self._gpio.set_step_period_us(period_us)
         self._gpio.start_switching()
+
+    # -- debounce -----------------------------------------------------------
+
+    def _schedule_flush_locked(self):
+        """Reset the debounce timer. Called with self._lock held."""
+        if self._flush_timer is not None:
+            self._flush_timer.cancel()
+        self._flush_timer = threading.Timer(_DEBOUNCE_S, self._flush)
+        self._flush_timer.daemon = True
+        self._flush_timer.start()
+
+    def _cancel_flush_locked(self):
+        """Drop any pending flush. Called with self._lock held."""
+        if self._flush_timer is not None:
+            self._flush_timer.cancel()
+            self._flush_timer = None
+        self._pending_period = False
+        self._pending_cycle = False
+
+    def _flush(self):
+        """Fires after the debounce window. Sends whichever RP2040 commands
+        are pending, using the latest state. If a cycle change is pending
+        it supersedes a period-only change (C+F+G covers both)."""
+        with self._lock:
+            if self._paused:
+                self._pending_period = False
+                self._pending_cycle = False
+                self._flush_timer = None
+                return
+            cycle = self._pending_cycle
+            period = self._pending_period
+            self._pending_period = False
+            self._pending_cycle = False
+            self._flush_timer = None
+            packed = self._current_packed_sequence_locked() if cycle else None
+            period_us = self._period_us
+        try:
+            if cycle:
+                self._gpio.program_sequence(packed)
+                self._gpio.set_step_period_us(period_us)
+                self._gpio.start_switching()
+            elif period:
+                self._gpio.set_step_period_us(period_us)
+        except Exception:
+            log.exception("debounced flush failed")
 
 
 def _unpack(packed):
