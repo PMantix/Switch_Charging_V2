@@ -14,6 +14,9 @@ Serial protocol (USB CDC, line-delimited):
     V <every>                Bus-voltage decimation: read bus once per <every>
                              shunt sweeps (1 = every sample, 0 = never)
     M                        Query max stream rate for current AVG/V settings
+    Z [n]                    Profile emit_stream_line() — times n=50 loops by
+                             default, updates _measured_emit_us and therefore
+                             _max_stream_hz to reflect real firmware throughput
     L <R> <G> <B>            Set NeoPixel LED color (0-255 each)
     P                        Ping (heartbeat)
     R                        Re-scan INA226 sensors
@@ -33,12 +36,19 @@ Serial protocol (USB CDC, line-delimited):
     OK A <avg> <max_hz>           Averaging applied; max_hz is computed cap
     OK V <every> <max_hz>         Decimation applied; max_hz is computed cap
     OK M <avg> <every> <max_hz>   Current sensor profile snapshot
+    OK Z <n> <avg_us> <max_hz>    Emit profile: n loops averaged to avg_us per
+                                  emit; max_hz recomputed from that measurement
     D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data
     OK L                          LED set
     OK P                          Pong
     OK C <n>                      Sequence programmed (n states)
     OK F <us>                     Period set
-    OK G <us> <n>                 Switching started
+    OK G <us> <n> <t_us>          Switching started; t_us is the firmware
+                                   time.ticks_us() at the moment state 0 was
+                                   applied. Pi uses this to anchor its step
+                                   estimate to the firmware clock rather than
+                                   its own monotonic() at reply-receipt time
+                                   (removes the serial round-trip drift).
     OK H                          Switching halted
     OK K <idx>                    Stepped to idx
     ERR <message>                 Error
@@ -100,10 +110,19 @@ _VBUSCT_CODE = 0b010      # 332 us
 _VSHCT_US = 332
 _VBUSCT_US = 332
 _MODE_CONT_BOTH = 0b111
-# Rough per-register I2C read cost at 400 kHz: reg-addr write (1B) +
-# repeat-start + 2B read ≈ 200 us including MicroPython overhead. Used
-# for the stream-rate cap calc so the TUI's "max Hz" number stays honest.
+# Per-register I2C read cost. Starts at a conservative theoretical
+# estimate (at 1 MHz: ~60 µs per 2-byte transaction ignoring MicroPython
+# overhead); replaced with a measured value after the first Z command
+# runs on the device. The initial estimate tends to be optimistic
+# because MicroPython's Python-to-C bridging per transaction adds
+# 100-300 µs that the bus speed calc doesn't capture.
 _I2C_READ_US = 200
+# Extra per-emit overhead (stdout.write to USB CDC, %-format of 8 floats,
+# main-loop polling). Initial estimate conservative; calibrated by Z.
+_EMIT_OVERHEAD_US = 500
+# Populated by the Z command once measurement runs. When non-zero, this
+# overrides the theoretical calc in _max_stream_hz.
+_measured_emit_us = 0
 
 # Live sensor profile. AVG and bus decimation can be re-programmed over
 # serial with A/V commands; the INA226 config register and the _max_stream_hz
@@ -125,7 +144,13 @@ fets = [
 ]
 
 np = neopixel.NeoPixel(Pin(PIN_NEOPIXEL), 1)
-i2c = I2C(1, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL), freq=400_000)
+# I2C at 1 MHz (Fm+). INA226 spec allows up to 2.94 MHz; 1 MHz gives
+# us ~4× the sweep throughput vs the prior 400 kHz setting, which was
+# a significant fraction of the ~4.5 ms per-emit cost observed in the
+# 2026-04-24 DOE. Pull-ups on the breadboard are internal (~50 kΩ) —
+# if SDA/SCL ever start looking glitchy on a scope, drop to 400 kHz
+# here and add external 2.2 kΩ pull-ups instead.
+i2c = I2C(1, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL), freq=1_000_000)
 ina226_present = {}
 
 # Streaming state
@@ -203,11 +228,18 @@ def _tick(t):
     _apply_packed(seq[_seq_idx])
 
 
+_last_start_ticks_us = 0  # firmware time at which state 0 was applied by G
+
+
 def _switching_start():
-    global _running, _timer
+    global _running, _timer, _last_start_ticks_us
     if len(_seq) == 0 or _period_us <= 0:
         return False
     _apply_packed(_seq[_seq_idx])
+    # Stamp the "zero time" AS CLOSE AS POSSIBLE to when state 0 actually
+    # reached the FET pins — before any timer setup, so serial reply
+    # latency doesn't pollute the number.
+    _last_start_ticks_us = time.ticks_us()
     if _timer is not None:
         _timer.deinit()
     _timer = Timer(-1)
@@ -268,14 +300,17 @@ def ina226_apply_all():
 
 def _max_stream_hz():
     """Ceiling on the streaming rate given the current AVG and bus
-    decimation. The larger of INA226 conversion time and the I2C sweep
-    time (4 sensors × up to 2 register reads) sets the floor period."""
+    decimation. If Z has been run, uses the measured per-emit time
+    (authoritative). Otherwise estimates from INA226 conversion time
+    and I2C sweep time plus fixed overhead — theoretical ceiling."""
+    if _measured_emit_us > 0:
+        return 1_000_000.0 / _measured_emit_us
     conv_us = _ina226_avg * (_VSHCT_US + _VBUSCT_US)
     # Shunt read on every sweep; bus read amortized over _bus_every sweeps.
     i2c_us = 4 * _I2C_READ_US
     if _bus_every > 0:
         i2c_us += (4 * _I2C_READ_US) / _bus_every
-    period_us = conv_us if conv_us > i2c_us else i2c_us
+    period_us = max(conv_us, i2c_us) + _EMIT_OVERHEAD_US
     return 1_000_000.0 / period_us
 
 
@@ -418,7 +453,7 @@ def emit_stream_line():
 def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
     global _seq, _seq_idx, _period_us, _running, _timer
-    global _ina226_avg, _bus_every, _bus_counter
+    global _ina226_avg, _bus_every, _bus_counter, _measured_emit_us
     line = line.strip()
     if not line:
         return None
@@ -507,6 +542,35 @@ def handle_command(line):
         elif cmd == "M":
             cap = _max_stream_hz()
             return f"OK M {_ina226_avg} {_bus_every} {cap:.1f}"
+
+        elif cmd == "Z":
+            # Profile emit_stream_line. Time N iterations and divide.
+            # Uses the same code path the stream uses, so the measured
+            # value is what streaming actually delivers.
+            n = 50
+            if len(parts) == 2:
+                try:
+                    n = max(10, min(500, int(parts[1])))
+                except ValueError:
+                    pass
+            # Suspend streaming so the profiler doesn't race with it.
+            prev_hz = stream_hz
+            stream_hz = 0
+            t0 = time.ticks_us()
+            for _ in range(n):
+                emit_stream_line()
+            t1 = time.ticks_us()
+            total_us = time.ticks_diff(t1, t0)
+            avg_us = total_us // n
+            _measured_emit_us = avg_us
+            # Re-clamp stream rate to new honest cap.
+            cap = _max_stream_hz()
+            if prev_hz > cap:
+                prev_hz = cap
+            stream_hz = prev_hz
+            if stream_hz > 0:
+                stream_interval = 1.0 / stream_hz
+            return f"OK Z {n} {avg_us} {cap:.1f}"
 
         elif cmd == "L":
             if len(parts) != 4:
@@ -604,7 +668,7 @@ def handle_command(line):
         elif cmd == "G":
             if _switching_start():
                 set_led(4, 0, 4)  # magenta = switching active
-                return f"OK G {_period_us} {len(_seq)}"
+                return f"OK G {_period_us} {len(_seq)} {_last_start_ticks_us}"
             return "ERR G requires C and F first"
 
         elif cmd == "H":

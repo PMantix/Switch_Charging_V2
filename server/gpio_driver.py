@@ -326,10 +326,35 @@ class GPIODriver:
 
     def start_switching(self):
         """Start periodic switching. Requires program_sequence() and
-        set_step_period_us() to have been called first."""
+        set_step_period_us() to have been called first.
+
+        Returns (anchor_pi_s, fw_ticks_us): the midpoint of send/reply
+        monotonic times — our best estimate of when firmware actually
+        applied state 0 on the FET pins, assuming symmetric one-way
+        serial latency — plus the firmware's own ticks_us stamp from
+        the OK G reply for validation / future clock-sync work.
+
+        The midpoint matters because serial RTT can be 5-10 ms and
+        without the correction the Pi's step estimator latches
+        _resume_time to t_reply, lagging firmware by ~half an RTT.
+        At 50 Hz switching (10 ms step) that was enough to flip the
+        label mod-2 in the 2026-04-24 DOE."""
+        from time import monotonic
+        t_send = monotonic()
         resp = self._send("G")
+        t_reply = monotonic()
         if resp and not resp.startswith("OK"):
             log.warning("RP2040 G error: %s", resp)
+            return None, None
+        fw_ticks_us = None
+        try:
+            parts = resp.split()
+            if len(parts) >= 5:
+                fw_ticks_us = int(parts[4])
+        except (ValueError, IndexError):
+            pass
+        anchor_pi_s = 0.5 * (t_send + t_reply)
+        return anchor_pi_s, fw_ticks_us
 
     def stop_switching(self):
         """Halt switching and set all FETs off."""

@@ -218,21 +218,24 @@ class SequenceEngine:
         """Send C + F + G to the firmware. Called outside the lock so the
         (potentially blocking) serial round-trip doesn't hold up get_state().
 
-        After start_switching() returns, the RP2040 has applied state 0 and
-        armed its timer. We capture _resume_time at THAT moment so step
-        estimation starts at the right zero point — otherwise the Pi's
-        clock starts 20-50 ms earlier than the firmware's, producing a
-        phase shift at high switching rates (visible in the DOE plots as
-        red trace shifted from commanded grey step)."""
+        The G reply carries a midpoint-timestamp anchor from gpio_driver —
+        that's the Pi-monotonic time at which the firmware *most likely*
+        applied state 0 on the FET pins, corrected for symmetric one-way
+        serial latency. Without this correction, _resume_time is latched
+        to t_reply, trailing firmware by half an RTT (~5 ms), which flips
+        the step label mod-2 at >=50 Hz switching."""
         with self._lock:
             packed = self._current_packed_sequence_locked()
             period_us = self._period_us
         self._gpio.program_sequence(packed)
         self._gpio.set_step_period_us(period_us)
-        self._gpio.start_switching()
+        anchor_pi_s, _fw_ticks = self._gpio.start_switching()
         with self._lock:
             self._step_at_resume = 0
-            self._resume_time = monotonic()
+            # Fall back to monotonic() if start_switching returned None
+            # (e.g. serial error); the fallback reintroduces the old lag
+            # but at least keeps the engine running.
+            self._resume_time = anchor_pi_s if anchor_pi_s is not None else monotonic()
 
     # -- debounce -----------------------------------------------------------
 

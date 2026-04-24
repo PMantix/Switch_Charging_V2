@@ -25,21 +25,37 @@ def upload(port, local_path, remote_name):
     time.sleep(0.2)
     ser.read(ser.in_waiting)
 
-    # Build the write script
-    script = (
-        f"f = open('{remote_name}', 'w')\n"
-        f"f.write({content!r})\n"
-        f"f.close()\n"
-        f"print('UPLOADED {remote_name}', len({content!r}), 'bytes')\n"
+    # Chunk the file — a single f.write({content!r}) of a >20 KB string
+    # triggers MemoryError on the RP2040 (can't allocate one ~28 KB repr
+    # plus the GC/parse overhead on a 264 KB heap). Writing in ~2 KB
+    # blocks stays well inside what the heap can hold at once.
+    def _exec(script: str, wait: float = 0.2) -> str:
+        ser.write(script.encode("utf-8"))
+        ser.write(b"\x04")
+        time.sleep(wait)
+        out = b""
+        while ser.in_waiting:
+            out += ser.read(ser.in_waiting)
+            time.sleep(0.02)
+        return out.decode("utf-8", errors="replace")
+
+    resp = _exec(f"f = open('{remote_name}', 'w')\n", 0.2)
+    if "Error" in resp or "error" in resp:
+        print(resp)
+
+    CHUNK = 2048
+    total = len(content)
+    for i in range(0, total, CHUNK):
+        block = content[i:i + CHUNK]
+        # repr() escapes newlines / quotes; safe to inline into the f.write call.
+        resp = _exec(f"f.write({block!r})\n", 0.1)
+        if "Error" in resp:
+            print(f"chunk @{i} failed: {resp}")
+            break
+
+    resp = _exec(
+        f"f.close()\nprint('UPLOADED {remote_name}', {total}, 'bytes')\n", 0.3
     )
-
-    # Send via raw REPL: Ctrl-A already sent, now paste + Ctrl-D to execute
-    ser.write(script.encode("utf-8"))
-    ser.write(b"\x04")  # Ctrl-D = execute
-    time.sleep(1.0)
-
-    # Read response
-    resp = ser.read(ser.in_waiting).decode("utf-8", errors="replace")
     print(resp)
 
     # Exit raw REPL

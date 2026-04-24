@@ -111,7 +111,12 @@ PULSE_CHARGE_SEQUENCE = [0, 3]
 # Frequency range and defaults
 # ---------------------------------------------------------------------------
 MIN_FREQ = 0.1       # Hz
-MAX_FREQ = 300.0     # Hz
+# Firmware's hard floor is 50 µs step period, so with a 2-step pulse
+# sequence the absolute ceiling is 10 kHz switching. 2 kHz keeps comfy
+# headroom for the UCC5304 gate-drive rise/fall and leaves the INA226
+# sampling cap (~500-1000 Hz) as the limiting factor rather than the
+# switching cap — which is what we want for aliasing DOEs.
+MAX_FREQ = 2000.0    # Hz
 DEFAULT_FREQ = 1.0   # Hz
 
 # ---------------------------------------------------------------------------
