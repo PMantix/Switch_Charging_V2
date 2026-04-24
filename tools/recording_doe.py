@@ -90,8 +90,12 @@ def run_doe(
         time.sleep(0.5)  # let the engine programme C+F+G
 
         pi_paths: list[str] = []
-        for sw_hz in switching_hz:
-            for sp_hz in sampling_hz:
+        # Inner loop is switching so the visual effect on the circuit
+        # (LED blink rate) cycles fast — more interesting to watch on video
+        # than if the outer loop varied switching and the LEDs held still
+        # for minutes at a time while only the sample rate changed.
+        for sp_hz in sampling_hz:
+            for sw_hz in switching_hz:
                 # Per-condition duration: when --cycles is used, duration
                 # scales inversely with switching freq so every recording
                 # captures the same number of switching cycles. A minimum
