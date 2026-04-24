@@ -223,20 +223,39 @@ class DataLogger:
         return tier, desc
 
     def _stop_pi(self) -> str:
-        # Tell Pi to stop recording
-        if self._client:
-            self._client.send_command({"cmd": "pi_record_stop"})
+        # Use the actually-connected Pi IP (e.g. 10.42.0.1 in AP mode)
+        # rather than `raspberrypi.local`, which may not resolve over a
+        # local AP network.
+        pi_host = "raspberrypi.local"
+        if self._client is not None:
+            host_attr = getattr(self._client, "host", "")
+            if host_attr:
+                pi_host = host_attr
 
-        # Brief pause to let Pi flush
+        # Tell the Pi to stop recording.
+        if self._client:
+            try:
+                self._client.send_command({"cmd": "pi_record_stop"})
+            except Exception:
+                pass
+
+        # Brief pause to let Pi flush the CSV writer queue.
         import time
         time.sleep(0.5)
 
-        # Find the most recent pi_*.csv on the Pi
+        ssh_target = f"pi@{pi_host}"
+        ssh_opts = [
+            "-o", "StrictHostKeyChecking=no",
+            "-o", "ConnectTimeout=3",
+            "-o", "BatchMode=yes",  # fail fast if auth would prompt
+        ]
+
+        # Find the most recent pi_*.csv on the Pi.
         try:
             result = subprocess.run(
-                ["ssh", "pi@raspberrypi.local",
+                ["ssh", *ssh_opts, ssh_target,
                  "ls -t ~/SwitchingCircuitV2_logs/pi_*.csv 2>/dev/null | head -1"],
-                capture_output=True, text=True, timeout=10,
+                capture_output=True, text=True, timeout=8,
             )
             remote_path = result.stdout.strip()
         except Exception:
@@ -245,14 +264,14 @@ class DataLogger:
         if not remote_path:
             return "No data on Pi"
 
-        # SCP from Pi to Mac
+        # SCP from Pi to Mac.
         self._log_dir.mkdir(parents=True, exist_ok=True)
         local_name = Path(remote_path).name
         local_path = self._log_dir / local_name
         try:
             result = subprocess.run(
-                ["scp", f"pi@raspberrypi.local:{remote_path}", str(local_path)],
-                capture_output=True, timeout=30,
+                ["scp", *ssh_opts, f"{ssh_target}:{remote_path}", str(local_path)],
+                capture_output=True, timeout=20,
             )
             if result.returncode == 0:
                 with open(local_path) as f:
@@ -260,13 +279,14 @@ class DataLogger:
                 self._path = local_path
                 self._sample_count = samples
                 subprocess.run(
-                    ["ssh", "pi@raspberrypi.local", f"rm {remote_path}"],
-                    capture_output=True, timeout=10,
+                    ["ssh", *ssh_opts, ssh_target, f"rm {remote_path}"],
+                    capture_output=True, timeout=5,
                 )
                 return f"{samples} samples -> {local_name}"
-            else:
-                err = result.stderr.decode(errors='replace').strip()
-                return f"SCP failed: {err}"
+            err = result.stderr.decode(errors="replace").strip()
+            return f"SCP failed: {err}"
+        except subprocess.TimeoutExpired:
+            return "SCP timed out — check Pi reachability"
         except Exception as e:
             log.warning("SCP failed: %s", e)
             return f"Transfer failed: {e}"

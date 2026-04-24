@@ -1197,18 +1197,40 @@ class SwitchingCircuitApp(App):
     LOG_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1800, 3600]
 
     def _on_recording_done(self, desc: Optional[str] = None) -> None:
-        """Called when any recording tier finishes."""
-        if desc is None:
-            _, desc = self._data_logger.stop()
+        """Called when any recording tier finishes.
+
+        If a description is supplied the stop already happened (e.g. Mac
+        tier finished via record() returning False). Otherwise we run the
+        stop in a worker thread because the Pi-tier SCP can take several
+        seconds and would otherwise freeze the UI at end-of-duration.
+        """
+        if desc is not None:
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            conn_bar.conn_label = "Connected"
+            self.notify(desc, title="Recording complete")
+            return
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
-        conn_bar.conn_label = "Connected"
-        self.notify(desc, title="Recording complete")
+        conn_bar.conn_label = "Finalizing log…"
+        self.run_worker(self._stop_recording_worker(), exclusive=True)
+
+    async def _stop_recording_worker(self) -> None:
+        """Run DataLogger.stop on an executor thread so the UI stays
+        responsive during SCP / writer-thread drain."""
+        import asyncio
+        loop = asyncio.get_event_loop()
+        _, desc = await loop.run_in_executor(None, self._data_logger.stop)
+        try:
+            conn_bar = self.query_one("#conn-bar", ConnectionBar)
+            conn_bar.conn_label = "Connected"
+            self.notify(desc or "done", title="Recording complete")
+        except Exception:
+            pass
 
     def action_toggle_log(self) -> None:
         if self._data_logger.is_logging:
-            # Early stop
-            tier, desc = self._data_logger.stop()
-            self._on_recording_done(desc)
+            # Early stop — kick off the worker-based stop flow (same as
+            # the auto-stop path) so the UI doesn't block on SCP.
+            self._on_recording_done()
         else:
             plot = self.query_one("#sensor-plot", SensorPlot)
             tier, desc = self._data_logger.start(
