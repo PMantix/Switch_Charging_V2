@@ -36,12 +36,13 @@ def load(path: Path) -> pd.DataFrame:
 
 
 def title_from_file(df: pd.DataFrame, path: Path) -> str:
+    n = len(df)
+    if n == 0:
+        return f"{path.name}\n(empty recording — 0 samples)"
     freq = df["frequency_hz"].iloc[0] if "frequency_hz" in df.columns else None
     mode = df["mode"].iloc[0] if "mode" in df.columns else ""
-    n = len(df)
     dur = df["elapsed_s"].iloc[-1] - df["elapsed_s"].iloc[0]
     sample_hz = (n - 1) / dur if dur > 0 else 0
-    parts = [path.name]
     bits = []
     if mode:
         bits.append(str(mode))
@@ -53,6 +54,9 @@ def title_from_file(df: pd.DataFrame, path: Path) -> str:
 
 def plot_one(path: Path, save: Path | None = None) -> None:
     df = load(path)
+    if len(df) == 0:
+        print(f"skip {path.name}: empty recording", file=sys.stderr)
+        return
     t = df["elapsed_s"].to_numpy()
 
     fig, (ax_v, ax_i, ax_f) = plt.subplots(

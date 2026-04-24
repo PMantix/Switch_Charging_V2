@@ -397,18 +397,21 @@ class CommandServer:
                 continue
             last_broadcast = now
 
-            with self._sub_lock:
-                if not self._subscribers:
-                    continue
-                subscribers = list(self._subscribers)
-
+            # Build status once per tick. Pi-side recording runs every
+            # tick regardless of whether any subscribers are connected —
+            # scripted command-only clients (recording_doe.py, etc.) need
+            # recordings to happen even though they never subscribe.
             status = self._mc.get_status()
 
-            # Pi-side recording (happens at stream rate, no network hop)
             if self._recorder.is_recording:
                 still_going = self._recorder.record(status)
                 if not still_going:
                     log.info("Pi recording auto-stopped at %d samples", self._recorder.sample_count)
+
+            with self._sub_lock:
+                if not self._subscribers:
+                    continue
+                subscribers = list(self._subscribers)
 
             payload = {"event": "state", "t_emit_ns": time.monotonic_ns(), **status}
 
