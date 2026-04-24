@@ -67,6 +67,9 @@ class SensorPlot(Widget):
     sensor_rate: reactive[float] = reactive(2.0)
     viz_mode: reactive[str] = reactive("line")
     expanded: reactive[bool] = reactive(False)
+    ina_avg: reactive[int] = reactive(4)           # INA226 sample averaging
+    bus_every: reactive[int] = reactive(1)         # bus-voltage decimation
+    max_hz: reactive[float] = reactive(376.0)      # firmware-computed cap
 
     # Expanded plot sizing is driven by the available_width / available_height
     # reactives set by the app's on_resize handler.
@@ -269,6 +272,10 @@ class SensorPlot(Widget):
         # Header with legend
         t.append(" SENSORS ", style="bold cyan underline")
         t.append(f"[{self.sensor_rate:.0f}Hz]", style="dim")
+        t.append(f"[max {self.max_hz:.0f}]", style="dim")
+        t.append(f"[avg={self.ina_avg}]", style="dim")
+        bus_tag = "v=off" if self.bus_every == 0 else f"v÷{self.bus_every}"
+        t.append(f"[{bus_tag}]", style="dim")
         t.append(f" [{mode}]", style="dim cyan")
         t.append("  ")
         t.append("/", style="bold white on dark_blue")
@@ -347,6 +354,10 @@ class SensorPlot(Widget):
         # Header
         t.append(" SENSORS ", style="bold cyan underline")
         t.append(f"[{self.sensor_rate:.0f}Hz]", style="dim")
+        t.append(f"[max {self.max_hz:.0f}]", style="dim")
+        t.append(f"[avg={self.ina_avg}]", style="dim")
+        bus_tag = "v=off" if self.bus_every == 0 else f"v÷{self.bus_every}"
+        t.append(f"[{bus_tag}]", style="dim")
         t.append(f" [{mode}]", style="dim cyan")
         t.append("  ")
         t.append("v", style="bold white on dark_blue")
@@ -451,6 +462,15 @@ class SensorPlot(Widget):
         return self._render_compact_from()
 
     def watch_sensor_rate(self, _: float) -> None:
+        self._dirty = True
+
+    def watch_ina_avg(self, _: int) -> None:
+        self._dirty = True
+
+    def watch_bus_every(self, _: int) -> None:
+        self._dirty = True
+
+    def watch_max_hz(self, _: float) -> None:
         self._dirty = True
 
     def watch_viz_mode(self, _: str) -> None:

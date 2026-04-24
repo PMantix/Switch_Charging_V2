@@ -75,11 +75,34 @@ def run_doe(
     cycles: float = 0,
     min_duration_s: float = 1.0,
     mode: str = "charge",
+    ina_avg: int = None,
+    bus_every: int = None,
 ) -> list[Path]:
     c = Client(host)
     print(f"connected to {host}:{AP_PORT}")
 
     try:
+        # Apply sensor profile up front. Echoed max_hz tells the rest of the
+        # sweep how high we can legitimately push --sampling.
+        max_hz = None
+        if ina_avg is not None:
+            print(f"→ set_ina226_avg {ina_avg}")
+            resp = c.send({"cmd": "set_ina226_avg", "avg": ina_avg})
+            print(resp)
+            if resp.get("ok"):
+                max_hz = resp.get("max_hz")
+        if bus_every is not None:
+            print(f"→ set_bus_every {bus_every}")
+            resp = c.send({"cmd": "set_bus_every", "every": bus_every})
+            print(resp)
+            if resp.get("ok"):
+                max_hz = resp.get("max_hz")
+        if max_hz is not None:
+            requested_max = max(sampling_hz)
+            if requested_max > max_hz:
+                print(f"WARNING: requested --sampling max {requested_max:.0f} Hz"
+                      f" exceeds firmware cap {max_hz:.0f} Hz — firmware will clamp")
+
         # Clean starting state.
         print("→ set_mode idle")
         print(c.send({"cmd": "set_mode", "mode": "idle"}))
@@ -206,6 +229,18 @@ def main() -> None:
         help="circuit mode during the DOE (default charge; use"
              " pulse_charge to exercise PULSE_CHARGE_SEQUENCE)",
     )
+    parser.add_argument(
+        "--avg", type=int, default=None,
+        choices=[1, 4, 16, 64, 128, 256, 512, 1024],
+        help="INA226 averaging count (fewer = faster but noisier). Leave"
+             " unset to keep whatever the firmware currently has."
+    )
+    parser.add_argument(
+        "--bus-every", type=int, default=None,
+        help="Bus-voltage decimation: read bus once per N shunt sweeps."
+             " 1 = every sample (default on firmware), 0 = never. Higher"
+             " values raise the sample-rate cap.",
+    )
     args = parser.parse_args()
 
     sw = [float(x) for x in args.switching.split(",") if x.strip()]
@@ -230,6 +265,7 @@ def main() -> None:
         args.host, sw, sp, args.duration, args.sequence,
         cycles=args.cycles, min_duration_s=args.min_duration,
         mode=args.mode,
+        ina_avg=args.avg, bus_every=args.bus_every,
     )
 
     print()

@@ -215,17 +215,72 @@ class GPIODriver:
         return None
 
     def set_sensor_rate(self, hz):
-        """Set the RP2040 streaming rate."""
-        hz = max(0, min(200.0, float(hz)))
+        """Set the RP2040 streaming rate. Firmware caps the actual rate to
+        whatever _max_stream_hz() returns for the current AVG + bus decimation
+        profile; the OK T reply echoes the effective rate."""
+        hz = max(0.0, float(hz))
         resp = self._send(f"T {hz:.1f}")
         if resp and resp.startswith("OK T"):
-            self._sensor_hz = hz
-            log.info("Sensor stream rate set to %.1f Hz", hz)
+            try:
+                actual = float(resp.split()[2])
+            except (ValueError, IndexError):
+                actual = hz
+            self._sensor_hz = actual
+            log.info("Sensor stream rate set to %.1f Hz (requested %.1f)", actual, hz)
         else:
             log.warning("Failed to set stream rate: %s", resp)
 
     def get_sensor_rate(self):
         return self._sensor_hz
+
+    def set_ina226_avg(self, avg):
+        """Set INA226 averaging count. Valid: 1/4/16/64/128/256/512/1024.
+        Returns (actual_avg, max_hz) — firmware echoes the new cap so the
+        caller can re-clamp the stream rate if needed."""
+        resp = self._send(f"A {int(avg)}")
+        if resp and resp.startswith("OK A"):
+            parts = resp.split()
+            try:
+                actual = int(parts[2])
+                max_hz = float(parts[3])
+                log.info("INA226 AVG set to %d (max stream %.1f Hz)", actual, max_hz)
+                return actual, max_hz
+            except (ValueError, IndexError):
+                pass
+        log.warning("Failed to set INA226 AVG: %s", resp)
+        return None, None
+
+    def set_bus_every(self, every):
+        """Set bus-voltage decimation. 0 = never read bus, 1 = every sample,
+        N = every Nth shunt sweep. Returns (actual_every, max_hz)."""
+        resp = self._send(f"V {int(every)}")
+        if resp and resp.startswith("OK V"):
+            parts = resp.split()
+            try:
+                actual = int(parts[2])
+                max_hz = float(parts[3])
+                log.info("INA226 bus_every set to %d (max stream %.1f Hz)", actual, max_hz)
+                return actual, max_hz
+            except (ValueError, IndexError):
+                pass
+        log.warning("Failed to set bus decimation: %s", resp)
+        return None, None
+
+    def get_sensor_profile(self):
+        """Query firmware for current AVG / bus_every / max_hz. Returns dict
+        or None on failure."""
+        resp = self._send("M")
+        if resp and resp.startswith("OK M"):
+            parts = resp.split()
+            try:
+                return {
+                    "avg": int(parts[2]),
+                    "bus_every": int(parts[3]),
+                    "max_hz": float(parts[4]),
+                }
+            except (ValueError, IndexError):
+                pass
+        return None
 
     def get_sensor_data(self):
         with self._sensor_lock:

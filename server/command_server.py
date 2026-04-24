@@ -238,6 +238,33 @@ class CommandServer:
                 self._broadcast_hz = min(max(rate, _DEFAULT_SUBSCRIBE_HZ), _MAX_SUBSCRIBE_HZ)
                 return {"ok": True, "sensor_rate": self._mc._gpio.get_sensor_rate()}
 
+            elif cmd == "set_ina226_avg":
+                avg = msg.get("avg")
+                if avg is None:
+                    return {"ok": False, "error": "Missing 'avg' field"}
+                actual, max_hz = self._mc._gpio.set_ina226_avg(int(avg))
+                if actual is None:
+                    return {"ok": False, "error": "Failed to set AVG"}
+                return {"ok": True, "avg": actual, "max_hz": max_hz,
+                        "sensor_rate": self._mc._gpio.get_sensor_rate()}
+
+            elif cmd == "set_bus_every":
+                every = msg.get("every")
+                if every is None:
+                    return {"ok": False, "error": "Missing 'every' field"}
+                actual, max_hz = self._mc._gpio.set_bus_every(int(every))
+                if actual is None:
+                    return {"ok": False, "error": "Failed to set bus decimation"}
+                return {"ok": True, "bus_every": actual, "max_hz": max_hz,
+                        "sensor_rate": self._mc._gpio.get_sensor_rate()}
+
+            elif cmd == "get_sensor_profile":
+                profile = self._mc._gpio.get_sensor_profile()
+                if profile is None:
+                    return {"ok": False, "error": "Failed to query profile"}
+                return {"ok": True, **profile,
+                        "sensor_rate": self._mc._gpio.get_sensor_rate()}
+
             elif cmd == "pi_record_start":
                 max_samples = int(msg.get("max_samples", 0))
                 rec_mode = msg.get("rec_mode", "unknown")

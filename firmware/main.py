@@ -10,6 +10,10 @@ Serial protocol (USB CDC, line-delimited):
     Q                        Query current FET states
     I                        Read INA226 sensors (one-shot)
     T <hz>                   Start streaming sensors at <hz> (0 = stop)
+    A <avg>                  INA226 averaging samples (1/4/16/64/128/256/512/1024)
+    V <every>                Bus-voltage decimation: read bus once per <every>
+                             shunt sweeps (1 = every sample, 0 = never)
+    M                        Query max stream rate for current AVG/V settings
     L <R> <G> <B>            Set NeoPixel LED color (0-255 each)
     P                        Ping (heartbeat)
     R                        Re-scan INA226 sensors
@@ -25,7 +29,10 @@ Serial protocol (USB CDC, line-delimited):
     OK S <P1> <P2> <N1> <N2>     FET state confirmation
     OK Q <P1> <P2> <N1> <N2>     FET state query response
     OK I <json>                   INA226 readings (one-shot)
-    OK T <hz>                     Streaming started/stopped
+    OK T <hz>                     Streaming started/stopped (hz = actual, may be capped)
+    OK A <avg> <max_hz>           Averaging applied; max_hz is computed cap
+    OK V <every> <max_hz>         Decimation applied; max_hz is computed cap
+    OK M <avg> <every> <max_hz>   Current sensor profile snapshot
     D <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data
     OK L                          LED set
     OK P                          Pong
@@ -81,6 +88,30 @@ INA226_SHUNT_V_LSB = 2.5e-6      # 2.5 uV per bit
 
 # Shunt resistor value
 SHUNT_RESISTOR = 0.1  # 100 mOhm
+
+# INA226 CONFIG register field layout:
+#   bits 11-9  AVG       (8 codes → 1, 4, 16, 64, 128, 256, 512, 1024)
+#   bits 8-6   VBUSCT    (8 codes → 140, 204, 332, 588, 1100, 2116, 4156, 8244 us)
+#   bits 5-3   VSHCT     (same codes)
+#   bits 2-0   MODE      (111 = continuous shunt+bus)
+_AVG_VALUES = (1, 4, 16, 64, 128, 256, 512, 1024)
+_VSHCT_CODE = 0b010       # 332 us — decent SNR/speed balance
+_VBUSCT_CODE = 0b010      # 332 us
+_VSHCT_US = 332
+_VBUSCT_US = 332
+_MODE_CONT_BOTH = 0b111
+# Rough per-register I2C read cost at 400 kHz: reg-addr write (1B) +
+# repeat-start + 2B read ≈ 200 us including MicroPython overhead. Used
+# for the stream-rate cap calc so the TUI's "max Hz" number stays honest.
+_I2C_READ_US = 200
+
+# Live sensor profile. AVG and bus decimation can be re-programmed over
+# serial with A/V commands; the INA226 config register and the _max_stream_hz
+# cap are recomputed from these.
+_ina226_avg = 4           # sample count (must be in _AVG_VALUES)
+_bus_every = 1            # read bus voltage every Nth shunt sweep (0 = never)
+_bus_counter = 0          # running count into the decimation cycle
+_last_bus_v = [0.0, 0.0, 0.0, 0.0]  # cache so skipped sweeps still emit a value
 
 
 # ---------------------------------------------------------------------------
@@ -211,10 +242,41 @@ def ina226_write_reg(addr, reg, value):
     i2c.writeto(addr, bytes([reg, (value >> 8) & 0xFF, value & 0xFF]))
 
 
+def _build_ina226_config(avg_value):
+    """Encode the INA226 CONFIG word for the requested AVG count.
+    VSHCT/VBUSCT/MODE are fixed; only AVG is runtime-tunable today."""
+    avg_code = _AVG_VALUES.index(avg_value)
+    return ((avg_code & 0x07) << 9) | ((_VBUSCT_CODE & 0x07) << 6) \
+        | ((_VSHCT_CODE & 0x07) << 3) | (_MODE_CONT_BOTH & 0x07)
+
+
 def ina226_init(addr):
-    """AVG=4, VBUSCT=332us, VSHCT=332us, continuous shunt+bus."""
-    config = 0x0297
+    """Write the current (_ina226_avg) config word to one sensor."""
+    config = _build_ina226_config(_ina226_avg)
     ina226_write_reg(addr, INA226_REG_CONFIG, config)
+
+
+def ina226_apply_all():
+    """Re-program every present sensor with the current config. Called
+    after A changes the averaging setting at runtime."""
+    for addr in ina226_present.values():
+        try:
+            ina226_init(addr)
+        except OSError:
+            pass
+
+
+def _max_stream_hz():
+    """Ceiling on the streaming rate given the current AVG and bus
+    decimation. The larger of INA226 conversion time and the I2C sweep
+    time (4 sensors × up to 2 register reads) sets the floor period."""
+    conv_us = _ina226_avg * (_VSHCT_US + _VBUSCT_US)
+    # Shunt read on every sweep; bus read amortized over _bus_every sweeps.
+    i2c_us = 4 * _I2C_READ_US
+    if _bus_every > 0:
+        i2c_us += (4 * _I2C_READ_US) / _bus_every
+    period_us = conv_us if conv_us > i2c_us else i2c_us
+    return 1_000_000.0 / period_us
 
 
 def ina226_scan():
@@ -233,7 +295,8 @@ def ina226_scan():
 
 
 def ina226_read_fast(addr):
-    """Read bus voltage and shunt voltage. Returns (bus_raw, shunt_raw)."""
+    """Read bus voltage and shunt voltage. Returns (bus_raw, shunt_raw).
+    Used by one-shot I and burst paths where we always want both."""
     i2c.writeto(addr, bytes([INA226_REG_BUS_V]))
     bv = i2c.readfrom(addr, 2)
     i2c.writeto(addr, bytes([INA226_REG_SHUNT_V]))
@@ -241,9 +304,17 @@ def ina226_read_fast(addr):
     return (bv[0] << 8) | bv[1], (sv[0] << 8) | sv[1]
 
 
+def _ina226_read_shunt_only(addr):
+    """Shunt-only fast path for decimated streaming. ~half the I2C time
+    of reading both registers — worth it when _bus_every is large."""
+    i2c.writeto(addr, bytes([INA226_REG_SHUNT_V]))
+    sv = i2c.readfrom(addr, 2)
+    return (sv[0] << 8) | sv[1]
+
+
 def ina226_read_all_fast():
-    """Read all sensors. Returns list of (bus_v, current_a) in SENSOR_ORDER.
-    Missing sensors return (0.0, 0.0)."""
+    """Read all sensors (always both). Returns list of (bus_v, current_a)
+    in SENSOR_ORDER. Missing sensors return (0.0, 0.0)."""
     results = []
     for name in SENSOR_ORDER:
         addr = ina226_present.get(name)
@@ -256,6 +327,35 @@ def ina226_read_all_fast():
                 raw_shunt -= 65536
             bus_v = raw_bus * INA226_BUS_V_LSB
             current_a = (raw_shunt * INA226_SHUNT_V_LSB) / SHUNT_RESISTOR
+            results.append((bus_v, current_a))
+        except OSError:
+            results.append((0.0, 0.0))
+    return results
+
+
+def ina226_read_all_streaming(read_bus):
+    """Stream-path reader. Always reads shunt; reads bus only when
+    read_bus is True, otherwise reuses the cached value. Bus voltage
+    changes slowly (supply rail) so decimation barely affects utility."""
+    results = []
+    for i in range(len(SENSOR_ORDER)):
+        name = SENSOR_ORDER[i]
+        addr = ina226_present.get(name)
+        if addr is None:
+            results.append((0.0, 0.0))
+            continue
+        try:
+            raw_shunt = _ina226_read_shunt_only(addr)
+            if raw_shunt > 32767:
+                raw_shunt -= 65536
+            current_a = (raw_shunt * INA226_SHUNT_V_LSB) / SHUNT_RESISTOR
+            if read_bus:
+                i2c.writeto(addr, bytes([INA226_REG_BUS_V]))
+                bv = i2c.readfrom(addr, 2)
+                bus_v = ((bv[0] << 8) | bv[1]) * INA226_BUS_V_LSB
+                _last_bus_v[i] = bus_v
+            else:
+                bus_v = _last_bus_v[i]
             results.append((bus_v, current_a))
         except OSError:
             results.append((0.0, 0.0))
@@ -287,9 +387,23 @@ _STREAM_FMT = "D %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
 def emit_stream_line():
     """Read all sensors and print a compact D line.
     One %-format call = one string allocation instead of the 9 that a
-    list-of-f-strings + join produces. Matters at 200 Hz sensor rate where
-    the list-build path triggers GC ~1×/sec and visibly stutters switching."""
-    r = ina226_read_all_fast()
+    list-of-f-strings + join produces. Matters at >1 kHz sensor rate where
+    the list-build path triggers GC ~1×/sec and visibly stutters switching.
+
+    Bus voltage is decimated per _bus_every — always read shunt (the fast
+    signal), read bus only every Nth sweep. Cached bus value fills the
+    slot otherwise so the D line schema stays fixed for downstream code."""
+    global _bus_counter
+    if _bus_every <= 0:
+        read_bus = False
+    else:
+        _bus_counter += 1
+        if _bus_counter >= _bus_every:
+            _bus_counter = 0
+            read_bus = True
+        else:
+            read_bus = False
+    r = ina226_read_all_streaming(read_bus)
     sys.stdout.write(_STREAM_FMT % (
         r[0][0], r[0][1],
         r[1][0], r[1][1],
@@ -304,6 +418,7 @@ def emit_stream_line():
 def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
     global _seq, _seq_idx, _period_us, _running, _timer
+    global _ina226_avg, _bus_every, _bus_counter
     line = line.strip()
     if not line:
         return None
@@ -346,11 +461,52 @@ def handle_command(line):
                 set_led(0, 0, 2)  # blue = idle
                 return "OK T 0"
             else:
-                hz = min(hz, 200.0)
+                cap = _max_stream_hz()
+                if hz > cap:
+                    hz = cap
                 stream_hz = hz
                 stream_interval = 1.0 / hz
                 set_led(0, 4, 4)  # cyan = streaming
                 return f"OK T {hz:.1f}"
+
+        elif cmd == "A":
+            if len(parts) != 2:
+                return "ERR A requires 1 arg: A <avg>"
+            try:
+                avg = int(parts[1])
+            except ValueError:
+                return "ERR A avg must be integer"
+            if avg not in _AVG_VALUES:
+                return "ERR A avg must be one of 1/4/16/64/128/256/512/1024"
+            _ina226_avg = avg
+            ina226_apply_all()
+            # New cap may be lower than current stream rate — clamp.
+            cap = _max_stream_hz()
+            if stream_hz > cap:
+                stream_hz = cap
+                stream_interval = 1.0 / cap
+            return f"OK A {_ina226_avg} {cap:.1f}"
+
+        elif cmd == "V":
+            if len(parts) != 2:
+                return "ERR V requires 1 arg: V <every>"
+            try:
+                every = int(parts[1])
+            except ValueError:
+                return "ERR V every must be integer"
+            if every < 0 or every > 1000:
+                return "ERR V every must be 0..1000"
+            _bus_every = every
+            _bus_counter = 0
+            cap = _max_stream_hz()
+            if stream_hz > cap:
+                stream_hz = cap
+                stream_interval = 1.0 / cap
+            return f"OK V {_bus_every} {cap:.1f}"
+
+        elif cmd == "M":
+            cap = _max_stream_hz()
+            return f"OK M {_ina226_avg} {_bus_every} {cap:.1f}"
 
         elif cmd == "L":
             if len(parts) != 4:

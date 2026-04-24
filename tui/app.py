@@ -510,6 +510,8 @@ class SwitchingCircuitApp(App):
         Binding("-", "freq_down_fine", "-0.1Hz", show=False),
         Binding("*", "sensor_rate_up", "Sensor+", show=False),
         Binding("/", "sensor_rate_down", "Sensor-", show=False),
+        Binding("j", "cycle_ina_avg", "AVG", show=False),
+        Binding("k", "cycle_bus_every", "V-decim", show=False),
         Binding("v", "cycle_viz", "Viz Mode", show=False),
         Binding("l", "toggle_log", "Log", show=False),
         Binding("[", "log_duration_down", "Dur-", show=False),
@@ -1193,6 +1195,54 @@ class SwitchingCircuitApp(App):
     def action_cycle_viz(self) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
         plot.cycle_mode()
+
+    # -- Actions: INA226 Sensor Profile --------------------------------------
+
+    # User-facing AVG choices — intentionally a subset of firmware's full
+    # 1/4/16/64/128/256/512/1024 ladder. 128+ averaging is slower than the
+    # typical battery timescale and rarely useful in the live TUI.
+    INA_AVG_STEPS = [1, 4, 16, 64]
+    # Bus-voltage decimation cycle: "every sample" → "every 5th" → "every
+    # 20th" → "off" (never). Ordered so repeated taps step from most-data
+    # to least-data, matching the rate-vs-detail mental model.
+    BUS_EVERY_STEPS = [1, 5, 20, 0]
+
+    def _apply_profile_reply(self, plot: "SensorPlot", reply: Optional[dict]) -> None:
+        """Pull firmware-echoed max_hz and any clamped sensor_rate out of
+        the reply so the header reflects real state, not just what we asked
+        for. Silent no-op if the command failed or we're disconnected."""
+        if not reply or not reply.get("ok"):
+            return
+        max_hz = reply.get("max_hz")
+        if max_hz is not None:
+            plot.max_hz = float(max_hz)
+        sensor_rate = reply.get("sensor_rate")
+        if sensor_rate is not None and sensor_rate > 0:
+            plot.sensor_rate = float(sensor_rate)
+
+    def action_cycle_ina_avg(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        try:
+            idx = self.INA_AVG_STEPS.index(plot.ina_avg)
+        except ValueError:
+            idx = 0
+        new_avg = self.INA_AVG_STEPS[(idx + 1) % len(self.INA_AVG_STEPS)]
+        plot.ina_avg = new_avg
+        if self._client and self._client.connection_state == ConnectionState.CONNECTED:
+            reply = self._client.send_command({"cmd": "set_ina226_avg", "avg": new_avg})
+            self._apply_profile_reply(plot, reply)
+
+    def action_cycle_bus_every(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        try:
+            idx = self.BUS_EVERY_STEPS.index(plot.bus_every)
+        except ValueError:
+            idx = 0
+        new_every = self.BUS_EVERY_STEPS[(idx + 1) % len(self.BUS_EVERY_STEPS)]
+        plot.bus_every = new_every
+        if self._client and self._client.connection_state == ConnectionState.CONNECTED:
+            reply = self._client.send_command({"cmd": "set_bus_every", "every": new_every})
+            self._apply_profile_reply(plot, reply)
 
     LOG_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1800, 3600]
 
