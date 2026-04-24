@@ -68,8 +68,12 @@ class SensorPlot(Widget):
     viz_mode: reactive[str] = reactive("line")
     expanded: reactive[bool] = reactive(False)
     ina_avg: reactive[int] = reactive(4)           # INA226 sample averaging
-    bus_every: reactive[int] = reactive(1)         # bus-voltage decimation
-    max_hz: reactive[float] = reactive(376.0)      # firmware-computed cap
+    # bus_every default 5 mirrors firmware default (2026-04-24 sweep). The
+    # rig is format-blocked at ~4 ms/emit regardless of AVG/CT, so the only
+    # rate-relevant knob the user touches with `k` is bus_every. Header
+    # initial state matches what the firmware actually reports on first M.
+    bus_every: reactive[int] = reactive(5)         # bus-voltage decimation
+    max_hz: reactive[float] = reactive(244.0)      # firmware-computed cap
 
     # Expanded plot sizing is driven by the available_width / available_height
     # reactives set by the app's on_resize handler.
