@@ -4,6 +4,10 @@ Switching Circuit V2 — RP2040-Zero Firmware
 Receives line-delimited commands over USB serial from the Raspberry Pi
 and drives the H-bridge gate signals via UCC5304 drivers.
 
+Stream output is BINARY framed (not the legacy ASCII "D" line) — see
+emit_stream_line_binary() and the wire-format block below. The ASCII
+emit_stream_line() is kept under _USE_BINARY=False for revert.
+
 Serial protocol (USB CDC, line-delimited):
   Commands (Pi → RP2040):
     S <P1> <P2> <N1> <N2>   Set FET states directly (auto-halts switching)
@@ -79,6 +83,7 @@ import sys
 import uselect
 import gc
 import json
+import struct
 from machine import Pin, I2C, Timer
 import neopixel
 import time
@@ -355,6 +360,8 @@ def ina226_scan():
                 ina226_present[name] = addr
             except OSError:
                 pass
+    # Refresh the cached address list used by the binary emit hot path.
+    _refresh_sensor_addrs()
     return ina226_present
 
 
@@ -449,10 +456,11 @@ _STREAM_FMT = "D %d %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
 
 
 def emit_stream_line():
-    """Read all sensors and print a compact D line.
-    One %-format call = one string allocation instead of the 9 that a
-    list-of-f-strings + join produces. Matters at >1 kHz sensor rate where
-    the list-build path triggers GC ~1×/sec and visibly stutters switching.
+    """LEGACY ASCII emit. Kept under `_USE_BINARY=False` for revert.
+
+    Read all sensors and print a compact D line. One %-format call =
+    one string allocation instead of the 9 that a list-of-f-strings +
+    join produces.
 
     Bus voltage is decimated per _bus_every — always read shunt (the fast
     signal), read bus only every Nth sweep. Cached bus value fills the
@@ -480,6 +488,147 @@ def emit_stream_line():
         r[2][0], r[2][1],
         r[3][0], r[3][1],
     ))
+
+
+# ---------------------------------------------------------------------------
+# Binary frame emit — ~5× smaller than ASCII, zero float formatting.
+# ---------------------------------------------------------------------------
+# Wire format (25 bytes total):
+#   [0]  0xAA           sync byte 1
+#   [1]  0x55           sync byte 2
+#   [2]  'B' (0x42)     frame tag — distinguishes from future frame types
+#   [3]  20             payload length in bytes
+#   [4:8]   uint32 LE   ticks_us (sample-capture firmware time.ticks_us())
+#   [8:10]  int16  LE   P1 shunt raw (LSB = 2.5 µV)
+#   [10:12] uint16 LE   P1 bus   raw (LSB = 1.25 mV)
+#   [12:14] int16  LE   P2 shunt raw
+#   [14:16] uint16 LE   P2 bus   raw
+#   [16:18] int16  LE   N1 shunt raw
+#   [18:20] uint16 LE   N1 bus   raw
+#   [20:22] int16  LE   N2 shunt raw
+#   [22:24] uint16 LE   N2 bus   raw
+#   [24]   uint8        XOR of bytes [4..24)
+#
+# Float conversion (raw × LSB / shunt_R) moves to the Pi where CPU is free.
+# The Pi parser drops bytes outside a valid frame (so ASCII boot banner +
+# firmware reset mid-stream are tolerated) by walking the SCAN_SYNC state.
+_USE_BINARY = True
+_FRAME_LEN = 25
+_PAYLOAD_LEN = 20
+_FRAME_BUF = bytearray(_FRAME_LEN)
+_FRAME_BUF[0] = 0xAA
+_FRAME_BUF[1] = 0x55
+_FRAME_BUF[2] = 0x42  # 'B'
+_FRAME_BUF[3] = _PAYLOAD_LEN
+# Cache last-seen raw bus words per sensor so non-bus-tick samples can fill
+# the slot without a fresh I²C read. Seeded to 0 — first bus_every cycle
+# fills with real values.
+_last_bus_raw = bytearray(8)  # 4 sensors × 2 bytes
+# Single-shot scratch buffer for I²C reads (re-used). We read into a
+# preallocated 2-byte memoryview to avoid `i2c.readfrom` allocating a
+# new bytes object every call. MicroPython's readfrom_into writes into
+# any bytes-like buffer.
+_I2C_RX = bytearray(2)
+_I2C_RX_MV = memoryview(_I2C_RX)
+# Pre-built single-byte register-pointer write buffers. Reused so the
+# hot path doesn't allocate a new `bytes([reg])` every transaction.
+_REG_SHUNT = bytes([INA226_REG_SHUNT_V])
+_REG_BUS = bytes([INA226_REG_BUS_V])
+# Resolved sensor addresses cached as a list once at scan time so the
+# hot path doesn't dict-lookup per emit. None entries mean "missing —
+# emit zeros". Refreshed by ina226_scan().
+_sensor_addrs = [None, None, None, None]
+
+
+def _refresh_sensor_addrs():
+    """Snapshot the current ina226_present mapping into _sensor_addrs (a
+    fixed-length list) so the hot emit path can index without a dict
+    lookup per sensor."""
+    for i in range(4):
+        _sensor_addrs[i] = ina226_present.get(SENSOR_ORDER[i])
+
+
+def emit_stream_line_binary():
+    """Binary stream emit — replaces ASCII `D` line.
+
+    Hot path is allocation-free: `struct.pack_into` writes into the
+    preallocated `_FRAME_BUF`, `i2c.readfrom_into` writes into the
+    preallocated `_I2C_RX`, and the per-sensor address list is cached.
+
+    Bus voltage is decimated per _bus_every — when read_bus is False,
+    the cached raw word in _last_bus_raw fills the slot. With bus_every=5
+    the I²C cost per emit is ~halved (4 shunt + 0.8 bus reads vs 8)."""
+    global _bus_counter
+    if _bus_every <= 0:
+        read_bus = False
+    else:
+        _bus_counter += 1
+        if _bus_counter >= _bus_every:
+            _bus_counter = 0
+            read_bus = True
+        else:
+            read_bus = False
+    # Sample-capture timestamp BEFORE the I²C sweep — same semantics as
+    # the legacy ASCII path, so Pi-side clock-offset math is unchanged.
+    t_us = time.ticks_us()
+    # Pack ticks_us at offset 4 (after sync/tag/len header).
+    struct.pack_into("<I", _FRAME_BUF, 4, t_us & 0xFFFFFFFF)
+    # Per-sensor reads. SENSOR_ORDER fixed at 4 → unrolled by index loop.
+    # Each sensor occupies 4 bytes of payload starting at offset 8 + i*4:
+    #   shunt int16 at +0, bus uint16 at +2.
+    pos = 8
+    for i in range(4):
+        addr = _sensor_addrs[i]
+        if addr is None:
+            # Missing sensor — emit zeros.
+            _FRAME_BUF[pos] = 0
+            _FRAME_BUF[pos + 1] = 0
+            _FRAME_BUF[pos + 2] = 0
+            _FRAME_BUF[pos + 3] = 0
+        else:
+            try:
+                # Shunt — always read (fast signal).
+                i2c.writeto(addr, _REG_SHUNT)
+                i2c.readfrom_into(addr, _I2C_RX_MV)
+                # INA226 ships big-endian; flip into LE in the frame.
+                _FRAME_BUF[pos] = _I2C_RX[1]
+                _FRAME_BUF[pos + 1] = _I2C_RX[0]
+                # Bus — read on bus-tick, otherwise reuse cached raw.
+                if read_bus:
+                    i2c.writeto(addr, _REG_BUS)
+                    i2c.readfrom_into(addr, _I2C_RX_MV)
+                    bus_lo = _I2C_RX[1]
+                    bus_hi = _I2C_RX[0]
+                    _last_bus_raw[i * 2] = bus_lo
+                    _last_bus_raw[i * 2 + 1] = bus_hi
+                    _FRAME_BUF[pos + 2] = bus_lo
+                    _FRAME_BUF[pos + 3] = bus_hi
+                else:
+                    _FRAME_BUF[pos + 2] = _last_bus_raw[i * 2]
+                    _FRAME_BUF[pos + 3] = _last_bus_raw[i * 2 + 1]
+            except OSError:
+                # I/O error — zero this sensor, keep the frame valid.
+                _FRAME_BUF[pos] = 0
+                _FRAME_BUF[pos + 1] = 0
+                _FRAME_BUF[pos + 2] = 0
+                _FRAME_BUF[pos + 3] = 0
+        pos += 4
+    # XOR checksum over payload bytes [4..24).
+    cksum = 0
+    for j in range(4, 24):
+        cksum ^= _FRAME_BUF[j]
+    _FRAME_BUF[24] = cksum
+    # Single write — USB CDC bulk transfer.
+    sys.stdout.buffer.write(_FRAME_BUF)
+
+
+def _emit():
+    """Dispatch to whichever emit path is active. Z and the main-loop
+    streamer call this so the active path is consistent."""
+    if _USE_BINARY:
+        emit_stream_line_binary()
+    else:
+        emit_stream_line()
 
 
 # ---------------------------------------------------------------------------
@@ -594,7 +743,7 @@ def handle_command(line):
             stream_hz = 0
             t0 = time.ticks_us()
             for _ in range(n):
-                emit_stream_line()
+                _emit()
             t1 = time.ticks_us()
             total_us = time.ticks_diff(t1, t0)
             avg_us = total_us // n
@@ -839,7 +988,7 @@ def main():
         if stream_hz > 0:
             elapsed = time.ticks_diff(now, last_stream)
             if elapsed >= stream_interval * 1_000_000:
-                emit_stream_line()
+                _emit()
                 last_stream = now
         else:
             # Idle (switching is IRQ-driven so it's fine to sleep here) —
