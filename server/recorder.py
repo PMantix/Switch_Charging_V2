@@ -11,6 +11,8 @@ stay within a few MB of memory. If the queue depth ever exceeds
 DEPTH_WARN_THRESHOLD we log one warning so backpressure is visible.
 """
 
+from __future__ import annotations
+
 import csv
 import logging
 import queue
