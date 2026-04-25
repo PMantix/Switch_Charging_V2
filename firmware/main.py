@@ -21,10 +21,6 @@ Serial protocol (USB CDC, line-delimited):
     P                        Ping (heartbeat) — reply includes time.ticks_us()
                              snapshot for Pi-side clock-offset estimation
     R                        Re-scan INA226 sensors
-    U <vsh_us> <vbus_us>     Set INA226 conversion times in µs (must be one
-                             of 140/204/332/588/1100/2116/4156/8244 each).
-                             Re-programs sensors and recomputes max_hz.
-    E                        Report gc.mem_free() — for leak diagnostics
     X                        Soft reset
     C <n> <s1> ... <sn>      Program switching Cycle: n packed states
                              (each 0-15, bits P1<<3|P2<<2|N1<<1|N2)
@@ -126,9 +122,6 @@ SHUNT_RESISTOR = 0.1  # 100 mOhm
 #   bits 5-3   VSHCT     (same codes)
 #   bits 2-0   MODE      (111 = continuous shunt+bus)
 _AVG_VALUES = (1, 4, 16, 64, 128, 256, 512, 1024)
-# Conversion-time codes — index = register bits, value = µs. Both VSHCT and
-# VBUSCT use the same encoding. Runtime-tunable via the U command.
-_CT_VALUES = (140, 204, 332, 588, 1100, 2116, 4156, 8244)
 _VSHCT_CODE = 0b010       # 332 us — decent SNR/speed balance
 _VBUSCT_CODE = 0b010      # 332 us
 _VSHCT_US = 332
@@ -152,12 +145,7 @@ _measured_emit_us = 0
 # serial with A/V commands; the INA226 config register and the _max_stream_hz
 # cap are recomputed from these.
 _ina226_avg = 4           # sample count (must be in _AVG_VALUES)
-# bus_every=5 default (was 1) — 2026-04-24 sweep showed sustained rate is
-# pinned to a ~4 ms format/USB floor (not conversion or I²C), so cutting
-# bus reads to 1-in-5 is effectively free SNR-wise and recovers ~20% of
-# the per-emit cost (4882 → 4093 µs). Bus voltage is the supply rail and
-# changes on a timescale of seconds — decimation is invisible in practice.
-_bus_every = 5            # read bus voltage every Nth shunt sweep (0 = never)
+_bus_every = 1            # read bus voltage every Nth shunt sweep (0 = never)
 _bus_counter = 0          # running count into the decimation cycle
 _last_bus_v = [0.0, 0.0, 0.0, 0.0]  # cache so skipped sweeps still emit a value
 
@@ -305,7 +293,7 @@ def ina226_write_reg(addr, reg, value):
 
 def _build_ina226_config(avg_value):
     """Encode the INA226 CONFIG word for the requested AVG count.
-    AVG/VSHCT/VBUSCT are runtime-tunable (A and U commands); MODE is fixed."""
+    VSHCT/VBUSCT/MODE are fixed; only AVG is runtime-tunable today."""
     avg_code = _AVG_VALUES.index(avg_value)
     return ((avg_code & 0x07) << 9) | ((_VBUSCT_CODE & 0x07) << 6) \
         | ((_VSHCT_CODE & 0x07) << 3) | (_MODE_CONT_BOTH & 0x07)
@@ -489,7 +477,6 @@ def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
     global _seq, _seq_idx, _period_us, _running, _timer
     global _ina226_avg, _bus_every, _bus_counter, _measured_emit_us
-    global _VSHCT_CODE, _VBUSCT_CODE, _VSHCT_US, _VBUSCT_US
     line = line.strip()
     if not line:
         return None
@@ -659,36 +646,6 @@ def handle_command(line):
             found = ina226_scan()
             names = ", ".join(f"{n}@0x{a:02X}" for n, a in found.items())
             return f"OK R {names}"
-
-        elif cmd == "U":
-            # U <vsh_us> <vbus_us> — runtime conversion-time tuning. Same
-            # 8-code ladder as the INA226 CONFIG register; each value must
-            # match one of _CT_VALUES. Re-encodes config word and re-applies
-            # to every present sensor, then resets _measured_emit_us so the
-            # next Z (or M) reflects the new floor honestly.
-            if len(parts) != 3:
-                return "ERR U requires 2 args: U <vsh_us> <vbus_us>"
-            try:
-                vsh = int(parts[1])
-                vbus = int(parts[2])
-            except ValueError:
-                return "ERR U values must be integer µs"
-            if vsh not in _CT_VALUES or vbus not in _CT_VALUES:
-                return "ERR U values must be in 140/204/332/588/1100/2116/4156/8244"
-            _VSHCT_CODE = _CT_VALUES.index(vsh)
-            _VBUSCT_CODE = _CT_VALUES.index(vbus)
-            _VSHCT_US = vsh
-            _VBUSCT_US = vbus
-            ina226_apply_all()
-            _measured_emit_us = 0  # invalidate so the cap reflects new CT
-            cap = _max_stream_hz()
-            if stream_hz > cap:
-                stream_hz = cap
-                stream_interval = 1.0 / cap
-            return f"OK U {_VSHCT_US} {_VBUSCT_US} {cap:.1f}"
-
-        elif cmd == "E":
-            return f"OK E {gc.mem_free()}"
 
         elif cmd == "X":
             import machine
