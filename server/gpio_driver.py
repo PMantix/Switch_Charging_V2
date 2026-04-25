@@ -285,6 +285,26 @@ class GPIODriver:
         log.warning("Failed to set INA226 AVG: %s", resp)
         return None, None
 
+    def set_cnvr_enabled(self, enabled: bool):
+        """Toggle CNVR-driven INA226 read scheduling. When enabled, the
+        firmware gates each emit on a hardware ALERT-pin edge from the
+        chips, so every emit is a fresh conversion. When disabled, the
+        legacy blind-poll path runs and ~5/6 emits at AVG=1 are stale
+        repeats. Returns (actual_enabled, armed) or (None, None) on
+        failure."""
+        resp = self._send(f"N {1 if enabled else 0}")
+        if resp and resp.startswith("OK N"):
+            parts = resp.split()
+            try:
+                actual = bool(int(parts[2]))
+                armed = bool(int(parts[3]))
+                log.info("CNVR set to %s (armed=%s)", actual, armed)
+                return actual, armed
+            except (ValueError, IndexError):
+                pass
+        log.warning("Failed to toggle CNVR: %s", resp)
+        return None, None
+
     def set_bus_every(self, every):
         """Set bus-voltage decimation. 0 = never read bus, 1 = every sample,
         N = every Nth shunt sweep. Returns (actual_every, max_hz)."""

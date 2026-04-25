@@ -272,6 +272,13 @@ class CommandServer:
                     return {"ok": False, "error": "profile_emit returned no parseable reply"}
                 return {"ok": True, **result}
 
+            elif cmd == "set_cnvr":
+                enabled = bool(msg.get("enabled", True))
+                actual, armed = self._mc._gpio.set_cnvr_enabled(enabled)
+                if actual is None:
+                    return {"ok": False, "error": "Firmware did not accept N command"}
+                return {"ok": True, "enabled": actual, "armed": armed}
+
             elif cmd == "pi_record_start":
                 max_samples = int(msg.get("max_samples", 0))
                 rec_mode = msg.get("rec_mode", "unknown")

@@ -98,6 +98,14 @@ PIN_N2 = 5    # GP5 → UCC5304 U4 → N2 low-side
 PIN_SDA = 6   # GP6 → INA226 I2C SDA
 PIN_SCL = 7   # GP7 → INA226 I2C SCL
 
+# GP27 ← shared open-drain ALERT line from all 4 INA226s (wired-OR via the
+# 4.7 kΩ pull-up R_ALERT1 on the PCB). Used for Conversion-Ready (CNVR)
+# scheduling: each chip pulls ALERT low after every conversion, the IRQ
+# handler latches that as "fresh data available", the stream loop reads
+# the shunt/bus registers, then reads register 06h on each chip to clear
+# CVRF (and release the ALERT line) before arming the next sweep.
+PIN_ALERT = 27
+
 PIN_NEOPIXEL = 16  # GP16 → onboard WS2812
 
 # INA226 I2C addresses
@@ -115,7 +123,16 @@ SENSOR_ORDER = ["P1", "P2", "N1", "N2"]
 INA226_REG_CONFIG = 0x00
 INA226_REG_SHUNT_V = 0x01
 INA226_REG_BUS_V = 0x02
+INA226_REG_MASK_EN = 0x06       # Mask/Enable: CNVR (bit 10) gates ALERT on
+                                # Conversion Ready; CVRF (bit 3) is the
+                                # read-and-clear conversion-done flag.
 INA226_REG_DIEID = 0xFF
+
+# Mask/Enable bits we care about for CNVR scheduling
+INA226_MASK_CNVR = 1 << 10      # 0x0400 — drive ALERT on conversion ready
+INA226_MASK_CVRF = 1 << 3       # 0x0008 — set after each conversion; cleared
+                                #          on read (and ALERT deasserts when
+                                #          all chips' CVRF have been cleared)
 
 # INA226 constants
 INA226_BUS_V_LSB = 1.25e-3       # 1.25 mV per bit
@@ -177,6 +194,31 @@ np = neopixel.NeoPixel(Pin(PIN_NEOPIXEL), 1)
 # here and add external 2.2 kΩ pull-ups instead.
 i2c = I2C(1, sda=Pin(PIN_SDA), scl=Pin(PIN_SCL), freq=1_000_000)
 ina226_present = {}
+
+# Shared INA226 ALERT line — open-drain wired-OR of all 4 chips, pulled
+# up on the board (R_ALERT1 = 4.7 kΩ). PULL_UP enabled defensively in case
+# of board-level rework; it's parallel with R_ALERT1 so doesn't change the
+# 1-µs-class fall time materially.
+alert_pin = Pin(PIN_ALERT, Pin.IN, Pin.PULL_UP)
+
+# CNVR scheduler state. Set in the falling-edge IRQ; consumed (cleared)
+# by the stream loop after a successful sweep. The IRQ handler must be
+# allocation-free — just one global write.
+_cnvr_ready = False
+# Set True once CNVR has been programmed into Mask/Enable on every chip.
+# When False, the stream loop falls back to pure timer cadence (legacy
+# behavior) so the firmware boots cleanly even if no INA226s are present.
+_cnvr_armed = False
+# User-facing toggle. When False, ina226_init skips the Mask/Enable write
+# and _arm_cnvr() short-circuits, so the stream stays on the legacy
+# timer-only path. Used for A/B comparison without re-flashing — flipping
+# this and re-applying via N command is enough.
+_cnvr_user_enabled = True
+# Watchdog: if the ALERT line has been silent for this many microseconds
+# past when we expected a conversion, fall through to a forced read. This
+# keeps a wedged chip / disconnected ALERT wire from freezing the stream.
+# Recomputed when AVG changes; conservative 4× one full conversion period.
+_cnvr_timeout_us = 16000
 
 # Streaming state
 stream_hz = 0       # 0 = off
@@ -308,9 +350,36 @@ def _build_ina226_config(avg_value):
 
 
 def ina226_init(addr):
-    """Write the current (_ina226_avg) config word to one sensor."""
+    """Write the current (_ina226_avg) config word to one sensor and
+    enable the Conversion-Ready ALERT (CNVR bit in Mask/Enable) when
+    the user has CNVR enabled. With CNVR set, the chip pulls its
+    open-drain ALERT pin low at the end of every conversion; the
+    wired-OR of all 4 ALERT pins is GP27, so the main loop can wait
+    on a single hardware edge instead of polling. Reading register
+    06h clears CVRF and releases that chip's ALERT."""
     config = _build_ina226_config(_ina226_avg)
     ina226_write_reg(addr, INA226_REG_CONFIG, config)
+    if _cnvr_user_enabled:
+        # Bit 10 (CNVR) = 1 reroutes ALERT to fire on conversion-ready.
+        # All other Mask bits stay 0 — we don't use the over/under-
+        # current alert function. Polarity bits default correctly.
+        ina226_write_reg(addr, INA226_REG_MASK_EN, INA226_MASK_CNVR)
+        # Reading 06h once now clears any stale CVRF latched during
+        # config writes so the first post-init ALERT edge corresponds
+        # to a real new conversion, not power-on residue.
+        try:
+            ina226_read_reg(addr, INA226_REG_MASK_EN)
+        except OSError:
+            pass
+    else:
+        # User has CNVR disabled — write zero to Mask/Enable so the
+        # ALERT pin won't be driven by this chip. (Important when A/B-
+        # toggling: a stale CNVR=1 left over from a previous session
+        # would still pull ALERT low even though we ignore it.)
+        try:
+            ina226_write_reg(addr, INA226_REG_MASK_EN, 0)
+        except OSError:
+            pass
 
 
 def ina226_apply_all():
@@ -321,6 +390,65 @@ def ina226_apply_all():
             ina226_init(addr)
         except OSError:
             pass
+    _recompute_cnvr_timeout()
+    _arm_cnvr()
+
+
+def _recompute_cnvr_timeout():
+    """Stale-data watchdog window. One conversion period is
+    AVG × (VSHCT + VBUSCT). 4× gives margin for I²C stalls and
+    arbitration without false-positive timeouts."""
+    global _cnvr_timeout_us
+    conv_us = _ina226_avg * (_VSHCT_US + _VBUSCT_US)
+    _cnvr_timeout_us = max(4 * conv_us, 2000)
+
+
+def _clear_cnvr_all():
+    """Read register 06h on every present chip to clear CVRF and release
+    the shared ALERT line. Returns silently on per-chip I²C failures so
+    a single bad chip doesn't take down streaming."""
+    for addr in ina226_present.values():
+        try:
+            ina226_read_reg(addr, INA226_REG_MASK_EN)
+        except OSError:
+            pass
+
+
+def _on_alert_irq(pin):
+    """ALERT line went low — at least one INA226 has CVRF set and is
+    holding the shared line down. Just latch the flag; the actual reads
+    happen in the main loop. MUST stay allocation-free (no f-strings,
+    no list ops) to avoid GC churn under fast switching."""
+    global _cnvr_ready
+    _cnvr_ready = True
+
+
+def _arm_cnvr():
+    """Enable the falling-edge IRQ on the ALERT line once we have at
+    least one INA226 talking. Idempotent. Skipped entirely when the
+    user has disabled CNVR via the N command — the stream loop then
+    runs the legacy blind-poll path, which is what we want when A/B-
+    testing CNVR-on vs CNVR-off without re-flashing."""
+    global _cnvr_armed, _cnvr_ready
+    if not _cnvr_user_enabled:
+        # Tear down any existing IRQ so the loop reverts cleanly.
+        try:
+            alert_pin.irq(handler=None)
+        except Exception:
+            pass
+        _cnvr_armed = False
+        _cnvr_ready = False
+        return
+    if not ina226_present:
+        _cnvr_armed = False
+        return
+    # Drain any pre-existing CVRF state, then unmask the IRQ. Order
+    # matters: clearing CVRF can itself release ALERT high, and we want
+    # the next falling edge (a real conversion) to wake the loop.
+    _clear_cnvr_all()
+    _cnvr_ready = False
+    alert_pin.irq(trigger=Pin.IRQ_FALLING, handler=_on_alert_irq)
+    _cnvr_armed = True
 
 
 def _max_stream_hz():
@@ -351,6 +479,8 @@ def ina226_scan():
                 ina226_present[name] = addr
             except OSError:
                 pass
+    _recompute_cnvr_timeout()
+    _arm_cnvr()
     return ina226_present
 
 
@@ -473,8 +603,15 @@ def emit_stream_line():
     Each emit also accumulates phase timings (I2C sweep, %-format, stdout
     write) into module-level globals — the Z command snapshots and resets
     them. We use ticks_us/ticks_diff and module globals (not a list) so
-    no allocation happens on the hot path."""
-    global _bus_counter, _stream_seq
+    no allocation happens on the hot path.
+
+    When CNVR is armed, the caller has already validated that ALERT
+    fired (or the watchdog timed out). After the write, clear CVRF on
+    every chip so ALERT releases and the next falling edge marks the
+    next genuinely-fresh conversion. CVRF-clear time is part of avg_us
+    but isn't bucketed — it surfaces as the small gap between avg_us
+    and (i2c_us + fmt_us + write_us) when CNVR is armed."""
+    global _bus_counter, _stream_seq, _cnvr_ready
     global _prof_count, _prof_i2c_us, _prof_fmt_us, _prof_write_us
     if _bus_every <= 0:
         read_bus = False
@@ -510,6 +647,13 @@ def emit_stream_line():
     _prof_fmt_us += time.ticks_diff(t2, t1)
     _prof_write_us += time.ticks_diff(t3, t2)
     _prof_count += 1
+    # Re-arm: drop the latched flag and clear CVRF on every chip so the
+    # shared ALERT line releases. The next falling edge then signals the
+    # next genuinely-fresh sample. Order matters — clear the flag first
+    # so a real edge that lands during _clear_cnvr_all() isn't dropped.
+    if _cnvr_armed:
+        _cnvr_ready = False
+        _clear_cnvr_all()
 
 
 # ---------------------------------------------------------------------------
@@ -712,6 +856,25 @@ def handle_command(line):
             import machine
             machine.reset()
 
+        elif cmd == "N":
+            # N <0|1> — toggle CNVR-driven scheduling at runtime.
+            # Lets us A/B test CNVR vs blind-poll without re-flashing.
+            # Re-applies INA226 init on every present chip and re-arms
+            # (or tears down) the ALERT IRQ so the next emit reflects
+            # the new mode immediately.
+            global _cnvr_user_enabled
+            if len(parts) != 2:
+                return f"ERR N requires 0 or 1 (current: {1 if _cnvr_user_enabled else 0})"
+            try:
+                v = int(parts[1])
+            except ValueError:
+                return "ERR N requires 0 or 1"
+            if v not in (0, 1):
+                return "ERR N requires 0 or 1"
+            _cnvr_user_enabled = bool(v)
+            ina226_apply_all()  # rewrites Mask/Enable on all chips
+            return f"OK N {1 if _cnvr_user_enabled else 0} {1 if _cnvr_armed else 0}"
+
         elif cmd == "C":
             # C <n> <s1> ... <sn> — program packed-state cycle
             if len(parts) < 2:
@@ -854,11 +1017,31 @@ def main():
             continue  # skip streaming during burst for max speed
 
         # --- Streaming: emit sensor data at configured rate ---
+        # Two gates must both pass before we emit a row:
+        #   1. user-configured cadence (stream_hz cap) — enforces the rate
+        #      the Pi asked for, and never bursts faster than the cap even
+        #      if the chips finish a conversion early
+        #   2. CNVR readiness — the chip(s) have actually finished a new
+        #      conversion since the last read, so the data is fresh
+        # Without (1), CNVR-driven would always run the chips flat-out.
+        # Without (2), the old timer-only path could re-emit a stale sample
+        # if the loop's cadence outran the chip's conversion period.
+        # The watchdog (_cnvr_timeout_us past last_stream) is the safety
+        # valve: if CNVR never fires (ALERT wire pulled, chip wedged), we
+        # fall through to a forced read so the Pi keeps getting D rows
+        # rather than going completely silent.
         if stream_hz > 0:
             elapsed = time.ticks_diff(now, last_stream)
             if elapsed >= stream_interval * 1_000_000:
-                emit_stream_line()
-                last_stream = now
+                if _cnvr_armed:
+                    if _cnvr_ready or elapsed >= _cnvr_timeout_us:
+                        emit_stream_line()
+                        last_stream = now
+                else:
+                    # CNVR not available (no INA226s present, or pin
+                    # malfunction) — legacy timer-only path.
+                    emit_stream_line()
+                    last_stream = now
         else:
             # Idle (switching is IRQ-driven so it's fine to sleep here) —
             # short sleep to avoid busy-looping on stdin polling.
