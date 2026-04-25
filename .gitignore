@@ -17,6 +17,10 @@ env/
 *.log
 logs/
 data/
+plots/
+
+# C firmware build artifacts (Pico SDK)
+firmware-c/build/
 
 # Editor
 .vscode/
