@@ -53,6 +53,13 @@ class PiRecorder:
         self._writer_thread: threading.Thread | None = None
         self._warned_backpressure = False
 
+        # Firmware emit-sequence tracking. The firmware stamps every D line
+        # with a monotonic 32-bit ``seq``; we log one warning per session
+        # if we see a non-contiguous step (drop or out-of-order). One-shot
+        # like ``_warned_backpressure`` so a chronic problem doesn't spam.
+        self._last_seq: int | None = None
+        self._warned_seq_gap = False
+
     @property
     def is_recording(self):
         return self._active
@@ -95,6 +102,8 @@ class PiRecorder:
             self._max_samples = max_samples
             self._start_time = monotonic()
             self._warned_backpressure = False
+            self._last_seq = None
+            self._warned_seq_gap = False
             self._align_to_step = align_to_step
             self._saw_non_target = False
             self._queue = queue.Queue()  # fresh queue per session
@@ -109,9 +118,17 @@ class PiRecorder:
             log.info("Pi recording started: %s (%d max samples)", self._path, max_samples)
             return str(self._path)
 
-    def record(self, status: dict):
+    def record(self, status: dict, sample_pi_s: float | None = None,
+               fw_ticks_us: int | None = None, fw_seq: int | None = None):
         """Record one sample. Auto-stops when max_samples reached.
         Returns True if still recording, False if just stopped.
+
+        ``sample_pi_s`` is the Pi-monotonic anchor for the row (translated
+        from the firmware's sample-capture ticks_us via the clock-offset
+        estimate). ``fw_ticks_us`` is the raw firmware stamp, written to
+        the CSV so analysis can reconstruct timing without re-running the
+        clock-offset arithmetic. ``fw_seq`` is the firmware emit counter
+        — successive values let us spot USB CDC drops.
 
         Producer-side only: builds the row and enqueues it. Never blocks
         on I/O; the writer thread handles the actual file write.
@@ -137,7 +154,17 @@ class PiRecorder:
                 self._align_to_step = None
                 self._start_time = monotonic()
 
-            elapsed = monotonic() - self._start_time
+            now = monotonic()
+            recv_elapsed = now - self._start_time
+            # Prefer the firmware-clock-anchored sample time as the canonical
+            # elapsed_s — receipt time can lag sample time by ~4.5 ms (and
+            # by much more if USB CDC bursts coalesce small frames). The
+            # raw sample_pi_s and recv_elapsed are also written so anyone
+            # debugging the timing chain has both anchors.
+            sample_elapsed = (
+                sample_pi_s - self._start_time
+                if sample_pi_s is not None else recv_elapsed
+            )
             mode = status.get("mode", "")
             seq = status.get("sequence", 0)
             freq = status.get("frequency", 0.0)
@@ -153,8 +180,30 @@ class PiRecorder:
             auto_detected = auto.get("detected_state", "") if auto else ""
             auto_match = auto.get("match", "") if auto else ""
 
+            # Firmware-seq gap detection. Compare against the previous seq
+            # we saw; any non-+1 step (after handling 32-bit wrap) means a
+            # D line went missing on the wire. One-shot warning per session
+            # — same gating pattern as backpressure so chronic gaps don't
+            # flood the log.
+            if fw_seq is not None and self._last_seq is not None:
+                expected = (self._last_seq + 1) & 0xFFFFFFFF
+                if fw_seq != expected and not self._warned_seq_gap:
+                    log.warning(
+                        "PiRecorder firmware seq gap: expected %d, got %d "
+                        "(USB CDC drop or out-of-order); subsequent gaps "
+                        "in this session will be silent",
+                        expected, fw_seq,
+                    )
+                    self._warned_seq_gap = True
+            if fw_seq is not None:
+                self._last_seq = fw_seq
+
             row = [
-                f"{elapsed:.6f}",
+                f"{sample_elapsed:.6f}",
+                "" if sample_pi_s is None else f"{sample_pi_s:.6f}",
+                "" if fw_ticks_us is None else fw_ticks_us,
+                "" if fw_seq is None else fw_seq,
+                f"{recv_elapsed:.6f}",
                 mode, seq, step, f"{freq:.2f}",
                 int(fets[0]), int(fets[1]), int(fets[2]), int(fets[3]),
                 f"{_sv('P1', 'voltage'):.6f}", f"{_sv('P1', 'current'):.8f}",
@@ -224,6 +273,8 @@ class PiRecorder:
             w = csv.writer(f)
             w.writerow([
                 "elapsed_s",
+                "sample_pi_s", "fw_ticks_us", "fw_seq",
+                "recv_elapsed_s",
                 "mode", "sequence", "step", "frequency_hz",
                 "p1_on", "p2_on", "n1_on", "n2_on",
                 "p1_voltage", "p1_current_a",

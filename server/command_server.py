@@ -411,7 +411,7 @@ class CommandServer:
 
     # -- sensor-driven recording --------------------------------------------
 
-    def _on_sensor_tick(self, sensor_data, sample_pi_s):
+    def _on_sensor_tick(self, sensor_data, sample_pi_s, fw_ts_us, seq):
         """Called from the GPIO reader thread after each fresh sensor frame
         is cached. Records one CSV row per frame (bounded by the queue in
         PiRecorder itself) so recording runs at the sensor stream rate,
@@ -424,6 +424,12 @@ class CommandServer:
         step labels lagging reality by up to a full step at 100 Hz, which
         inverts the recorded labels relative to the actual current sign.
 
+        ``fw_ts_us`` is the raw firmware ticks_us stamp (passed straight
+        through to the CSV for offline reconstruction independent of the
+        clock-offset estimate). ``seq`` is the monotonic 32-bit emit
+        counter the firmware stamps on every D line — recorder uses it
+        to detect gaps from USB CDC drops.
+
         ``sensor_data`` is the freshly-parsed dict but we pull full status
         via mode_controller to pick up mode / sequence / step / fet_states,
         which change independently of the sensor cadence.
@@ -432,7 +438,7 @@ class CommandServer:
             return
         try:
             status = self._mc.get_status_at(sample_pi_s)
-            still_going = self._recorder.record(status)
+            still_going = self._recorder.record(status, sample_pi_s, fw_ts_us, seq)
             if not still_going:
                 log.info(
                     "Pi recording auto-stopped at %d samples",
