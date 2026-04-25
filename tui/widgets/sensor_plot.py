@@ -64,7 +64,7 @@ class SensorPlot(Widget):
     }
     """
 
-    sensor_rate: reactive[float] = reactive(2.0)
+    sensor_rate: reactive[float] = reactive(50.0)
     viz_mode: reactive[str] = reactive("line")
     expanded: reactive[bool] = reactive(False)
     ina_avg: reactive[int] = reactive(4)           # INA226 sample averaging

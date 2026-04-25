@@ -117,7 +117,7 @@ MIN_FREQ = 0.1       # Hz
 # sampling cap (~500-1000 Hz) as the limiting factor rather than the
 # switching cap — which is what we want for aliasing DOEs.
 MAX_FREQ = 2000.0    # Hz
-DEFAULT_FREQ = 1.0   # Hz
+DEFAULT_FREQ = 10.0  # Hz
 
 # ---------------------------------------------------------------------------
 # Dead time inserted between mode transitions (seconds)

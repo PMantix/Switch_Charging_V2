@@ -159,6 +159,7 @@ static void cmd_A(size_t nt, const token_t *tk) {
         puts("ERR A avg must be one of 1/4/16/64/128/256/512/1024");
         return;
     }
+    streaming_invalidate_measurement();
     float cap = streaming_max_hz();
     if (streaming_get_rate_hz() > cap) streaming_set_rate_hz(cap);
     printf("OK A %u %.1f\n", (unsigned)ina226_get_avg(), (double)cap);
@@ -176,6 +177,7 @@ static void cmd_V(size_t nt, const token_t *tk) {
         return;
     }
     streaming_set_bus_every((uint16_t)every);
+    streaming_invalidate_measurement();
     float cap = streaming_max_hz();
     if (streaming_get_rate_hz() > cap) streaming_set_rate_hz(cap);
     printf("OK V %u %.1f\n", (unsigned)streaming_get_bus_every(), (double)cap);

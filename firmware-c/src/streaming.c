@@ -96,6 +96,10 @@ uint16_t streaming_get_bus_every(void) { return s_bus_every; }
 // ---------------------------------------------------------------------------
 // Public: rate
 // ---------------------------------------------------------------------------
+void streaming_invalidate_measurement(void) {
+    s_measured_emit_us = 0;
+}
+
 float streaming_max_hz(void) {
     if (s_measured_emit_us > 0) {
         return 1000000.0f / (float)s_measured_emit_us;

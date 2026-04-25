@@ -732,6 +732,21 @@ class SwitchingCircuitApp(App):
         )
         if connected:
             save_host(host)
+            # Pre-subscribe sensor-profile fetch: send_command can still
+            # readline() a synchronous reply here. After subscribe(), replies
+            # interleave with the state stream and the direct read no longer
+            # works — so the header would otherwise sit on its placeholder
+            # max_hz until the user manually cycles AVG/bus_every.
+            profile = await loop.run_in_executor(
+                None,
+                self._client.send_command,
+                {"cmd": "get_sensor_profile"},
+            )
+            if profile:
+                def _apply():
+                    plot = self.query_one("#sensor-plot", SensorPlot)
+                    self._apply_profile_reply(plot, profile)
+                self.call_from_thread(_apply)
             # Subscribe to the state stream
             await loop.run_in_executor(None, self._client.subscribe)
 
@@ -1170,9 +1185,10 @@ class SwitchingCircuitApp(App):
 
     # -- Actions: Sensor Rate -------------------------------------------------
 
-    # Goes well past the old 100 Hz ceiling — with AVG=1 + bus_every>=1 the
-    # firmware max_hz is ~800-1250 Hz. The TUI plot caps at 15 fps regardless,
-    # so values above ~50 Hz mostly matter for CSV recording / DOE captures.
+    # C firmware delivers ~999 Hz at AVG=4 / bus_every=1 (measured 2026-04-25
+    # post-port; was ~230 Hz clamped on the MicroPython firmware). The TUI plot
+    # caps at 15 fps regardless, so values above ~50 Hz mostly matter for CSV
+    # recording / DOE captures. Header shows live max_hz echoed from firmware.
     SENSOR_RATES = [0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0, 100.0, 200.0, 500.0, 1000.0]
 
     def _set_sensor_rate(self, rate: float) -> None:
@@ -1214,9 +1230,11 @@ class SwitchingCircuitApp(App):
     BUS_EVERY_STEPS = [1, 2, 3, 5, 10, 0]
 
     def _apply_profile_reply(self, plot: "SensorPlot", reply: Optional[dict]) -> None:
-        """Pull firmware-echoed max_hz and any clamped sensor_rate out of
+        """Pull firmware-echoed max_hz / sensor_rate / avg / bus_every out of
         the reply so the header reflects real state, not just what we asked
-        for. Silent no-op if the command failed or we're disconnected."""
+        for. Same shape works for set_ina226_avg, set_bus_every, and the
+        post-connect get_sensor_profile bootstrap. Silent no-op if the
+        command failed or we're disconnected."""
         if not reply or not reply.get("ok"):
             return
         max_hz = reply.get("max_hz")
@@ -1225,6 +1243,12 @@ class SwitchingCircuitApp(App):
         sensor_rate = reply.get("sensor_rate")
         if sensor_rate is not None and sensor_rate > 0:
             plot.sensor_rate = float(sensor_rate)
+        avg = reply.get("avg")
+        if avg is not None:
+            plot.ina_avg = int(avg)
+        bus_every = reply.get("bus_every")
+        if bus_every is not None:
+            plot.bus_every = int(bus_every)
         # Force an immediate redraw. The sensor stream triggers a rate-
         # limited render on its own, but that can be up to ~70 ms away
         # at 15 fps — this way the header ticks as soon as the user taps.

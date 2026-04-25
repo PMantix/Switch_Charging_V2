@@ -21,6 +21,12 @@ float    streaming_get_rate_hz(void);
 // Theoretical / measured ceiling on streaming rate.
 float    streaming_max_hz(void);
 
+// Drop the cached measured emit time so streaming_max_hz() falls back to
+// the theoretical formula until the next streaming_profile() runs. Call
+// this whenever AVG or bus_every changes — the prior measurement is
+// timing-invariant from the new profile and would lie if reused.
+void     streaming_invalidate_measurement(void);
+
 // Tick: called from the main loop on every iteration. Emits a D-line if
 // the streaming interval has elapsed. Cheap when not streaming (one
 // time_us_64 + compare).
