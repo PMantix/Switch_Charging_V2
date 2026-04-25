@@ -142,7 +142,7 @@ class GPIODriver:
                 break
 
     def _handle_stream_line(self, line):
-        """Parse a D line: D <t_us> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>
+        """Parse a D line: D <t_us> <seq> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>
 
         The leading ``t_us`` is the firmware ``time.ticks_us()`` snapshot
         taken at sample-capture time (just before the INA226 sweep). We
@@ -153,13 +153,19 @@ class GPIODriver:
         of stamping it at line-receive time. With ~4.5 ms of emit latency
         between capture and stdout, the receive-time anchor lags reality
         by up to a full step at 100 Hz switching, inverting the labels.
+
+        ``seq`` is a monotonic 32-bit counter the firmware bumps on every
+        emitted D line. The recorder uses successive seq deltas to detect
+        gaps from USB CDC drops or write-buffer overflow — receipt-side
+        timing alone can't tell a real drop from CDC burst-aggregation.
         """
         try:
             parts = line.split()
-            if len(parts) != 10:  # "D" + t_us + 8 values
+            if len(parts) != 11:  # "D" + t_us + seq + 8 values
                 return
             fw_ts_us = int(parts[1])
-            vals = [float(x) for x in parts[2:]]
+            seq = int(parts[2])
+            vals = [float(x) for x in parts[3:]]
             data = {}
             for i, name in enumerate(SENSOR_ORDER):
                 data[name] = {
@@ -183,7 +189,7 @@ class GPIODriver:
             cb = self.on_sensor_tick
             if cb is not None:
                 try:
-                    cb(data, sample_pi_s)
+                    cb(data, sample_pi_s, fw_ts_us, seq)
                 except Exception:
                     log.exception("on_sensor_tick callback failed")
         except (ValueError, IndexError):
@@ -309,6 +315,49 @@ class GPIODriver:
                 }
             except (ValueError, IndexError):
                 pass
+        return None
+
+    def profile_emit(self, n: int = 50):
+        """Run the firmware Z command and parse the per-emit phase
+        breakdown. Returns a dict with keys ``n``, ``avg_us``, ``i2c_us``,
+        ``fmt_us``, ``write_us``, ``max_hz``, or None if the firmware
+        didn't reply with a parseable line.
+
+        New firmware format: ``OK Z <n> <avg_us> <i2c_us> <fmt_us>
+        <write_us> <max_hz>``. Older firmware that only returns ``OK Z
+        <n> <avg_us> <max_hz>`` is detected by token count and the phase
+        fields are returned as None — callers can still use ``avg_us``.
+        """
+        n = max(10, min(500, int(n)))
+        resp = self._send(f"Z {n}")
+        if not resp or not resp.startswith("OK Z"):
+            log.warning("profile_emit: bad reply: %s", resp)
+            return None
+        parts = resp.split()
+        try:
+            if len(parts) >= 8:
+                # New format: OK Z <n> <avg_us> <i2c_us> <fmt_us> <write_us> <max_hz>
+                return {
+                    "n": int(parts[2]),
+                    "avg_us": int(parts[3]),
+                    "i2c_us": int(parts[4]),
+                    "fmt_us": int(parts[5]),
+                    "write_us": int(parts[6]),
+                    "max_hz": float(parts[7]),
+                }
+            elif len(parts) >= 5:
+                # Legacy: OK Z <n> <avg_us> <max_hz>
+                return {
+                    "n": int(parts[2]),
+                    "avg_us": int(parts[3]),
+                    "i2c_us": None,
+                    "fmt_us": None,
+                    "write_us": None,
+                    "max_hz": float(parts[4]),
+                }
+        except (ValueError, IndexError):
+            pass
+        log.warning("profile_emit: unparseable reply: %s", resp)
         return None
 
     def get_sensor_data(self):

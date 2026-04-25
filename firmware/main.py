@@ -37,9 +37,14 @@ Serial protocol (USB CDC, line-delimited):
     OK A <avg> <max_hz>           Averaging applied; max_hz is computed cap
     OK V <every> <max_hz>         Decimation applied; max_hz is computed cap
     OK M <avg> <every> <max_hz>   Current sensor profile snapshot
-    OK Z <n> <avg_us> <max_hz>    Emit profile: n loops averaged to avg_us per
-                                  emit; max_hz recomputed from that measurement
-    D <t_us> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data.
+    OK Z <n> <avg_us> <i2c_us> <fmt_us> <write_us> <max_hz>
+                                  Emit profile: n loops averaged to avg_us per
+                                  emit, broken into the I2C-sweep, %-format,
+                                  and stdout-write phases (each averaged per
+                                  emit). max_hz recomputed from avg_us. Phase
+                                  fields appended at the end so older parsers
+                                  reading just <n> <avg_us> still work.
+    D <t_us> <seq> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>   Stream data.
                                   t_us is the firmware time.ticks_us() captured
                                   at the moment the INA226 sweep began (i.e.
                                   the sample-capture timestamp). The Pi
@@ -51,6 +56,9 @@ Serial protocol (USB CDC, line-delimited):
                                   (eliminates a one-step label lag at high
                                   switching frequencies caused by ~4.5 ms
                                   emit latency between sweep and stdout).
+                                  seq is a monotonic 32-bit counter that
+                                  increments on every emitted D line; the Pi
+                                  uses it to detect gaps from USB CDC drops.
     OK L                          LED set
     OK P <t_us>                   Pong; t_us is firmware time.ticks_us() at
                                    reply-build time. Pi pairs it with its own
@@ -433,7 +441,23 @@ def ina226_read_all_json():
     return results
 
 
-_STREAM_FMT = "D %d %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
+_STREAM_FMT = "D %d %d %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n"
+
+# Monotonic 32-bit emit counter. Stamped onto every D line so the Pi can
+# detect gaps from USB CDC drops or write-buffer overflow. Wraps cleanly
+# at 2^32 (well over a day of 1 kHz streaming) — host code is expected
+# to handle wrap when comparing successive seqs. Reset only on boot or
+# when streaming starts (T command); intentionally NOT reset by Z so a
+# Z mid-stream doesn't fake a gap warning.
+_stream_seq = 0
+
+# Per-emit profiling accumulators. Module-level globals (not a list/dict)
+# so the hot path stays allocation-free under MicroPython's GC. Reset on
+# every Z command so each window is independent.
+_prof_count = 0
+_prof_i2c_us = 0
+_prof_fmt_us = 0
+_prof_write_us = 0
 
 
 def emit_stream_line():
@@ -444,8 +468,14 @@ def emit_stream_line():
 
     Bus voltage is decimated per _bus_every — always read shunt (the fast
     signal), read bus only every Nth sweep. Cached bus value fills the
-    slot otherwise so the D line schema stays fixed for downstream code."""
-    global _bus_counter
+    slot otherwise so the D line schema stays fixed for downstream code.
+
+    Each emit also accumulates phase timings (I2C sweep, %-format, stdout
+    write) into module-level globals — the Z command snapshots and resets
+    them. We use ticks_us/ticks_diff and module globals (not a list) so
+    no allocation happens on the hot path."""
+    global _bus_counter, _stream_seq
+    global _prof_count, _prof_i2c_us, _prof_fmt_us, _prof_write_us
     if _bus_every <= 0:
         read_bus = False
     else:
@@ -460,14 +490,26 @@ def emit_stream_line():
     # AFTER the sweep would fold the I2C read time into the row's apparent
     # capture moment and re-introduce a fraction of the lag we're fixing.
     t_us = time.ticks_us()
+    t0 = t_us
     r = ina226_read_all_streaming(read_bus)
-    sys.stdout.write(_STREAM_FMT % (
-        t_us,
+    t1 = time.ticks_us()
+    # Bump the sequence counter just before formatting so the value
+    # actually written is the same one we report. Wrap at 2^32.
+    _stream_seq = (_stream_seq + 1) & 0xFFFFFFFF
+    line = _STREAM_FMT % (
+        t_us, _stream_seq,
         r[0][0], r[0][1],
         r[1][0], r[1][1],
         r[2][0], r[2][1],
         r[3][0], r[3][1],
-    ))
+    )
+    t2 = time.ticks_us()
+    sys.stdout.write(line)
+    t3 = time.ticks_us()
+    _prof_i2c_us += time.ticks_diff(t1, t0)
+    _prof_fmt_us += time.ticks_diff(t2, t1)
+    _prof_write_us += time.ticks_diff(t3, t2)
+    _prof_count += 1
 
 
 # ---------------------------------------------------------------------------
@@ -477,6 +519,7 @@ def handle_command(line):
     global stream_hz, stream_interval, burst_buffer, burst_target, burst_active
     global _seq, _seq_idx, _period_us, _running, _timer
     global _ina226_avg, _bus_every, _bus_counter, _measured_emit_us
+    global _stream_seq, _prof_count, _prof_i2c_us, _prof_fmt_us, _prof_write_us
     line = line.strip()
     if not line:
         return None
@@ -524,6 +567,12 @@ def handle_command(line):
                     hz = cap
                 stream_hz = hz
                 stream_interval = 1.0 / hz
+                # Reset the seq counter when streaming (re)starts so each
+                # recording session begins at seq=1. Pi-side gap detection
+                # treats any decrease as a fresh session and re-arms the
+                # warning gate. (We bump TO 1 on the first emit, so 0 is
+                # the "no D lines yet" sentinel.)
+                _stream_seq = 0
                 set_led(0, 4, 4)  # cyan = streaming
                 return f"OK T {hz:.1f}"
 
@@ -569,7 +618,9 @@ def handle_command(line):
         elif cmd == "Z":
             # Profile emit_stream_line. Time N iterations and divide.
             # Uses the same code path the stream uses, so the measured
-            # value is what streaming actually delivers.
+            # value is what streaming actually delivers. Phase totals
+            # are accumulated by emit_stream_line itself; we reset the
+            # module-level accumulators here so each Z window is fresh.
             n = 50
             if len(parts) == 2:
                 try:
@@ -579,12 +630,22 @@ def handle_command(line):
             # Suspend streaming so the profiler doesn't race with it.
             prev_hz = stream_hz
             stream_hz = 0
+            _prof_count = 0
+            _prof_i2c_us = 0
+            _prof_fmt_us = 0
+            _prof_write_us = 0
             t0 = time.ticks_us()
             for _ in range(n):
                 emit_stream_line()
             t1 = time.ticks_us()
             total_us = time.ticks_diff(t1, t0)
             avg_us = total_us // n
+            # Phase averages — divide by the count emit_stream_line
+            # actually saw (defensive in case any iteration short-circuits).
+            count = _prof_count if _prof_count > 0 else n
+            i2c_us = _prof_i2c_us // count
+            fmt_us = _prof_fmt_us // count
+            write_us = _prof_write_us // count
             _measured_emit_us = avg_us
             # Re-clamp stream rate to new honest cap.
             cap = _max_stream_hz()
@@ -593,7 +654,7 @@ def handle_command(line):
             stream_hz = prev_hz
             if stream_hz > 0:
                 stream_interval = 1.0 / stream_hz
-            return f"OK Z {n} {avg_us} {cap:.1f}"
+            return f"OK Z {n} {avg_us} {i2c_us} {fmt_us} {write_us} {cap:.1f}"
 
         elif cmd == "L":
             if len(parts) != 4:
