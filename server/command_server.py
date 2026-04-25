@@ -265,6 +265,13 @@ class CommandServer:
                 return {"ok": True, **profile,
                         "sensor_rate": self._mc._gpio.get_sensor_rate()}
 
+            elif cmd == "profile_emit":
+                n = int(msg.get("n", 100))
+                result = self._mc._gpio.profile_emit(n)
+                if result is None:
+                    return {"ok": False, "error": "profile_emit returned no parseable reply"}
+                return {"ok": True, **result}
+
             elif cmd == "pi_record_start":
                 max_samples = int(msg.get("max_samples", 0))
                 rec_mode = msg.get("rec_mode", "unknown")

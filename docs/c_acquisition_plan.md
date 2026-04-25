@@ -59,30 +59,64 @@ def emit_stream_line():
     ))
 ```
 
-Where the time goes — **hypothesis, not measurement**. The split is
-estimated from interpreter behavior and the historical 4108 µs → 1300
-µs total delta of `845c40d`; the per-stage values have not been
-isolated on the actual rig. The split-Z instrumentation added by the
-seq+profiling work (worktree `worktree-agent-ae33049ed22730043`)
-provides per-emit phase totals via the extended `Z` command:
-`OK Z <n> <avg_us> <i2c_us> <fmt_us> <write_us> <max_hz>`. **Phase
-1.5 of this plan replaces this table with measured numbers.**
+Where the time goes — **measured 2026-04-25** on the live rig via the
+extended `Z` command (`OK Z <n> <avg_us> <i2c_us> <fmt_us>
+<write_us> <max_hz>`), 100–200 emits averaged per row:
 
-| Stage                          | ASCII path (estimated) | Binary path (estimated) |
-| ------------------------------ | ---------------------- | ----------------------- |
-| 4× I²C shunt-only readfrom     | ~1.0 ms                | ~1.0 ms                 |
-| 1× I²C bus read (`bus_every=5`)| ~0.05 ms               | ~0.05 ms                |
-| Float math (raw → V/A)         | ~0.3 ms                | 0 (moved to Pi)         |
-| `%`-format 9 floats            | ~1.5 ms                | 0                       |
-| `sys.stdout.write` → USB CDC   | ~1.2 ms                | ~0.25 ms (25 vs 88 bytes) |
-| **Total per emit**             | **~4.1 ms (244 Hz)**   | **~1.3 ms (770 Hz)**    |
+| Config                                  | total µs | i2c µs (%)  | fmt µs (%)  | write µs (%) | other µs (%) | max Hz |
+| --------------------------------------- | -------- | ----------- | ----------- | ------------ | ------------ | ------ |
+| AVG=4, bus_every=1 (default)            | 5242     | 3283 (63%)  | 1360 (26%)  | 270 (5%)     | 329 (6%)     | 190.8  |
+| AVG=4, bus_every=5                      | 4522     | 2581 (57%)  | 1350 (30%)  | 268 (6%)     | 323 (7%)     | 221.1  |
+| AVG=1, bus_every=1                      | 5308     | 3226 (61%)  | 1491 (28%)  | 269 (5%)     | 322 (6%)     | 188.4  |
+| AVG=1, bus_every=5                      | 4348     | 2306 (53%)  | 1446 (33%)  | 268 (6%)     | 328 (8%)     | 230.0  |
+| AVG=1, bus_every=5 (≥600 sps requested) | 4420     | 2308 (52%)  | 1511 (34%)  | 265 (6%)     | 336 (7%)     | 226.2  |
 
-The **most likely** dominant cost is MicroPython's `%`-format on 9
-floats — but the conclusion that the wire format is the right first
-lever does not depend on which sub-stage dominates, only on the
-measured 3.16× total delta of `845c40d`. Treat the per-stage split
-as a hypothesis to confirm with profiling, not a basis for further
-architectural decisions until validated.
+(`other` = loop bookkeeping, timer poll, the seq increment, and the
+Z-command profile harness's own `ticks_diff` calls — all unavoidable
+under the current architecture.)
+
+The earlier hypothesis that **`%`-format on 9 floats is the dominant
+cost is wrong.** The data overturns it:
+
+- **I²C reads dominate (52–63% of every emit).** That's 4 sequential
+  `i2c.readfrom` calls per sweep, each ~580 µs at 1 MHz nominal,
+  including MicroPython's per-call interpreter overhead. The bus
+  rate the firmware *requests* is 1 MHz, but per `machine.I2C` docs
+  the *actual* SCL rate may be lower; this needs scope verification
+  (already in the Phase 1 checklist).
+- **Format string is secondary (26–34%).** Real, but second-place.
+- **USB CDC `write` is negligible (5–6%).** The "wire is the
+  bottleneck" framing was wrong.
+- **AVG=1 vs AVG=4 changes total emit time by <2%.** The
+  per-conversion time (664–2656 µs) is dominated by I²C-side
+  overlap — the chip finishes converting while the CPU is still
+  walking the bus from the prior sweep. Lowering AVG buys very
+  little until I²C is faster.
+- **`bus_every=5` saves ~700 µs of I²C** vs `bus_every=1` (matches
+  4-of-5-skipped × ~150 µs/bus-read prediction). This is the
+  cheapest lever currently available.
+
+**Implications for the rest of this plan:**
+
+A pure ASCII → binary conversion (Phase 1) zeroes out only the
+format + a sliver of write — best case ~1450 + ~150 = ~1600 µs
+saved on a 4400 µs emit, **~36% improvement, not 3.16×**. Realistic
+post-binary ceiling at AVG=1, bus_every=5: ~2800 µs total, ~360 Hz.
+The historical 245 → 770 Hz claim of `845c40d` is therefore
+**suspect** — it should be re-validated against this measured
+baseline before Phase 1 effort is committed. Possible explanations:
+the prior baseline used a fatter format (more decimals, more
+fields), or the prior measurement methodology differed.
+
+The right architectural lever is **whatever cuts I²C**: PIO-driven
+reads, async ALERT-driven scheduling so the CPU doesn't spin
+waiting for the bus, or a C user-C-module that sheds MicroPython's
+per-`readfrom` interpreter overhead. CNVR/ALERT (already
+implemented in `worktree-agent-a4ee9ebd1f4cf8c1c`) is now a
+higher-priority experiment than re-landing binary, because at
+AVG=1 with chip cadence ~1.5 kHz vs sweep cadence ~230 Hz, ~5/6
+emits read the same conversion. CNVR is a *correctness* fix in
+addition to whatever throughput it recovers.
 
 ---
 
