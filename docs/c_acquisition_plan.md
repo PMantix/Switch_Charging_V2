@@ -109,14 +109,39 @@ the prior baseline used a fatter format (more decimals, more
 fields), or the prior measurement methodology differed.
 
 The right architectural lever is **whatever cuts I²C**: PIO-driven
-reads, async ALERT-driven scheduling so the CPU doesn't spin
-waiting for the bus, or a C user-C-module that sheds MicroPython's
-per-`readfrom` interpreter overhead. CNVR/ALERT (already
-implemented in `worktree-agent-a4ee9ebd1f4cf8c1c`) is now a
-higher-priority experiment than re-landing binary, because at
-AVG=1 with chip cadence ~1.5 kHz vs sweep cadence ~230 Hz, ~5/6
-emits read the same conversion. CNVR is a *correctness* fix in
-addition to whatever throughput it recovers.
+reads, or a C user-C-module that sheds MicroPython's per-`readfrom`
+interpreter overhead. PIO+DMA can run the I²C state machine without
+CPU intervention; a C user-C-module collapses the per-call
+interpreter cost into a single packed transaction.
+
+### CNVR/ALERT — A/B'd 2026-04-25, no benefit measured
+
+The earlier hypothesis ("at AVG=1 with chip cadence ~1.5 kHz vs
+sweep cadence ~230 Hz, ~5/6 emits read the same conversion") was
+**wrong**. A/B sweep across 12 conditions (sw ∈ {1, 5, 20, 100} Hz,
+sp ∈ {50, 100, 200} sps, AVG=1, bus_every=5):
+
+| condition          | stale-rate off | stale-rate on | throughput Δ |
+| ------------------ | -------------: | ------------: | -----------: |
+| 1 Hz × 200 sps     | 0.00 %         | 0.43 %        | −5.6 %       |
+| 5 Hz × 200 sps     | 0.38 %         | 0.39 %        | −5.8 %       |
+| 20 Hz × 200 sps    | 0.12 %         | 0.38 %        | −6.6 %       |
+| 100 Hz × 200 sps   | 0.00 %         | 0.00 %        | **−10.6 %**  |
+
+Stale-repeat rate is ≤0.74 % in *every* condition with or without
+CNVR. The premise was inverted: the INA226 in continuous mode keeps
+overwriting the Shunt register with the latest conversion, so a
+sweep at 200 Hz simply reads whichever conversion just completed
+(the chip has done ~7 in the prior 5 ms). Stale repeats only
+happen when the sweep is *faster* than the conversion rate — we're
+slower. CNVR-on actively loses throughput at higher rates because
+each emit now does four extra `clear_cnvr` register reads (~1.4 ms
+overhead).
+
+CNVR is therefore **dropped** from the roadmap as a useful lever.
+The `N` runtime toggle and IRQ wiring stay in (cheap to keep, may
+matter if a future config sweeps faster than chip cadence), but
+default is OFF.
 
 ---
 

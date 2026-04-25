@@ -213,7 +213,15 @@ _cnvr_armed = False
 # and _arm_cnvr() short-circuits, so the stream stays on the legacy
 # timer-only path. Used for A/B comparison without re-flashing — flipping
 # this and re-applying via N command is enough.
-_cnvr_user_enabled = True
+#
+# Default is OFF after the 2026-04-25 A/B which measured no benefit and
+# a 5–11 % throughput penalty (the per-emit _clear_cnvr_all() adds
+# ~1.4 ms of I²C). Stale-repeat rate is ≤ 0.74 % even with CNVR off,
+# because the chip's continuous mode overwrites the Shunt register every
+# conversion and the sweep is slower than that — every read is the
+# latest conversion. CNVR plumbing is kept in case a future config
+# sweeps faster than chip cadence.
+_cnvr_user_enabled = False
 # Watchdog: if the ALERT line has been silent for this many microseconds
 # past when we expected a conversion, fall through to a forced read. This
 # keeps a wedged chip / disconnected ALERT wire from freezing the stream.
