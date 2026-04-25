@@ -5,22 +5,11 @@ Sends FET state commands to the RP2040-Zero over USB serial.
 Receives streaming sensor data via push from the RP2040.
 Falls back to a mock implementation when pyserial is unavailable
 or the RP2040 is not connected.
-
-Stream wire format is BINARY (since 2026-04-24): the firmware emits
-25-byte frames `0xAA 0x55 'B' 20 <ticks_us:u32 LE> <(shunt:i16,bus:u16)*4 LE> <xor>`.
-The parser is a small state machine that resyncs on the AA 55 sync
-pair so a firmware reboot mid-stream (which dumps ASCII boot banner)
-recovers cleanly. Float conversion (raw × LSB / shunt_R) lives here on
-the Pi instead of on the MCU. Command replies (`OK ...`, `ERR ...`,
-boot text) remain ASCII line-delimited; we sniff for ASCII bytes
-in the SCAN_SYNC state and route any complete `\\n`-terminated line
-to the response queue or log.
 """
 
 import json
 import logging
 import queue
-import struct
 import threading
 import time
 
@@ -28,19 +17,6 @@ from server.config import (
     RP2040_SERIAL_PORT, RP2040_SERIAL_BAUD,
     STATE_DEFS,
 )
-
-# INA226 LSB constants — float conversion moved from firmware to Pi.
-_INA226_SHUNT_LSB_V = 2.5e-6   # 2.5 µV per LSB
-_INA226_BUS_LSB_V = 1.25e-3    # 1.25 mV per LSB
-# Shunt resistor value (Ω). Mirror of firmware's SHUNT_RESISTOR.
-_SHUNT_R_OHMS = 0.1
-
-# Binary frame constants — must mirror firmware/main.py emit_stream_line_binary.
-_FRAME_SYNC0 = 0xAA
-_FRAME_SYNC1 = 0x55
-_FRAME_TAG_B = 0x42  # 'B'
-_FRAME_PAYLOAD_LEN = 20
-_FRAME_TOTAL_LEN = 25  # 4 header + 20 payload + 1 checksum
 
 log = logging.getLogger(__name__)
 
@@ -137,150 +113,63 @@ class GPIODriver:
     # -- Reader thread -------------------------------------------------------
 
     def _reader_loop(self):
-        """Read bytes from the RP2040 and dispatch frames + ASCII lines.
-
-        State machine — the wire alternates binary stream frames with
-        ASCII command replies. We scan byte-by-byte:
-
-          - In SCAN_SYNC: look for the AA 55 'B' <len> header. Any byte
-            that doesn't match is treated as ASCII; we accumulate it in
-            ``ascii_buf`` until we see ``\\n``, then dispatch the line.
-          - On valid header: read the next 21 bytes (20 payload + 1 cksum),
-            verify XOR, parse, and either dispatch sensor data or drop on
-            checksum failure (next iteration re-enters SCAN_SYNC).
-
-        This handles the firmware-reboot-mid-stream case naturally — when
-        the MCU resets, the partially-buffered frame becomes garbage,
-        SCAN_SYNC drops bytes until it finds the boot banner's text
-        (routed as ASCII lines to debug log) followed by the next valid
-        AA 55 frame.
-
-        Reading is done in chunks (`self._ser.read(N)` with timeout=0.5)
-        to amortize syscall overhead at 700+ Hz frame rates.
-        """
-        ascii_buf = bytearray()
-        # Persistent byte buffer across read iterations so frames that
-        # straddle chunk boundaries are reassembled. Bounded in practice
-        # by the read chunk size + at most one frame of unparsed tail.
-        rxbuf = bytearray()
+        """Continuously read lines from RP2040. Route stream data to cache,
+        command responses to the response queue."""
         while not self._stop_event.is_set():
             try:
                 if not self._ser or not self._ser.is_open:
                     break
-                # Read a chunk. 256 bytes covers ~10 frames at 25 B each;
-                # the 0.5s pyserial timeout bounds idle wait when the
-                # stream is paused.
-                chunk = self._ser.read(256)
-                if not chunk:
+                raw = self._ser.readline()
+                if not raw:
                     continue
-                rxbuf.extend(chunk)
-                pos = 0
-                blen = len(rxbuf)
-                while pos < blen:
-                    # Need at least 4 bytes to test for a valid header.
-                    if blen - pos < 4:
-                        break
-                    b = rxbuf[pos]
-                    if b == _FRAME_SYNC0 \
-                            and rxbuf[pos + 1] == _FRAME_SYNC1 \
-                            and rxbuf[pos + 2] == _FRAME_TAG_B \
-                            and rxbuf[pos + 3] == _FRAME_PAYLOAD_LEN:
-                        # Header looks valid. Need full 25-byte frame.
-                        if blen - pos < _FRAME_TOTAL_LEN:
-                            break  # wait for more bytes
-                        # Verify XOR checksum over payload bytes.
-                        cksum = 0
-                        for k in range(_FRAME_PAYLOAD_LEN):
-                            cksum ^= rxbuf[pos + 4 + k]
-                        if cksum == rxbuf[pos + 4 + _FRAME_PAYLOAD_LEN]:
-                            self._handle_stream_frame(
-                                bytes(rxbuf[pos + 4:pos + 4 + _FRAME_PAYLOAD_LEN])
-                            )
-                            pos += _FRAME_TOTAL_LEN
-                            continue
-                        # Bad checksum — drop the sync byte, resync next.
-                        log.debug("Bad binary frame checksum, resyncing")
-                        pos += 1
-                        continue
-                    # Not a frame start — treat as ASCII.
-                    if b == 0x0A:  # '\n'
-                        line = ascii_buf.decode("utf-8", errors="replace").rstrip("\r")
-                        ascii_buf = bytearray()
-                        if line:
-                            self._dispatch_ascii_line(line)
-                    elif b != 0x00 and b != _FRAME_SYNC0:
-                        # Drop stray 0xAA bytes (broken-frame remnants);
-                        # nulls are filtered to avoid polluting log output.
-                        ascii_buf.append(b)
-                    pos += 1
-                # Compact rxbuf: keep only the unparsed tail.
-                if pos > 0:
-                    del rxbuf[:pos]
+                line = raw.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+
+                if line.startswith("D "):
+                    self._handle_stream_line(line)
+                elif line.startswith("BR ") or line.startswith("OK ") or line.startswith("ERR"):
+                    self._response_q.put(line)
+                elif "BURST_DONE" in line:
+                    self._response_q.put(line)
+                    log.info("RP2040: %s", line)
+                else:
+                    # Boot messages, info, etc
+                    log.debug("RP2040: %s", line)
             except (serial.SerialException, OSError) as e:
                 if not self._stop_event.is_set():
                     log.error("Reader error: %s", e)
                 break
 
-    def _dispatch_ascii_line(self, line):
-        """Route a complete ASCII line — command reply, error, or
-        boot/info chatter."""
-        if line.startswith("BR ") or line.startswith("OK ") or line.startswith("ERR"):
-            self._response_q.put(line)
-        elif "BURST_DONE" in line:
-            self._response_q.put(line)
-            log.info("RP2040: %s", line)
-        else:
-            log.debug("RP2040: %s", line)
+    def _handle_stream_line(self, line):
+        """Parse a D line: D <t_us> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>
 
-    def _handle_stream_frame(self, payload):
-        """Decode a 20-byte sensor payload into the consumer dict shape.
-
-        Layout (mirrors firmware emit_stream_line_binary):
-          [0:4]   uint32 LE  ticks_us
-          [4..]   per-sensor (int16 shunt LE, uint16 bus LE) × 4
-
-        Yields the same `{P1: {voltage, current}, ...}` dict the legacy
-        ASCII path produced — consumers (command_server, recorder,
-        mode_controller) are unchanged. Float conversion (raw × LSB /
-        shunt_R) happens here so the firmware never touches floats.
+        The leading ``t_us`` is the firmware ``time.ticks_us()`` snapshot
+        taken at sample-capture time (just before the INA226 sweep). We
+        translate it into the Pi's monotonic clock via ``_clock_offset_s``
+        (set by ``sync_firmware_clock()``) and pass it through the
+        ``on_sensor_tick`` callback so downstream consumers (recorder,
+        sequence engine) can anchor the row in the firmware clock instead
+        of stamping it at line-receive time. With ~4.5 ms of emit latency
+        between capture and stdout, the receive-time anchor lags reality
+        by up to a full step at 100 Hz switching, inverting the labels.
         """
         try:
-            # Mixed signed-shunt / unsigned-bus layout. Single
-            # `struct.unpack` doesn't handle the alternation cleanly,
-            # so unpack ticks_us + 4 shunt int16s, then re-pull the
-            # bus uint16s by offset. Both calls operate on the same
-            # 20-byte buffer; cheap relative to the float math below.
-            fw_ts_us, sh_p1, _, sh_p2, _, sh_n1, _, sh_n2, _ = \
-                struct.unpack("<Ihhhhhhhh", payload)
-            bus_p1 = struct.unpack_from("<H", payload, 6)[0]
-            bus_p2 = struct.unpack_from("<H", payload, 10)[0]
-            bus_n1 = struct.unpack_from("<H", payload, 14)[0]
-            bus_n2 = struct.unpack_from("<H", payload, 18)[0]
-
-            # Convert raw → physical units. Same math the firmware did
-            # before; just running on the Pi.
-            data = {
-                "P1": {
-                    "voltage": round(bus_p1 * _INA226_BUS_LSB_V, 4),
-                    "current": round(sh_p1 * _INA226_SHUNT_LSB_V / _SHUNT_R_OHMS, 6),
-                },
-                "P2": {
-                    "voltage": round(bus_p2 * _INA226_BUS_LSB_V, 4),
-                    "current": round(sh_p2 * _INA226_SHUNT_LSB_V / _SHUNT_R_OHMS, 6),
-                },
-                "N1": {
-                    "voltage": round(bus_n1 * _INA226_BUS_LSB_V, 4),
-                    "current": round(sh_n1 * _INA226_SHUNT_LSB_V / _SHUNT_R_OHMS, 6),
-                },
-                "N2": {
-                    "voltage": round(bus_n2 * _INA226_BUS_LSB_V, 4),
-                    "current": round(sh_n2 * _INA226_SHUNT_LSB_V / _SHUNT_R_OHMS, 6),
-                },
-            }
-            # Same clock-offset arithmetic as the legacy ASCII path: feed
-            # the firmware ticks_us through self._clock_offset_s to land
-            # on Pi monotonic seconds at sample-capture time. Preserves
-            # the recently-fixed phase-correctness mechanism.
+            parts = line.split()
+            if len(parts) != 10:  # "D" + t_us + 8 values
+                return
+            fw_ts_us = int(parts[1])
+            vals = [float(x) for x in parts[2:]]
+            data = {}
+            for i, name in enumerate(SENSOR_ORDER):
+                data[name] = {
+                    "voltage": round(vals[i * 2], 4),
+                    "current": round(vals[i * 2 + 1], 6),
+                }
+            # Convert firmware ticks_us → Pi monotonic seconds when we have
+            # an offset; otherwise fall back to monotonic() at receive time
+            # (the legacy behaviour, which is wrong by ~4.5 ms but better
+            # than dropping the row before sync_firmware_clock has run).
             if self._clock_offset_s is not None:
                 sample_pi_s = fw_ts_us / 1_000_000.0 - self._clock_offset_s
             else:
@@ -288,14 +177,17 @@ class GPIODriver:
             with self._sensor_lock:
                 self._sensor_data = data
             self._sensor_new.set()
+            # Fire the optional per-frame callback (used by command_server
+            # for Pi-side recording at the sensor rate). Kept tolerant of
+            # callback errors so a bad recorder state can't kill the reader.
             cb = self.on_sensor_tick
             if cb is not None:
                 try:
                     cb(data, sample_pi_s)
                 except Exception:
                     log.exception("on_sensor_tick callback failed")
-        except struct.error:
-            log.debug("Bad binary frame payload, dropping")
+        except (ValueError, IndexError):
+            pass
 
     # -- Command interface ---------------------------------------------------
 
