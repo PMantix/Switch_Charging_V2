@@ -501,6 +501,11 @@ class GPIODriver:
         if resp and not resp.startswith("OK"):
             log.warning("RP2040 G error: %s", resp)
             return None, None
+        # Mock mode (and serial errors) return resp=None; no firmware stamp
+        # to parse. Sequence engine handles (None, None) by falling back to
+        # monotonic() for the anchor.
+        if resp is None:
+            return None, None
         fw_ticks_us = None
         try:
             parts = resp.split()
