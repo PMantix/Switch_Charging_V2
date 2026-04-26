@@ -102,12 +102,13 @@ class PiClient:
             self._rfile = sock.makefile("r", encoding="utf-8")
             self._set_state(ConnectionState.CONNECTED)
             log.info("Connected to %s:%d", host, port)
-
-            # Start the receive loop
-            self._recv_thread = threading.Thread(
-                target=self._recv_loop, daemon=True, name="pi-recv"
-            )
-            self._recv_thread.start()
+            # Recv thread is started by subscribe() — not here. Otherwise it
+            # races send_command's direct readline path (the recv loop only
+            # routes event=state / event=pong, drops everything else, and
+            # whoever wins the race on each line decides whether the caller
+            # sees the reply or it vanishes). With deferred start, all
+            # pre-subscribe send_command calls (subscribe itself, on-connect
+            # bootstrap) read their replies cleanly.
             return True
 
         except (OSError, ConnectionError) as exc:
@@ -193,6 +194,16 @@ class PiClient:
         # Send subscribe and read the ack before marking subscribed
         resp = self.send_command({"cmd": "subscribe"})
         self._subscribed = True
+        # Now that the ack is in hand, hand the socket over to the recv
+        # thread. From this point on, command replies and state events
+        # both arrive through the same loop — which is fine because the
+        # server only pushes state events from here on, and command
+        # replies are routed on demand (e.g. ping_server's Event).
+        if self._recv_thread is None or not self._recv_thread.is_alive():
+            self._recv_thread = threading.Thread(
+                target=self._recv_loop, daemon=True, name="pi-recv"
+            )
+            self._recv_thread.start()
         return resp
 
     def get_status(self) -> Optional[dict]:

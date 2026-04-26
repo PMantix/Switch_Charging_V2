@@ -515,6 +515,7 @@ class SwitchingCircuitApp(App):
         Binding("j", "cycle_ina_avg", "AVG", show=False),
         Binding("k", "cycle_bus_every", "V-decim", show=False),
         Binding("v", "cycle_viz", "Viz Mode", show=False),
+        Binding("y", "cycle_cycle_window", "Cycles", show=False),
         Binding("l", "toggle_log", "Log", show=False),
         Binding("[", "log_duration_down", "Dur-", show=False),
         Binding("]", "log_duration_up", "Dur+", show=False),
@@ -732,23 +733,28 @@ class SwitchingCircuitApp(App):
         )
         if connected:
             save_host(host)
-            # Pre-subscribe sensor-profile fetch: send_command can still
-            # readline() a synchronous reply here. After subscribe(), replies
-            # interleave with the state stream and the direct read no longer
-            # works — so the header would otherwise sit on its placeholder
-            # max_hz until the user manually cycles AVG/bus_every.
-            profile = await loop.run_in_executor(
-                None,
-                self._client.send_command,
-                {"cmd": "get_sensor_profile"},
-            )
+            # Pre-subscribe sensor-profile fetch. Safe now that the recv
+            # thread doesn't start until subscribe() — send_command can
+            # readline() its reply directly without the race that froze
+            # the TUI on first connect. Without this the header would sit
+            # on its placeholder max_hz until the user manually cycles
+            # AVG/bus_every.
+            try:
+                profile = await loop.run_in_executor(
+                    None,
+                    self._client.send_command,
+                    {"cmd": "get_sensor_profile"},
+                )
+            except Exception:
+                profile = None
+            # Subscribe to the state stream (also starts the recv thread).
+            await loop.run_in_executor(None, self._client.subscribe)
             if profile:
-                def _apply():
+                try:
                     plot = self.query_one("#sensor-plot", SensorPlot)
                     self._apply_profile_reply(plot, profile)
-                self.call_from_thread(_apply)
-            # Subscribe to the state stream
-            await loop.run_in_executor(None, self._client.subscribe)
+                except Exception:
+                    pass
 
     # -- State stream callback (called from background thread) ---------------
 
@@ -836,6 +842,10 @@ class SwitchingCircuitApp(App):
 
             sensors = data.get("sensors", {})
             plot = self.query_one("#sensor-plot", SensorPlot)
+            # Feed the live switching frequency so cycle-window mode can
+            # convert "N cycles" to a wallclock filter. Cheap when the
+            # value is unchanged (reactive deduplicates).
+            plot.switching_freq = float(freq)
             t_plot0 = monotonic_ns()
             plot.append_data(sensors)
             plot.commit()  # refresh inside batch_update so it coalesces
@@ -1216,6 +1226,13 @@ class SwitchingCircuitApp(App):
     def action_cycle_viz(self) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
         plot.cycle_mode()
+
+    def action_cycle_cycle_window(self) -> None:
+        """Step the cycle-window filter: off → 1 → 2 → 5 → 10 → off …
+        Useful at high switching freq to lock the visible window to a
+        small integer number of switching cycles for transient analysis."""
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        plot.cycle_cycle_window()
 
     # -- Actions: INA226 Sensor Profile --------------------------------------
 

@@ -56,7 +56,10 @@ class LeftPanel(Widget):
             ]),
             ("SENSORS", [
                 (" / * ", "Rate -/+"),
+                ("  j  ", "INA226 AVG"),
+                ("  k  ", "Bus-V decim"),
                 ("  v  ", "Cycle plot mode"),
+                ("  y  ", "Cycle window N"),
             ]),
             ("RECORD", [
                 ("  l  ", "Start/stop"),
