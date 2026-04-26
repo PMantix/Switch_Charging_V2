@@ -3,8 +3,9 @@ Switching Circuit V2 - Auto Mode Engine.
 
 Daemon thread that runs a loaded schedule, applies circuit actions at each
 step, and uses the CyclerDetector to confirm and sync with the external
-Arbin cycler.  Periodic "sense windows" (briefly going transparent) solve
-the chicken-and-egg problem during active switching.
+Arbin cycler.  The detector estimates cycler current via KCL on the HV
+bus (sum of P-side shunts vs. sum of N-side shunts), so sensing is
+continuous and never interrupts the active switching pattern.
 """
 
 from __future__ import annotations
@@ -23,16 +24,10 @@ from server.schedule import Schedule
 
 log = logging.getLogger(__name__)
 
-# Sense window defaults (overridable via config)
-SENSE_WINDOW_S = 0.5          # seconds in transparent mode for sensing
-SENSE_INTERVAL_ACTIVE_S = 60  # sense every N seconds during CHARGE
-SENSE_INTERVAL_TRANSITION_S = 10  # faster sensing near expected timeout
-
 
 class StepPhase(enum.Enum):
     ENTERING = "entering"
     ACTIVE = "active"
-    SENSING = "sensing"         # brief transparent window during charge
     TRANSITIONING = "transitioning"
 
 
@@ -54,8 +49,6 @@ class AutoEngine:
         set_sequence_fn: Callable[[int], None],
         set_frequency_fn: Callable[[float], None],
         on_event: Optional[Callable[[dict], None]] = None,
-        sense_window_s: float = SENSE_WINDOW_S,
-        sense_interval_s: float = SENSE_INTERVAL_ACTIVE_S,
     ):
         self._schedule = schedule
         self._get_sensor_data = get_sensor_data_fn
@@ -63,8 +56,6 @@ class AutoEngine:
         self._set_sequence = set_sequence_fn
         self._set_frequency = set_frequency_fn
         self._on_event = on_event or (lambda e: None)
-        self._sense_window_s = sense_window_s
-        self._sense_interval_s = sense_interval_s
 
         self._detector = CyclerDetector(schedule.detection_thresholds)
         self._logger = AutoLogger()
@@ -74,9 +65,7 @@ class AutoEngine:
         self._step_index = 0
         self._step_phase = StepPhase.ENTERING
         self._step_start_time = 0.0
-        self._last_sense_time = 0.0
         self._last_heartbeat_time = 0.0
-        self._pre_sense_action: Optional[str] = None  # action to restore after sense
 
         # Heartbeat interval (seconds)
         self._heartbeat_interval = 300.0  # 5 minutes
@@ -257,13 +246,8 @@ class AutoEngine:
         with self._lock:
             self._step_phase = StepPhase.ENTERING
             self._step_start_time = monotonic()
-            self._last_sense_time = monotonic()
 
         if step.circuit_action == "charge":
-            # Go transparent first to confirm cycler state
-            self._set_mode("discharge")
-            self._sense_and_classify(duration=self._sense_window_s)
-            # Now apply charge settings
             self._set_sequence(step.sequence)
             self._set_frequency(step.frequency)
             self._set_mode("charge")
@@ -307,14 +291,6 @@ class AutoEngine:
                     "detected_state": result.state.value,
                     "match": result.state.value == step.expected_state,
                 })
-
-            # Check if we need a sense window (during charge, sensors are unreliable)
-            if step.circuit_action == "charge":
-                sense_interval = self._sense_interval_s
-                if elapsed > step.timeout_s * 0.8:
-                    sense_interval = SENSE_INTERVAL_TRANSITION_S
-                if now - self._last_sense_time >= sense_interval:
-                    self._do_sense_window(step)
 
             # Check for state transition to next step
             next_step = self._peek_next_step()
@@ -390,37 +366,6 @@ class AutoEngine:
             "elapsed_s": round(monotonic() - self._step_start_time, 1),
         })
 
-    def _do_sense_window(self, step):
-        """Briefly go transparent to sense the cycler state, then resume."""
-        with self._lock:
-            self._step_phase = StepPhase.SENSING
-            self._pre_sense_action = step.circuit_action
-
-        # Go transparent (all FETs on)
-        self._set_mode("discharge")
-        self._sense_and_classify(duration=self._sense_window_s)
-
-        # Restore previous action
-        if step.circuit_action == "charge":
-            self._set_sequence(step.sequence)
-            self._set_frequency(step.frequency)
-            self._set_mode("charge")
-        else:
-            self._apply_circuit_action(step.circuit_action)
-
-        with self._lock:
-            self._step_phase = StepPhase.ACTIVE
-            self._last_sense_time = monotonic()
-
-    def _sense_and_classify(self, duration: float):
-        """Read sensor data for `duration` seconds and feed to detector."""
-        deadline = monotonic() + duration
-        while monotonic() < deadline and not self._stop_event.is_set():
-            sensor_data = self._get_sensor_data()
-            if sensor_data:
-                self._detector.feed(sensor_data)
-            sleep(0.066)
-
     def _apply_circuit_action(self, action: str):
         """Apply a circuit action string to the mode controller."""
         if action == "idle":
@@ -457,7 +402,6 @@ class AutoEngine:
             self._cycle += 1
         self._step_phase = StepPhase.ENTERING
         self._step_start_time = monotonic()
-        self._last_sense_time = monotonic()
 
     # -- events --------------------------------------------------------------
 

@@ -154,22 +154,34 @@ class CyclerDetector:
     # -- internals -----------------------------------------------------------
 
     def _extract_averages(self, sensor_data: dict) -> tuple[float, float]:
-        """Extract mean current and voltage across all valid sensors."""
-        currents = []
+        """Estimate cycler current via KCL on the HV bus.
+
+        I_HV+ = I_P1 + I_P2 (current entering through high-side FETs)
+        I_GND = I_N1 + I_N2 (current exiting through low-side FETs)
+        These must be equal in steady state; averaging the two sides is
+        invariant to which gates are switched on at any instant, so the
+        estimate is continuous across switching transitions and does not
+        require interrupting the pattern with a transparent sense window.
+        """
+        p_sum = 0.0
+        n_sum = 0.0
         voltages = []
         for name in SENSOR_NAMES:
             s = sensor_data.get(name)
-            if s and "error" not in s:
-                v = s.get("voltage", 0.0)
-                i = s.get("current", 0.0)
-                # Only include sensors that show non-trivial voltage
-                # (indicates the FET path is active)
-                if v > 0.01:
-                    currents.append(i)
-                    voltages.append(v)
-        if not currents:
-            return 0.0, 0.0
-        return sum(currents) / len(currents), sum(voltages) / len(voltages)
+            if not s or "error" in s:
+                continue
+            i = s.get("current", 0.0)
+            v = s.get("voltage", 0.0)
+            if name.startswith("P"):
+                p_sum += i
+            elif name.startswith("N"):
+                n_sum += i
+            # Voltage averaging: only include active (non-floating) sensors.
+            if v > 0.01:
+                voltages.append(v)
+        avg_i = (p_sum + n_sum) / 2.0
+        avg_v = sum(voltages) / len(voltages) if voltages else 0.0
+        return avg_i, avg_v
 
     def _classify(self, avg_i: float, avg_v: float, now: float) -> CyclerState:
         """Classify a single sample based on thresholds, with CV hysteresis."""

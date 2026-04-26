@@ -8,12 +8,16 @@ from server.cycler_detector import (
 
 
 def _sensor(v=3.5, i=0.0):
-    """Build a sensor_data dict with uniform readings across all 4 channels."""
+    """Build a sensor_data dict simulating a state-0 (P1+N1) switch, where
+    cycler current `i` flows through the cell-A path and the P2/N2 shunts
+    read 0 (FETs off). The detector estimates cycler current as
+    (P1+P2 + N1+N2) / 2, so this gives avg_current == i.
+    """
     return {
         "P1": {"voltage": v, "current": i},
-        "P2": {"voltage": v, "current": i},
+        "P2": {"voltage": 0.0, "current": 0.0},
         "N1": {"voltage": v, "current": i},
-        "N2": {"voltage": v, "current": i},
+        "N2": {"voltage": 0.0, "current": 0.0},
     }
 
 
