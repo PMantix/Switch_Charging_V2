@@ -398,6 +398,35 @@ class CommandServer:
                 ae.skip_step()
                 return {"ok": True, "auto": ae.get_status()}
 
+            # -- auto-follow (current-threshold mode switcher) ---------------
+
+            elif cmd == "auto_follow_status":
+                return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
+
+            elif cmd == "auto_follow_set_enabled":
+                enabled = bool(msg.get("enabled", False))
+                self._mc.set_auto_follow_enabled(enabled)
+                return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
+
+            elif cmd == "auto_follow_set_thresholds":
+                try:
+                    i_enter = float(msg["i_enter_a"])
+                    i_exit = float(msg["i_exit_a"])
+                except (KeyError, TypeError, ValueError) as e:
+                    return {"ok": False, "error": f"Need numeric i_enter_a and i_exit_a: {e}"}
+                try:
+                    self._mc.set_auto_follow_thresholds(i_enter, i_exit)
+                except ValueError as e:
+                    return {"ok": False, "error": str(e)}
+                return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
+
+            elif cmd == "auto_follow_set_target":
+                target = msg.get("target_mode")
+                if target not in ("charge", "pulse_charge"):
+                    return {"ok": False, "error": "target_mode must be 'charge' or 'pulse_charge'"}
+                self._mc.set_auto_follow_target(target)
+                return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
+
             # -- network mode (client <-> AP) --------------------------------
 
             elif cmd == "set_network_mode":

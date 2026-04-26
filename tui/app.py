@@ -29,6 +29,7 @@ from tui.widgets.pi_picker import PiPicker
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
 from tui.widgets.auto_panel import AutoPanel
+from tui.widgets.auto_follow_panel import AutoFollowPanel
 from tui.widgets.connection_bar import ConnectionBar
 from tui.widgets.mascot import Mascot
 from tui.widgets.schedule_screen import SchedulePickerScreen, SchedulePreviewScreen
@@ -524,6 +525,7 @@ class SwitchingCircuitApp(App):
         Binding("n", "auto_skip", "Skip Step", show=False),
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
         Binding("A", "ap_mode", "AP Mode", show=False),
+        Binding("F", "auto_follow_panel", "Auto-Follow", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
         Binding("P", "switch_pi", "Switch Pi", show=False),
@@ -549,6 +551,7 @@ class SwitchingCircuitApp(App):
         self._last_apply_time = 0.0      # last time _apply_state ran
         self._showing_auto_panel = False  # right column: status vs auto panel
         self._prev_mode = "idle"         # track mode changes for panel auto-switch
+        self._latest_auto_follow: dict = {}  # mirror of last auto_follow status
         self._probe = LatencyProbe()
         self._offset_worker_started = False
         self._last_probe_display_ns = 0
@@ -856,6 +859,9 @@ class SwitchingCircuitApp(App):
             auto_panel = self.query_one("#auto-panel", AutoPanel)
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             auto_data = data.get("auto", {})
+            af = data.get("auto_follow")
+            if af:
+                self._latest_auto_follow = af
 
             if mode == "auto":
                 if auto_data:
@@ -1387,6 +1393,29 @@ class SwitchingCircuitApp(App):
         self.push_screen(
             ConnectDialog(prescan=self._take_prescan()),
             self._on_connect_dialog_result,
+        )
+
+    # -- Auto-follow (current-driven mode switching) ------------------------
+
+    def action_auto_follow_panel(self) -> None:
+        """Open the auto-follow settings modal."""
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            self.notify("Not connected", title="Auto-Follow", severity="warning")
+            return
+
+        def _send(payload: dict):
+            try:
+                return self._client.send_command(payload)
+            except Exception as e:
+                self.notify(str(e), title="Auto-Follow", severity="error")
+                return None
+
+        # Seed the panel with the latest broadcast snapshot, then it polls.
+        self.push_screen(
+            AutoFollowPanel(
+                get_status=lambda: self._latest_auto_follow,
+                send_cmd=_send,
+            ),
         )
 
     # -- Network mode (client <-> AP) ---------------------------------------

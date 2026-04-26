@@ -125,7 +125,14 @@ DEFAULT_FREQ = 10.0  # Hz
 DEAD_TIME = 0.002    # 2 ms
 
 # ---------------------------------------------------------------------------
-# Auto mode (cycler-synchronized switching)
+# Auto-follow (current-threshold-driven mode switcher)
+# ---------------------------------------------------------------------------
+AUTO_FOLLOW_I_ENTER_A = 0.005    # A — enter switching when |i| rises above this
+AUTO_FOLLOW_I_EXIT_A = 0.002     # A — drop back to transparent below this (or i<=0)
+AUTO_FOLLOW_LOOP_HZ = 15.0       # controller poll rate
+
+# ---------------------------------------------------------------------------
+# Schedule (loaded for monitoring; see schedule_monitor.py)
 # ---------------------------------------------------------------------------
 AUTO_SCHEDULE_DIR = "schedules"  # default directory for schedule files
 

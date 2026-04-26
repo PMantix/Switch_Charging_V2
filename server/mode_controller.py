@@ -11,6 +11,7 @@ import logging
 import threading
 from time import sleep
 
+from server.auto_follow import ALLOWED_TARGET_MODES, AutoFollow
 from server.config import DEAD_TIME
 
 log = logging.getLogger(__name__)
@@ -36,6 +37,14 @@ class ModeController:
         self._auto_engine = None       # AutoEngine instance when in AUTO mode
         self._loaded_schedule = None   # Schedule loaded but not yet running
 
+        # Auto-follow: hysteresis-based current-driven mode switcher.
+        # Started here but disabled by default; user toggles via TUI.
+        self._auto_follow = AutoFollow(
+            get_sensor_data_fn=self._gpio.get_sensor_data,
+            set_mode_fn=lambda m: self._set_mode_internal(Mode(m)),
+        )
+        self._auto_follow.start()
+
         # Ensure we start in a safe state
         self._gpio.all_off()
         self._engine.pause()
@@ -50,6 +59,13 @@ class ModeController:
         Accepts a Mode enum member or a string ('idle', 'charge', 'discharge').
         Returns the new Mode value.
         Raises ValueError for unknown mode strings.
+
+        Interaction with auto-follow: while auto-follow is enabled,
+        picking a switching target (`charge` / `pulse_charge`) updates
+        the auto-follow target without forcing the mode (auto-follow's
+        hysteresis decides when to engage). Picking any other mode
+        (`idle` / `discharge` / `auto` / `debug`) disables auto-follow
+        first, then applies the requested mode.
         """
         if isinstance(mode, str):
             try:
@@ -59,6 +75,17 @@ class ModeController:
                     f"Unknown mode {mode!r}. "
                     f"Valid modes: {', '.join(m.value for m in Mode)}"
                 )
+
+        # Route through auto-follow when enabled and the target is a
+        # switching mode — let the controller's hysteresis decide
+        # engagement instead of forcing the transition here.
+        if self._auto_follow.enabled and mode.value in ALLOWED_TARGET_MODES:
+            self._auto_follow.set_target_mode(mode.value)
+            return self.get_mode()
+
+        # Any other mode pick disables auto-follow before proceeding.
+        if self._auto_follow.enabled:
+            self._auto_follow.set_enabled(False)
 
         # If leaving AUTO externally, stop the auto engine first
         if self._auto_engine and mode != Mode.AUTO:
@@ -158,6 +185,27 @@ class ModeController:
         with self._lock:
             return self._mode
 
+    # -- auto-follow ---------------------------------------------------------
+
+    def set_auto_follow_enabled(self, enabled: bool):
+        """Enable or disable threshold-driven mode switching."""
+        # Stop any schedule-driven AUTO engine first — they shouldn't both
+        # be driving the mode at once.
+        if enabled and self._auto_engine:
+            log.info("Stopping auto engine because auto-follow is enabling")
+            self._auto_engine.stop()
+            self._auto_engine = None
+        self._auto_follow.set_enabled(enabled)
+
+    def set_auto_follow_thresholds(self, i_enter_a: float, i_exit_a: float):
+        self._auto_follow.set_thresholds(i_enter_a, i_exit_a)
+
+    def set_auto_follow_target(self, mode: str):
+        self._auto_follow.set_target_mode(mode)
+
+    def get_auto_follow_status(self) -> dict:
+        return self._auto_follow.get_status()
+
     def set_fet(self, index: int, on: bool):
         """Set an individual FET (0=P1, 1=P2, 2=N1, 3=N2). Only works in DEBUG mode."""
         with self._lock:
@@ -219,4 +267,5 @@ class ModeController:
             status["debug_step"] = debug_step
         if mode == Mode.AUTO and self._auto_engine:
             status["auto"] = self._auto_engine.get_status()
+        status["auto_follow"] = self._auto_follow.get_status()
         return status
