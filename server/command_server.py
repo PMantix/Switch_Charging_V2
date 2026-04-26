@@ -285,9 +285,17 @@ class CommandServer:
                 rec_freq = float(msg.get("rec_freq", 1.0))
                 rec_seq = int(msg.get("rec_seq", 0))
                 rec_sensor_hz = float(msg.get("rec_sensor_hz", 15.0))
+                # Optional override of the recorder's step-alignment gate.
+                # Default (1) waits for a transition into step=1, which gives
+                # cycle-aligned recordings — but aliases to "never starts"
+                # when sample rate happens to land on the same step every
+                # frame (e.g. 100 Hz × 10/50 sps in pulse mode). Pass null
+                # to begin recording on the first sample regardless.
+                align_to_step = msg.get("align_to_step", 1)
                 path = self._recorder.start(
                     max_samples, mode=rec_mode, freq=rec_freq,
                     seq=rec_seq, sensor_hz=rec_sensor_hz,
+                    align_to_step=align_to_step,
                 )
                 return {"ok": True, "path": path}
 
