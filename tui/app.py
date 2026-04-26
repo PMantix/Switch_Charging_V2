@@ -25,6 +25,7 @@ from tui import wifi_scan
 from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
 from tui.widgets.fleet_list import FleetList, FleetEntry
 from tui.widgets.left_panel import LeftPanel
+from tui.widgets.pi_picker import PiPicker
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
 from tui.widgets.auto_panel import AutoPanel
@@ -525,6 +526,7 @@ class SwitchingCircuitApp(App):
         Binding("A", "ap_mode", "AP Mode", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
+        Binding("P", "switch_pi", "Switch Pi", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -1454,3 +1456,53 @@ class SwitchingCircuitApp(App):
                 callback=self._on_auto_discover_result,
                 on_status=self._on_auto_discover_status,
             )
+
+    # -- Pi picker (swap which Pi the TUI is talking to) --------------------
+
+    def action_switch_pi(self) -> None:
+        """Open the Pi picker to swap the active Pi."""
+        if self._data_logger.is_logging:
+            self.notify(
+                "Stop the active recording (l) before switching Pis.",
+                title="Recording active",
+                severity="warning",
+            )
+            return
+        current_host = self._client.host if self._client else ""
+        self.push_screen(
+            PiPicker(current_host=current_host),
+            self._on_pi_picker_result,
+        )
+
+    def _on_pi_picker_result(self, host: Optional[str]) -> None:
+        if not host:
+            return  # cancelled or no change
+        self._switch_pi(host)
+
+    def _switch_pi(self, new_host: str) -> None:
+        """Retarget the existing PiClient at a different Pi.
+
+        Resets per-Pi state (mode/freq/seq/auto-panel) so the bootstrap
+        flow on the new connection populates clean values rather than
+        flashing the previous Pi's last-known frame.
+        """
+        if not self._client:
+            return
+        self._reset_pi_state()
+        conn_bar = self.query_one("#conn-bar", ConnectionBar)
+        conn_bar.host = f"{new_host}:{self._initial_port}"
+        conn_bar.conn_label = f"Switching to {new_host}..."
+        save_host(new_host)
+        self._client.reconnect_to(new_host, self._initial_port)
+
+    def _reset_pi_state(self) -> None:
+        """Clear per-Pi cached state ahead of a Pi switch. The next
+        on-connect bootstrap (`_apply_profile_reply` + first state event)
+        refills it from the new server."""
+        self._circuit_mode = "idle"
+        self._current_freq = 1.0
+        self._current_seq = 0
+        self._prev_mode = "idle"
+        self._showing_auto_panel = False
+        self._first_state_time = 0.0
+        self._last_apply_time = 0.0

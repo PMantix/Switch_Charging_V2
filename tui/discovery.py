@@ -17,9 +17,11 @@ import socket
 import subprocess
 import sys
 import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 log = logging.getLogger(__name__)
 
@@ -103,6 +105,76 @@ def _try_fleet_mdns(port: int = SERVER_PORT) -> Optional[str]:
                     f.cancel()
                 return hit
     return None
+
+
+@dataclass(frozen=True)
+class FleetHit:
+    """A live Pi server discovered on the fleet."""
+    hostname: str
+    ip: str
+    latency_ms: float
+
+
+def _probe_with_latency(host: str, port: int = SERVER_PORT) -> Optional[float]:
+    """TCP connect probe that returns latency in ms, or None on failure."""
+    t0 = time.monotonic()
+    try:
+        with socket.create_connection((host, port), timeout=CONNECT_TIMEOUT):
+            return (time.monotonic() - t0) * 1000.0
+    except (OSError, ConnectionError):
+        return None
+
+
+def discover_fleet(
+    on_status: Optional[Callable[[str], None]] = None,
+    port: int = SERVER_PORT,
+) -> list[FleetHit]:
+    """Resolve every fleet hostname in parallel and return all live hits.
+
+    Unlike `discover()` which returns the first hit, this enumerates the
+    full fleet so the UI can offer a Pi picker. Hostnames that don't
+    resolve or whose port isn't open are simply absent from the result.
+    """
+    def status(msg: str) -> None:
+        log.info("Fleet scan: %s", msg)
+        if on_status:
+            on_status(msg)
+
+    def check(hostname: str) -> Optional[FleetHit]:
+        ip = _resolve(hostname)
+        if not ip:
+            return None
+        latency_ms = _probe_with_latency(ip, port)
+        if latency_ms is None:
+            return None
+        return FleetHit(hostname=hostname, ip=ip, latency_ms=latency_ms)
+
+    status(f"Probing fleet ({FLEET_HOSTNAMES[0]}..{FLEET_HOSTNAMES[-1]})...")
+    hits: list[FleetHit] = []
+    with ThreadPoolExecutor(max_workers=len(FLEET_HOSTNAMES)) as pool:
+        futures = {pool.submit(check, h): h for h in FLEET_HOSTNAMES}
+        for fut in as_completed(futures):
+            hit = fut.result()
+            if hit:
+                hits.append(hit)
+    hits.sort(key=lambda h: h.hostname)
+    status(f"Fleet scan complete: {len(hits)} live")
+    return hits
+
+
+def discover_fleet_async(
+    callback: Callable[[list[FleetHit]], None],
+    on_status: Optional[Callable[[str], None]] = None,
+    port: int = SERVER_PORT,
+) -> threading.Thread:
+    """Run discover_fleet in a background thread."""
+    def _run():
+        hits = discover_fleet(on_status=on_status, port=port)
+        callback(hits)
+
+    t = threading.Thread(target=_run, daemon=True, name="fleet-scan")
+    t.start()
+    return t
 
 
 def _try_legacy_mdns(port: int = SERVER_PORT) -> Optional[str]:
