@@ -54,6 +54,7 @@ class AutoPanel(Widget):
     """
 
     auto_data: reactive[dict] = reactive({}, layout=True)
+    monitor_data: reactive[dict] = reactive({}, layout=True)
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -61,11 +62,14 @@ class AutoPanel(Widget):
         self._text_cache_key: str | None = None
 
     def render(self) -> Text:
-        # Most auto ticks don't change auto_data (or only change step_elapsed_s
-        # while the rest of the dict is stable). Cache by a JSON snapshot so
-        # the large Text build only runs when something real changed.
+        # Most ticks change only the elapsed-second fields while the
+        # rest of the dicts are stable. Cache by a combined JSON snapshot
+        # so the heavy Text build only runs when something real changed.
         try:
-            key = json.dumps(self.auto_data, sort_keys=True, default=str)
+            key = json.dumps(
+                [self.auto_data, self.monitor_data],
+                sort_keys=True, default=str,
+            )
         except (TypeError, ValueError):
             key = None
         if key is not None and key == self._text_cache_key and self._text_cache is not None:
@@ -81,10 +85,19 @@ class AutoPanel(Widget):
         t.append(" Tab", style="bold white on dark_blue")
         t.append(" \u2192 Status panel\n\n", style="dim")
         d = self.auto_data
+        m = self.monitor_data
+
+        # Schedule monitor (passive) \u2014 render whenever a schedule is loaded
+        # and no schedule-driven auto engine is currently running.
+        if (not d or not d.get("running")) and m and m.get("loaded"):
+            self._render_monitor(t, m)
+            return t
 
         if not d or not d.get("running"):
             t.append(" AUTO MODE\n", style="bold cyan underline")
             t.append("\n Not running\n", style="dim")
+            if m and not m.get("loaded"):
+                t.append(" (no schedule loaded)\n", style="dim")
             return t
 
         # -- Header --
@@ -259,6 +272,106 @@ class AutoPanel(Widget):
 
         t.append("\n")
 
+    def _render_monitor(self, t: Text, m: dict) -> None:
+        """Render the passive PLAN | OBSERVED display for the schedule monitor."""
+        plan = m.get("plan", {}) or {}
+        obs = m.get("observed", {}) or {}
+        divergence = m.get("divergence", "unknown")
+        running = m.get("running", False)
+        complete = plan.get("schedule_complete", False)
+
+        t.append(" SCHEDULE MONITOR", style="bold blue underline")
+        if not running:
+            t.append("  STOPPED", style="bold yellow reverse")
+        elif complete:
+            t.append("  COMPLETE", style="bold green reverse")
+        t.append("\n\n")
+
+        name = m.get("schedule_name", "?")
+        cycle = plan.get("cycle", 0)
+        total_cycles = m.get("total_cycles", 1)
+        total_steps = m.get("total_steps", 0)
+        step_idx = plan.get("step_index", 0)
+
+        t.append(" Schedule ", style="dim")
+        t.append(f"{name}\n", style="bold white")
+        t.append(" Cycle    ", style="dim")
+        t.append(f"{cycle + 1}", style="bold white")
+        t.append(f" / {total_cycles}\n", style="dim")
+        t.append(" Step     ", style="dim")
+        t.append(f"{step_idx + 1}", style="bold white")
+        t.append(f" / {total_steps}\n\n", style="dim")
+
+        # Two-column PLAN | OBSERVED display
+        plan_state = plan.get("expected_state", "")
+        plan_label, plan_style = STATE_STYLES.get(
+            plan_state, (plan_state.upper() if plan_state else "—", "white"),
+        )
+        obs_state = obs.get("state", "unknown")
+        obs_label, obs_style = STATE_STYLES.get(obs_state, (obs_state.upper(), "white"))
+
+        t.append(" ", style="dim")
+        t.append("PLAN", style="bold cyan")
+        t.append("              ", style="dim")
+        t.append("OBSERVED\n", style="bold cyan")
+        t.append(" ─────────────    ────────────\n", style="dim")
+
+        # Step name vs detected state
+        step_name = plan.get("step_name", "—")
+        if len(step_name) > 12:
+            step_name = step_name[:11] + "…"
+        t.append(f" {step_name:<13}", style="white")
+        t.append("    ", style="dim")
+        t.append(f"{obs_label}\n", style=obs_style)
+
+        # Expected state
+        t.append(f" {plan_label:<13}", style=plan_style)
+        t.append("    ", style="dim")
+        confidence = obs.get("confidence", 0.0)
+        t.append(f"{confidence*100:.0f}% conf\n", style="dim")
+
+        # Timing
+        elapsed = plan.get("step_elapsed_s", 0.0)
+        timeout = plan.get("step_timeout_s", 0.0)
+        current_a = obs.get("current_a", 0.0)
+        voltage_v = obs.get("voltage_v", 0.0)
+
+        t.append(f" {self._fmt_time(elapsed)}/{self._fmt_time(timeout):<8}",
+                 style="white")
+        t.append("  ", style="dim")
+        t.append(f"{current_a*1000:+6.1f} mA\n", style="white")
+
+        # Progress bar
+        pct = min(1.0, elapsed / timeout) if timeout > 0 else 0
+        bar_w = 13
+        filled = int(pct * bar_w)
+        t.append(" [", style="dim")
+        bar_color = "bold green" if running and not complete else "dim"
+        t.append("█" * filled, style=bar_color)
+        t.append("░" * (bar_w - filled), style="dim")
+        t.append("]   ", style="dim")
+        t.append(f"{voltage_v:6.4f} V\n", style="white")
+
+        t.append("\n")
+
+        # Divergence indicator
+        t.append(" Divergence  ", style="dim")
+        if divergence == "match":
+            t.append("✓ FOLLOWING\n", style="bold green")
+        elif divergence == "mismatch":
+            t.append("✗ DIVERGED\n", style="bold red reverse")
+        else:
+            t.append("? unknown\n", style="dim yellow")
+
+        t.append("\n")
+
+        # Hint
+        t.append(" CONTROLS\n", style="bold cyan underline")
+        t.append("\n")
+        t.append("  ", style="dim")
+        t.append(" a ", style="bold white on dark_blue")
+        t.append(" Load schedule\n", style="dim")
+
     @staticmethod
     def _fmt_time(seconds: float) -> str:
         s = int(seconds)
@@ -269,4 +382,7 @@ class AutoPanel(Widget):
         return f"{s}s"
 
     def watch_auto_data(self, _: dict) -> None:
+        self.refresh()
+
+    def watch_monitor_data(self, _: dict) -> None:
         self.refresh()

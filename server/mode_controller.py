@@ -13,6 +13,7 @@ from time import sleep
 
 from server.auto_follow import ALLOWED_TARGET_MODES, AutoFollow
 from server.config import DEAD_TIME
+from server.schedule_monitor import ScheduleMonitor
 
 log = logging.getLogger(__name__)
 
@@ -44,6 +45,15 @@ class ModeController:
             set_mode_fn=lambda m: self._set_mode_internal(Mode(m)),
         )
         self._auto_follow.start()
+
+        # Schedule monitor: passive PLAN-vs-OBSERVED tracker. Always
+        # running; updates OBSERVED state from sensor data continuously
+        # so the TUI can show live detection even before a schedule is
+        # loaded.
+        self._schedule_monitor = ScheduleMonitor(
+            get_sensor_data_fn=self._gpio.get_sensor_data,
+        )
+        self._schedule_monitor.start_thread()
 
         # Ensure we start in a safe state
         self._gpio.all_off()
@@ -170,8 +180,9 @@ class ModeController:
     # -- schedule management -------------------------------------------------
 
     def load_schedule(self, schedule):
-        """Load a schedule for auto mode (does not start it)."""
+        """Load a schedule for auto mode and the passive monitor."""
         self._loaded_schedule = schedule
+        self._schedule_monitor.load_schedule(schedule)
         log.info("Schedule loaded: %r (%d steps, %d repeats)",
                  schedule.name, len(schedule.steps), schedule.repeat)
 
@@ -180,6 +191,16 @@ class ModeController:
 
     def get_auto_engine(self):
         return self._auto_engine
+
+    def get_schedule_monitor(self):
+        return self._schedule_monitor
+
+    def restart_schedule_monitor(self):
+        """Reset the PLAN clock to step 0 of cycle 0."""
+        self._schedule_monitor.restart()
+
+    def stop_schedule_monitor(self):
+        self._schedule_monitor.stop()
 
     def get_mode(self):
         with self._lock:
@@ -268,4 +289,5 @@ class ModeController:
         if mode == Mode.AUTO and self._auto_engine:
             status["auto"] = self._auto_engine.get_status()
         status["auto_follow"] = self._auto_follow.get_status()
+        status["schedule_monitor"] = self._schedule_monitor.get_status()
         return status

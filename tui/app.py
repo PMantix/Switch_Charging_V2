@@ -526,6 +526,7 @@ class SwitchingCircuitApp(App):
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
         Binding("A", "ap_mode", "AP Mode", show=False),
         Binding("F", "auto_follow_panel", "Auto-Follow", show=False),
+        Binding("M", "restart_monitor", "Restart monitor clock", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
         Binding("P", "switch_pi", "Switch Pi", show=False),
@@ -862,23 +863,30 @@ class SwitchingCircuitApp(App):
             af = data.get("auto_follow")
             if af:
                 self._latest_auto_follow = af
+            monitor_data = data.get("schedule_monitor", {}) or {}
+            auto_panel.monitor_data = monitor_data
+
+            schedule_loaded = bool(monitor_data.get("loaded"))
+            should_show_panel = (mode == "auto") or schedule_loaded
 
             if mode == "auto":
                 if auto_data:
                     auto_panel.auto_data = auto_data
                 conn_bar.update_auto_status(auto_data)
-                # Auto-switch to auto panel when ENTERING auto mode
-                if self._prev_mode != "auto" and not self._showing_auto_panel:
-                    self._showing_auto_panel = True
-                    rpanel.add_class("hidden")
-                    auto_panel.remove_class("hidden")
             else:
+                # Clear stale auto-engine data; monitor data drives the render now.
+                if auto_panel.auto_data:
+                    auto_panel.auto_data = {}
                 conn_bar.update_auto_status({})
-                # Auto-switch back only when LEAVING auto mode
-                if self._prev_mode == "auto" and self._showing_auto_panel:
-                    self._showing_auto_panel = False
-                    auto_panel.add_class("hidden")
-                    rpanel.remove_class("hidden")
+
+            if should_show_panel and not self._showing_auto_panel:
+                self._showing_auto_panel = True
+                rpanel.add_class("hidden")
+                auto_panel.remove_class("hidden")
+            elif not should_show_panel and self._showing_auto_panel:
+                self._showing_auto_panel = False
+                auto_panel.add_class("hidden")
+                rpanel.remove_class("hidden")
 
             self._prev_mode = mode
 
@@ -1394,6 +1402,19 @@ class SwitchingCircuitApp(App):
             ConnectDialog(prescan=self._take_prescan()),
             self._on_connect_dialog_result,
         )
+
+    # -- Schedule monitor ---------------------------------------------------
+
+    def action_restart_monitor(self) -> None:
+        """Reset the schedule monitor's PLAN clock back to step 0 cycle 0."""
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            return
+        resp = self._client.send_command({"cmd": "schedule_monitor_restart"})
+        if resp and resp.get("ok"):
+            self.notify("Monitor PLAN clock restarted", title="Monitor")
+        else:
+            err = (resp or {}).get("error", "no schedule loaded")
+            self.notify(f"Restart failed: {err}", title="Monitor", severity="warning")
 
     # -- Auto-follow (current-driven mode switching) ------------------------
 

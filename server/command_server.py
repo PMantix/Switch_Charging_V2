@@ -427,6 +427,23 @@ class CommandServer:
                 self._mc.set_auto_follow_target(target)
                 return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
 
+            # -- schedule monitor (passive PLAN/OBSERVED tracker) ------------
+
+            elif cmd == "schedule_monitor_status":
+                sm = self._mc.get_schedule_monitor()
+                return {"ok": True, "schedule_monitor": sm.get_status()}
+
+            elif cmd == "schedule_monitor_restart":
+                try:
+                    self._mc.restart_schedule_monitor()
+                except ValueError as e:
+                    return {"ok": False, "error": str(e)}
+                return {"ok": True, "schedule_monitor": self._mc.get_schedule_monitor().get_status()}
+
+            elif cmd == "schedule_monitor_stop":
+                self._mc.stop_schedule_monitor()
+                return {"ok": True, "schedule_monitor": self._mc.get_schedule_monitor().get_status()}
+
             # -- network mode (client <-> AP) --------------------------------
 
             elif cmd == "set_network_mode":
