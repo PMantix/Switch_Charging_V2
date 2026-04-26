@@ -371,33 +371,6 @@ class CommandServer:
                     )
                 return {"ok": True, "schedules": files}
 
-            elif cmd == "auto_status":
-                ae = self._mc.get_auto_engine()
-                if ae:
-                    return {"ok": True, "auto": ae.get_status()}
-                return {"ok": True, "auto": None}
-
-            elif cmd == "auto_pause":
-                ae = self._mc.get_auto_engine()
-                if not ae:
-                    return {"ok": False, "error": "Auto mode not active"}
-                ae.pause()
-                return {"ok": True}
-
-            elif cmd == "auto_resume":
-                ae = self._mc.get_auto_engine()
-                if not ae:
-                    return {"ok": False, "error": "Auto mode not active"}
-                ae.resume()
-                return {"ok": True}
-
-            elif cmd == "auto_skip_step":
-                ae = self._mc.get_auto_engine()
-                if not ae:
-                    return {"ok": False, "error": "Auto mode not active"}
-                ae.skip_step()
-                return {"ok": True, "auto": ae.get_status()}
-
             # -- auto-follow (current-threshold mode switcher) ---------------
 
             elif cmd == "auto_follow_status":

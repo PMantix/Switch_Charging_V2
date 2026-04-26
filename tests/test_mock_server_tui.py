@@ -214,141 +214,65 @@ class TestMockServerTUI(unittest.TestCase):
         finally:
             sock.close()
 
-    # ----- Auto mode -----
+    # ----- Schedule monitor (passive PLAN/OBSERVED) -----
 
-    def test_20_auto_mode_requires_schedule(self):
+    def test_20_set_mode_auto_is_rejected(self):
+        """The legacy schedule-driven 'auto' mode is removed. Trying to
+        enter it should fail with an unknown-mode error."""
         sock = self._connect()
         try:
-            # Without loading a schedule first, auto mode should fail
-            # Reset any previously loaded schedule
-            self.mc._loaded_schedule = None
             resp = _send_recv(sock, {"cmd": "set_mode", "mode": "auto"})
             self.assertFalse(resp["ok"])
-            self.assertIn("schedule", resp["error"].lower())
         finally:
             sock.close()
 
-    def test_21_auto_mode_starts_with_schedule(self):
+    def test_21_load_schedule_starts_monitor(self):
         sock = self._connect()
         try:
-            # Load a schedule first
             resp = _send_recv(sock, {
                 "cmd": "load_schedule",
                 "path": "schedules/example_short_test.json",
             })
             self.assertTrue(resp["ok"])
 
-            # Start auto mode
-            resp = _send_recv(sock, {"cmd": "set_mode", "mode": "auto"})
+            resp = _send_recv(sock, {"cmd": "schedule_monitor_status"})
             self.assertTrue(resp["ok"])
-            self.assertEqual(resp["mode"], "auto")
-
-            sleep(0.5)
-
-            # Check auto_status
-            resp = _send_recv(sock, {"cmd": "auto_status"})
-            self.assertTrue(resp["ok"])
-            auto = resp["auto"]
-            self.assertIsNotNone(auto)
-            self.assertTrue(auto["running"])
-            self.assertEqual(auto["schedule_name"], "short_bench_test")
-            self.assertIn("steps", auto)
-            self.assertIn("recent_events", auto)
-            self.assertIn("detected_state", auto)
-            self.assertIn("in_timeout", auto)
-            self.assertEqual(len(auto["steps"]), 4)
+            sm = resp["schedule_monitor"]
+            self.assertTrue(sm["loaded"])
+            self.assertTrue(sm["running"])
+            self.assertEqual(sm["schedule_name"], "short_bench_test")
+            self.assertIn("plan", sm)
+            self.assertIn("observed", sm)
+            self.assertIn("divergence", sm)
         finally:
-            _send_recv(sock, {"cmd": "set_mode", "mode": "idle"})
             sock.close()
 
-    def test_22_auto_pause_resume(self):
+    def test_22_schedule_monitor_restart_resets_clock(self):
         sock = self._connect()
         try:
             _send_recv(sock, {
                 "cmd": "load_schedule",
                 "path": "schedules/example_short_test.json",
             })
-            _send_recv(sock, {"cmd": "set_mode", "mode": "auto"})
-            sleep(0.3)
-
-            # Pause
-            resp = _send_recv(sock, {"cmd": "auto_pause"})
+            sleep(0.2)
+            resp = _send_recv(sock, {"cmd": "schedule_monitor_restart"})
             self.assertTrue(resp["ok"])
-
-            resp = _send_recv(sock, {"cmd": "auto_status"})
-            self.assertTrue(resp["auto"]["paused"])
-
-            # Resume
-            resp = _send_recv(sock, {"cmd": "auto_resume"})
-            self.assertTrue(resp["ok"])
-
-            resp = _send_recv(sock, {"cmd": "auto_status"})
-            self.assertFalse(resp["auto"]["paused"])
+            sm = resp["schedule_monitor"]
+            self.assertEqual(sm["plan"]["step_index"], 0)
         finally:
-            _send_recv(sock, {"cmd": "set_mode", "mode": "idle"})
             sock.close()
 
-    def test_23_auto_skip_step(self):
+    def test_23_schedule_monitor_stop_freezes_running(self):
         sock = self._connect()
         try:
             _send_recv(sock, {
                 "cmd": "load_schedule",
                 "path": "schedules/example_short_test.json",
             })
-            _send_recv(sock, {"cmd": "set_mode", "mode": "auto"})
-            sleep(0.3)
-
-            resp = _send_recv(sock, {"cmd": "auto_skip_step"})
+            resp = _send_recv(sock, {"cmd": "schedule_monitor_stop"})
             self.assertTrue(resp["ok"])
-            self.assertIn("auto", resp)
+            self.assertFalse(resp["schedule_monitor"]["running"])
         finally:
-            _send_recv(sock, {"cmd": "set_mode", "mode": "idle"})
-            sock.close()
-
-    def test_24_auto_status_fields_complete(self):
-        """Verify auto_status returns all expected fields including steps and events."""
-        sock = self._connect()
-        try:
-            _send_recv(sock, {
-                "cmd": "load_schedule",
-                "path": "schedules/example_multistage.json",
-            })
-            _send_recv(sock, {"cmd": "set_mode", "mode": "auto"})
-            sleep(0.5)
-
-            resp = _send_recv(sock, {"cmd": "auto_status"})
-            self.assertTrue(resp["ok"])
-            auto = resp["auto"]
-
-            # Core fields
-            self.assertTrue(auto["running"])
-            self.assertEqual(auto["schedule_name"], "multistage_formation")
-            self.assertEqual(auto["total_cycles"], 5)
-            self.assertEqual(auto["total_steps"], 11)
-
-            # Step list
-            self.assertIn("steps", auto)
-            self.assertEqual(len(auto["steps"]), 11)
-            self.assertEqual(auto["steps"][0]["name"], "Low-Rate CC Charge")
-            self.assertEqual(auto["steps"][0]["expected_state"], "cc_charge")
-
-            # Detection
-            self.assertIn("detected_state", auto)
-            self.assertIn("detected_confidence", auto)
-            self.assertIn("match", auto)
-
-            # Timeout
-            self.assertIn("in_timeout", auto)
-            self.assertIn("on_timeout", auto)
-            self.assertIn("timeout_grace_s", auto)
-
-            # Events
-            self.assertIn("recent_events", auto)
-            self.assertIsInstance(auto["recent_events"], list)
-            # Should have at least auto_started + step_start events
-            self.assertGreaterEqual(len(auto["recent_events"]), 1)
-        finally:
-            _send_recv(sock, {"cmd": "set_mode", "mode": "idle"})
             sock.close()
 
     # ----- Error handling -----

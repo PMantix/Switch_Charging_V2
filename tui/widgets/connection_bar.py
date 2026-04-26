@@ -51,31 +51,33 @@ class ConnectionBar(Widget):
             if self.host:
                 t.append(f"  {self.host}", style="dim")
 
-        # Auto mode status (right side of bar)
+        # Schedule monitor status (right side of bar)
         ad = self._auto_data
-        if ad and ad.get("running"):
-            step_name = ad.get("step_name", "?")
-            cycle = ad.get("cycle", 0) + 1
+        if ad and ad.get("loaded"):
+            plan = ad.get("plan", {}) or {}
+            obs = ad.get("observed", {}) or {}
+            step_name = plan.get("step_name", "?")
+            cycle = plan.get("cycle", 0) + 1
             total_cycles = ad.get("total_cycles", 1)
-            detected = ad.get("detected_state", "unknown")
-            match = ad.get("match", False)
-            paused = ad.get("paused", False)
+            detected = obs.get("state", "unknown")
+            divergence = ad.get("divergence", "unknown")
+            running = ad.get("running", False)
             det_label, det_style = AUTO_STATE_STYLES.get(detected, ("?", "white"))
 
             t.append("  \u2502 ", style="dim")
-            t.append("AUTO ", style="bold blue")
-            if paused:
-                t.append("PAUSED ", style="bold yellow")
+            t.append("MON ", style="bold blue")
+            if not running:
+                t.append("STOPPED ", style="bold yellow")
             t.append(f"{step_name}", style="bold white")
             t.append(f" [{cycle}/{total_cycles}]", style="dim")
             t.append("  ", style="dim")
             t.append(f"{det_label}", style=det_style)
-            if match:
+            if divergence == "match":
                 t.append(" \u2714", style="bold green")
-            else:
+            elif divergence == "mismatch":
                 t.append(" \u2718", style="bold red")
-            if ad.get("in_timeout"):
-                t.append("  TIMEOUT", style="bold red reverse")
+            else:
+                t.append(" ?", style="dim yellow")
 
         if self.probe_text:
             t.append("  │ ", style="dim")

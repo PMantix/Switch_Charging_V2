@@ -39,7 +39,7 @@ log = logging.getLogger(__name__)
 MIN_FREQ = 0.1
 MAX_FREQ = 300.0
 
-CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug", "auto"]
+CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug"]
 
 
 # ---------------------------------------------------------------------------
@@ -521,8 +521,7 @@ class SwitchingCircuitApp(App):
         Binding("l", "toggle_log", "Log", show=False),
         Binding("[", "log_duration_down", "Dur-", show=False),
         Binding("]", "log_duration_up", "Dur+", show=False),
-        Binding("a", "mode_auto", "Auto", show=False),
-        Binding("n", "auto_skip", "Skip Step", show=False),
+        Binding("a", "load_schedule", "Load schedule", show=False),
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
         Binding("A", "ap_mode", "AP Mode", show=False),
         Binding("F", "auto_follow_panel", "Auto-Follow", show=False),
@@ -859,7 +858,6 @@ class SwitchingCircuitApp(App):
 
             auto_panel = self.query_one("#auto-panel", AutoPanel)
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
-            auto_data = data.get("auto", {})
             af = data.get("auto_follow")
             if af:
                 self._latest_auto_follow = af
@@ -867,23 +865,13 @@ class SwitchingCircuitApp(App):
             auto_panel.monitor_data = monitor_data
 
             schedule_loaded = bool(monitor_data.get("loaded"))
-            should_show_panel = (mode == "auto") or schedule_loaded
+            conn_bar.update_auto_status(monitor_data if schedule_loaded else {})
 
-            if mode == "auto":
-                if auto_data:
-                    auto_panel.auto_data = auto_data
-                conn_bar.update_auto_status(auto_data)
-            else:
-                # Clear stale auto-engine data; monitor data drives the render now.
-                if auto_panel.auto_data:
-                    auto_panel.auto_data = {}
-                conn_bar.update_auto_status({})
-
-            if should_show_panel and not self._showing_auto_panel:
+            if schedule_loaded and not self._showing_auto_panel:
                 self._showing_auto_panel = True
                 rpanel.add_class("hidden")
                 auto_panel.remove_class("hidden")
-            elif not should_show_panel and self._showing_auto_panel:
+            elif not schedule_loaded and self._showing_auto_panel:
                 self._showing_auto_panel = False
                 auto_panel.add_class("hidden")
                 rpanel.remove_class("hidden")
@@ -1010,16 +998,6 @@ class SwitchingCircuitApp(App):
             self._client.set_mode(mode)
 
     def action_toggle_run(self) -> None:
-        if self._circuit_mode == "auto":
-            # In auto mode, space toggles pause/resume
-            if self._client:
-                auto_panel = self.query_one("#auto-panel", AutoPanel)
-                is_paused = auto_panel.auto_data.get("paused", False)
-                if is_paused:
-                    self._client.auto_resume()
-                else:
-                    self._client.auto_pause()
-            return
         new_mode = "charge" if self._circuit_mode == "idle" else "idle"
         self._send_mode(new_mode)
 
@@ -1046,27 +1024,9 @@ class SwitchingCircuitApp(App):
     def action_mode_debug(self) -> None:
         self._send_mode("debug")
 
-    def action_mode_auto(self) -> None:
-        """Enter auto mode, or show current schedule if already running."""
-        if self._circuit_mode == "auto":
-            # Show current schedule as read-only preview
-            auto_panel = self.query_one("#auto-panel", AutoPanel)
-            ad = auto_panel.auto_data
-            if ad and ad.get("steps"):
-                # Reconstruct a schedule dict from the broadcast data
-                current = {
-                    "name": ad.get("schedule_name", "?"),
-                    "steps": ad.get("steps", []),
-                    "repeat": ad.get("total_cycles", 1),
-                    "description": f"Currently running — cycle {ad.get('cycle', 0) + 1}/{ad.get('total_cycles', 1)}",
-                }
-                self.push_screen(
-                    SchedulePreviewScreen(current, path="(running)"),
-                    lambda _: None,  # dismiss does nothing — can't restart while running
-                )
-            else:
-                self.notify("Auto mode active. Press [space] to pause, [i] to stop.", title="Auto")
-            return
+    def action_load_schedule(self) -> None:
+        """Open the schedule picker. Loading hands the schedule to the
+        passive monitor — does not change the circuit mode."""
         self.push_screen(SchedulePickerScreen(), self._on_schedule_file_picked)
 
     def _on_schedule_file_picked(self, path: str) -> None:
@@ -1101,24 +1061,24 @@ class SwitchingCircuitApp(App):
         )
 
     def _on_schedule_confirmed(self, result) -> None:
-        """Stage 2 callback: user confirmed (with possible edits) or cancelled."""
+        """Stage 2 callback: user confirmed (with possible edits) or cancelled.
+        The schedule is handed to the passive monitor; circuit mode is
+        not changed."""
         if result is None or not self._client:
             return
-        # Send the (possibly edited) schedule inline to the server
         resp = self._client.send_command({"cmd": "load_schedule", "schedule": result})
         if resp and resp.get("ok"):
             warnings = resp.get("warnings", [])
             for w in warnings:
                 self.notify(w, title="Schedule Warning", severity="warning")
-            self._send_mode("auto")
+            self.notify(
+                f"Loaded {resp.get('schedule_name', '?')} "
+                f"({resp.get('steps', 0)} steps × {resp.get('repeat', 1)})",
+                title="Schedule Monitor",
+            )
         else:
             err = resp.get("error", "Unknown error") if resp else "No response"
             self.notify(f"Failed to load schedule: {err}", title="Error", severity="error")
-
-    def action_auto_skip(self) -> None:
-        """Skip to the next step in auto mode."""
-        if self._circuit_mode == "auto" and self._client:
-            self._client.auto_skip_step()
 
     def action_toggle_right_panel(self) -> None:
         """Toggle between Status and Auto panel in the right column."""

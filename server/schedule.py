@@ -1,10 +1,11 @@
 """
 Switching Circuit V2 - Schedule Format and Parser.
 
-Defines, loads, and validates JSON schedule files that describe an expected
-Arbin cycler test program.  The auto-mode engine uses these schedules to
-know what circuit action to apply at each step and what sensor state to
-expect from the external cycler.
+Defines, loads, and validates JSON schedule files that describe an
+expected cycler test program. ScheduleMonitor consumes these to walk
+the PLAN clock and compare against what CyclerDetector observes.
+The schedule does NOT control modes — see auto_follow.py for the
+hysteresis-based current-driven mode switcher.
 """
 
 from __future__ import annotations
@@ -200,7 +201,7 @@ def validate_schedule_semantics(schedule: Schedule) -> list[str]:
         if schedule.steps[i].expected_state == schedule.steps[i + 1].expected_state:
             warnings.append(
                 f"Steps {i} and {i+1} both expect {schedule.steps[i].expected_state!r} "
-                f"\u2014 auto engine may not detect a transition between them"
+                f"\u2014 monitor may not detect a transition between them"
             )
 
     return warnings

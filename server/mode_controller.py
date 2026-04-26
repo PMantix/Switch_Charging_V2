@@ -1,9 +1,15 @@
 """
 Switching Circuit V2 - Mode Controller.
 
-State machine with three modes: IDLE, CHARGE, DISCHARGE.
+State machine with five modes: IDLE, CHARGE, DISCHARGE, PULSE_CHARGE, DEBUG.
 Every transition enforces a dead-time interlock (all-off gap) to prevent
 shoot-through.  All public methods are thread-safe.
+
+Two cycler-aware subsystems run alongside:
+  - AutoFollow: hysteresis-based current-driven mode switcher (active
+    control). Optional, toggled by user from the TUI.
+  - ScheduleMonitor: passive PLAN-vs-OBSERVED tracker. Always running;
+    fed by load_schedule(); does not control any modes.
 """
 
 import enum
@@ -24,7 +30,6 @@ class Mode(enum.Enum):
     DISCHARGE = "discharge"
     PULSE_CHARGE = "pulse_charge"
     DEBUG = "debug"
-    AUTO = "auto"
 
 
 class ModeController:
@@ -35,8 +40,7 @@ class ModeController:
         self._engine = sequence_engine
         self._lock = threading.Lock()
         self._mode = Mode.IDLE
-        self._auto_engine = None       # AutoEngine instance when in AUTO mode
-        self._loaded_schedule = None   # Schedule loaded but not yet running
+        self._loaded_schedule = None
 
         # Auto-follow: hysteresis-based current-driven mode switcher.
         # Started here but disabled by default; user toggles via TUI.
@@ -66,7 +70,7 @@ class ModeController:
         """
         Transition to a new mode.
 
-        Accepts a Mode enum member or a string ('idle', 'charge', 'discharge').
+        Accepts a Mode enum member or a string ('idle', 'charge', etc.).
         Returns the new Mode value.
         Raises ValueError for unknown mode strings.
 
@@ -74,8 +78,8 @@ class ModeController:
         picking a switching target (`charge` / `pulse_charge`) updates
         the auto-follow target without forcing the mode (auto-follow's
         hysteresis decides when to engage). Picking any other mode
-        (`idle` / `discharge` / `auto` / `debug`) disables auto-follow
-        first, then applies the requested mode.
+        (`idle` / `discharge` / `debug`) disables auto-follow first,
+        then applies the requested mode.
         """
         if isinstance(mode, str):
             try:
@@ -97,31 +101,15 @@ class ModeController:
         if self._auto_follow.enabled:
             self._auto_follow.set_enabled(False)
 
-        # If leaving AUTO externally, stop the auto engine first
-        if self._auto_engine and mode != Mode.AUTO:
-            log.info("Stopping auto engine due to external mode change to %s", mode.value)
-            self._auto_engine.stop()
-            self._auto_engine = None
-
-        if mode == Mode.AUTO:
-            return self._start_auto_mode()
-
         return self._set_mode_internal(mode)
 
     def _set_mode_internal(self, mode):
-        """
-        Internal mode transition — used by AutoEngine to change circuit
-        state without stopping itself.  When the auto engine is running,
-        the reported mode stays AUTO; only the hardware state changes.
-        """
+        """Internal mode transition — also used by AutoFollow to drive
+        the hardware state directly."""
         with self._lock:
-            auto_active = self._auto_engine and self._auto_engine.running
-            if auto_active:
-                log.info("Auto circuit action: %s", mode.value)
-            else:
-                if mode == self._mode:
-                    return self._mode
-                log.info("Mode transition: %s -> %s", self._mode.value, mode.value)
+            if mode == self._mode:
+                return self._mode
+            log.info("Mode transition: %s -> %s", self._mode.value, mode.value)
 
             # Dead-time interlock: all off -> wait -> new state
             self._engine.pause()
@@ -129,7 +117,6 @@ class ModeController:
             sleep(DEAD_TIME)
 
             if mode == Mode.IDLE:
-                # Stay all-off, engine paused (already done above)
                 pass
 
             elif mode == Mode.CHARGE:
@@ -137,7 +124,6 @@ class ModeController:
                 self._engine.resume()
 
             elif mode == Mode.DISCHARGE:
-                # All FETs on, engine stays paused
                 self._gpio.all_on()
 
             elif mode == Mode.PULSE_CHARGE:
@@ -145,42 +131,15 @@ class ModeController:
                 self._engine.resume()
 
             elif mode == Mode.DEBUG:
-                # All off, engine stays paused — individual FETs controlled manually
                 self._debug_step = -1  # -1 = manual, 0-3 = stepping
 
-            # Keep reported mode as AUTO when auto engine is driving
-            if not (self._auto_engine and self._auto_engine.running):
-                self._mode = mode
+            self._mode = mode
             return self._mode
-
-    def _start_auto_mode(self):
-        """Start auto mode with the loaded schedule."""
-        from server.auto_engine import AutoEngine
-
-        if self._loaded_schedule is None:
-            raise ValueError("No schedule loaded — load a schedule before entering auto mode")
-
-        # Stop any existing auto engine
-        if self._auto_engine:
-            self._auto_engine.stop()
-
-        self._auto_engine = AutoEngine(
-            schedule=self._loaded_schedule,
-            get_sensor_data_fn=self._gpio.get_sensor_data,
-            set_mode_fn=lambda m: self._set_mode_internal(Mode(m)),
-            set_sequence_fn=self._engine.set_sequence,
-            set_frequency_fn=self._engine.set_frequency,
-        )
-        with self._lock:
-            self._mode = Mode.AUTO
-        self._auto_engine.start()
-        log.info("Auto mode started with schedule %r", self._loaded_schedule.name)
-        return Mode.AUTO
 
     # -- schedule management -------------------------------------------------
 
     def load_schedule(self, schedule):
-        """Load a schedule for auto mode and the passive monitor."""
+        """Load a schedule for the passive monitor."""
         self._loaded_schedule = schedule
         self._schedule_monitor.load_schedule(schedule)
         log.info("Schedule loaded: %r (%d steps, %d repeats)",
@@ -188,9 +147,6 @@ class ModeController:
 
     def get_loaded_schedule(self):
         return self._loaded_schedule
-
-    def get_auto_engine(self):
-        return self._auto_engine
 
     def get_schedule_monitor(self):
         return self._schedule_monitor
@@ -210,12 +166,6 @@ class ModeController:
 
     def set_auto_follow_enabled(self, enabled: bool):
         """Enable or disable threshold-driven mode switching."""
-        # Stop any schedule-driven AUTO engine first — they shouldn't both
-        # be driving the mode at once.
-        if enabled and self._auto_engine:
-            log.info("Stopping auto engine because auto-follow is enabling")
-            self._auto_engine.stop()
-            self._auto_engine = None
         self._auto_follow.set_enabled(enabled)
 
     def set_auto_follow_thresholds(self, i_enter_a: float, i_exit_a: float):
@@ -226,6 +176,8 @@ class ModeController:
 
     def get_auto_follow_status(self) -> dict:
         return self._auto_follow.get_status()
+
+    # -- debug helpers -------------------------------------------------------
 
     def set_fet(self, index: int, on: bool):
         """Set an individual FET (0=P1, 1=P2, 2=N1, 3=N2). Only works in DEBUG mode."""
@@ -258,6 +210,8 @@ class ModeController:
                 log.info("Debug step: all OFF (step %d)", step)
             return step
 
+    # -- status --------------------------------------------------------------
+
     def get_status(self):
         """Return full system state dict (engine step labelled at
         ``monotonic()`` — fine for live broadcasts/TUI)."""
@@ -286,8 +240,6 @@ class ModeController:
         }
         if mode == Mode.DEBUG:
             status["debug_step"] = debug_step
-        if mode == Mode.AUTO and self._auto_engine:
-            status["auto"] = self._auto_engine.get_status()
         status["auto_follow"] = self._auto_follow.get_status()
         status["schedule_monitor"] = self._schedule_monitor.get_status()
         return status
