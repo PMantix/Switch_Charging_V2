@@ -1389,28 +1389,18 @@ class SwitchingCircuitApp(App):
     # -- Auto-follow (current-driven mode switching) ------------------------
 
     def _send_auto_follow(self, payload: dict) -> None:
-        """Send an auto_follow_* command and update the cached status
-        from the response so the right-panel display refreshes
-        immediately rather than waiting for the next broadcast."""
+        """Send an auto_follow_* command. Send-and-forget: the next state
+        broadcast (~33 ms later) will carry the updated status, and the
+        right-panel reactive picks it up. We don't try to read the
+        synchronous response because PiClient.send_command can't
+        correlate replies back to the caller while subscribed — it
+        returns a {"ok": True} placeholder."""
         if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
             return
         try:
-            resp = self._client.send_command(payload)
+            self._client.send_command(payload)
         except Exception as e:
             self.notify(str(e), title="Auto-Follow", severity="error")
-            return
-        if not resp or not resp.get("ok"):
-            self.notify(f"{(resp or {}).get('error', 'failed')}",
-                        title="Auto-Follow", severity="warning")
-            return
-        af = resp.get("auto_follow")
-        if af:
-            self._latest_auto_follow = af
-            try:
-                rpanel = self.query_one("#right-panel", RightPanel)
-                rpanel.auto_follow = af
-            except Exception:
-                pass
 
     def action_auto_follow_toggle(self) -> None:
         new = not bool(self._latest_auto_follow.get("enabled", False))
