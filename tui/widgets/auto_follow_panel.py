@@ -78,8 +78,8 @@ class AutoFollowPanel(ModalScreen[None]):
             yield Label("[bold]Auto-Follow Settings[/]", id="af-title")
             yield Static(self._render_body(), id="af-body")
             yield Label(
-                "[dim]space=toggle  t=target  [/] / [/] -/+ I_enter  "
-                "{/} -/+ I_exit  Esc=close[/]",
+                "[dim]space=toggle  t=target  \\[ \\] adjust I_enter  "
+                "{ } adjust I_exit  Esc=close[/]",
                 id="af-hint",
             )
 
