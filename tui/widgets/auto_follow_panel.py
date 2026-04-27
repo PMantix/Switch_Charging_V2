@@ -23,7 +23,9 @@ class AutoFollowPanel(ModalScreen[None]):
 
     BINDINGS = [
         Binding("escape", "close", "Close"),
-        Binding("space", "toggle_enabled", "Toggle"),
+        # 'enter' for toggle because app-level 'space' is priority=True
+        # and would preempt our modal binding.
+        Binding("enter", "toggle_enabled", "Toggle"),
         Binding("t", "cycle_target", "Target"),
         Binding("]", "enter_up", "I_enter +1mA"),
         Binding("[", "enter_down", "I_enter -1mA"),
@@ -78,7 +80,7 @@ class AutoFollowPanel(ModalScreen[None]):
             yield Label("[bold]Auto-Follow Settings[/]", id="af-title")
             yield Static(self._render_body(), id="af-body")
             yield Label(
-                "[dim]space=toggle  t=target  \\[ \\] adjust I_enter  "
+                "[dim]enter=toggle  t=target  \\[ \\] adjust I_enter  "
                 "{ } adjust I_exit  Esc=close[/]",
                 id="af-hint",
             )
@@ -173,6 +175,10 @@ class AutoFollowPanel(ModalScreen[None]):
     # -- live update from broadcast -----------------------------------------
 
     def on_mount(self) -> None:
+        # The modal has only non-focusable children (Label, Static), so
+        # focus would otherwise stay on the underlying app screen and
+        # our BINDINGS would never fire. Take focus explicitly.
+        self.focus()
         # Periodic refresh so the live current/voltage updates while the
         # panel is open. set_interval runs on the UI thread.
         self.set_interval(0.25, self._poll_status)

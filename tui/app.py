@@ -779,7 +779,11 @@ class SwitchingCircuitApp(App):
             if now - self._last_apply_time < interval:
                 return  # skip this frame
         self._last_apply_time = now
-        self.call_from_thread(self._apply_state, data)
+        try:
+            self.call_from_thread(self._apply_state, data)
+        except RuntimeError:
+            # Event loop is gone (app shutting down). Drop the frame.
+            pass
 
     def _start_offset_worker(self) -> None:
         """Background thread that re-measures Pi↔Mac clock offset every 60s
