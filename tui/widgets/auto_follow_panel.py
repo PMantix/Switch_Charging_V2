@@ -11,27 +11,64 @@ from __future__ import annotations
 
 from typing import Callable, Optional
 
+from rich.text import Text
 from textual.app import ComposeResult
-from textual.binding import Binding
 from textual.containers import Vertical
+from textual.reactive import reactive
 from textual.screen import ModalScreen
-from textual.widgets import Label, Static
+from textual.widget import Widget
+from textual.widgets import Label
+
+
+class _AutoFollowBody(Widget):
+    """Body of the auto-follow modal. Re-renders automatically when
+    `state` changes (Static.update() proved unreliable on older
+    Textual; a reactive-driven custom widget always refreshes)."""
+
+    DEFAULT_CSS = """
+    _AutoFollowBody { width: 100%; height: auto; }
+    """
+
+    state: reactive[dict] = reactive({}, layout=True)
+
+    def render(self) -> Text:
+        s = self.state or {}
+        enabled = bool(s.get("enabled", False))
+        active = bool(s.get("active", False))
+        target = s.get("target_mode", "charge")
+        i_enter_ma = s.get("i_enter_a", 0.0) * 1000.0
+        i_exit_ma = s.get("i_exit_a", 0.0) * 1000.0
+        avg_i_ma = s.get("avg_current_a", 0.0) * 1000.0
+        avg_v = s.get("avg_voltage_v", 0.0)
+
+        t = Text()
+        t.append("\n  Enabled       ")
+        t.append("ON" if enabled else "OFF",
+                 style="bold green" if enabled else "dim")
+        t.append("\n  Target mode   ")
+        t.append(target, style="bold")
+        t.append("\n\n  I_enter       ")
+        t.append(f"{i_enter_ma:6.2f}", style="bold")
+        t.append(" mA\n  I_exit        ")
+        t.append(f"{i_exit_ma:6.2f}", style="bold")
+        t.append(" mA\n\n  Live current  ")
+        t.append(f"{avg_i_ma:+7.2f} mA")
+        t.append(f"\n  Live voltage  {avg_v:7.4f} V\n\n  State         ")
+        if not enabled:
+            t.append("disabled", style="dim")
+        elif active:
+            t.append(" SWITCHING ", style="bold green reverse")
+        else:
+            t.append(" transparent ", style="bold yellow")
+        t.append("\n")
+        return t
+
+    def watch_state(self, _: dict) -> None:
+        self.refresh()
 
 
 class AutoFollowPanel(ModalScreen[None]):
     """Modal for configuring the auto-follow controller."""
-
-    BINDINGS = [
-        Binding("escape", "close", "Close"),
-        # 'enter' for toggle because app-level 'space' is priority=True
-        # and would preempt our modal binding.
-        Binding("enter", "toggle_enabled", "Toggle"),
-        Binding("t", "cycle_target", "Target"),
-        Binding("]", "enter_up", "I_enter +1mA"),
-        Binding("[", "enter_down", "I_enter -1mA"),
-        Binding("}", "exit_up", "I_exit +0.5mA"),
-        Binding("{", "exit_down", "I_exit -0.5mA"),
-    ]
 
     DEFAULT_CSS = """
     AutoFollowPanel {
@@ -49,10 +86,6 @@ class AutoFollowPanel(ModalScreen[None]):
         width: 100%;
         margin-bottom: 1;
     }
-    #af-body {
-        width: 100%;
-        height: auto;
-    }
     #af-hint {
         text-align: center;
         width: 100%;
@@ -69,130 +102,36 @@ class AutoFollowPanel(ModalScreen[None]):
         super().__init__()
         self._get_status = get_status
         self._send_cmd = send_cmd
-        # Local mirror of state — refreshed on every action so the panel
-        # reflects what the server actually accepted.
         self._state = get_status() or {}
-
-    # -- compose -------------------------------------------------------------
 
     def compose(self) -> ComposeResult:
         with Vertical(id="af-box"):
             yield Label("[bold]Auto-Follow Settings[/]", id="af-title")
-            yield Static(self._render_body(), id="af-body")
+            yield _AutoFollowBody(id="af-body")
             yield Label(
                 "[dim]enter=toggle  t=target  \\[ \\] adjust I_enter  "
                 "{ } adjust I_exit  Esc=close[/]",
                 id="af-hint",
             )
 
-    # -- rendering -----------------------------------------------------------
-
-    def _render_body(self) -> str:
-        s = self._state
-        enabled = s.get("enabled", False)
-        active = s.get("active", False)
-        target = s.get("target_mode", "charge")
-        i_enter_ma = s.get("i_enter_a", 0.0) * 1000.0
-        i_exit_ma = s.get("i_exit_a", 0.0) * 1000.0
-        avg_i_ma = s.get("avg_current_a", 0.0) * 1000.0
-        avg_v = s.get("avg_voltage_v", 0.0)
-
-        en_color = "bold green" if enabled else "dim"
-        en_text = "ON" if enabled else "OFF"
-
-        if not enabled:
-            state_text = "[dim]disabled[/]"
-        elif active:
-            state_text = "[bold green reverse] SWITCHING [/]"
-        else:
-            state_text = "[bold yellow] transparent [/]"
-
-        return (
-            f"\n"
-            f"  Enabled       [{en_color}]{en_text}[/]\n"
-            f"  Target mode   [bold]{target}[/]\n"
-            f"\n"
-            f"  I_enter       [bold]{i_enter_ma:6.2f}[/] mA\n"
-            f"  I_exit        [bold]{i_exit_ma:6.2f}[/] mA\n"
-            f"\n"
-            f"  Live current  {avg_i_ma:+7.2f} mA\n"
-            f"  Live voltage  {avg_v:7.4f} V\n"
-            f"\n"
-            f"  State         {state_text}\n"
-        )
-
-    def _refresh(self) -> None:
-        body = self.query_one("#af-body", Static)
-        body.update(self._render_body())
-
-    # -- actions -------------------------------------------------------------
-
-    def action_close(self) -> None:
-        self.dismiss(None)
-
-    def action_toggle_enabled(self) -> None:
-        new = not bool(self._state.get("enabled", False))
-        resp = self._send_cmd({"cmd": "auto_follow_set_enabled", "enabled": new})
-        if resp and resp.get("ok"):
-            self._state = resp.get("auto_follow", self._state)
-            self._refresh()
-            self.app.notify(f"Auto-follow {'ON' if new else 'OFF'}",
-                            title="Auto-Follow", timeout=1.5)
-        else:
-            self.app.notify(f"Toggle failed: {resp}",
-                            title="Auto-Follow", severity="warning", timeout=2.5)
-
-    def action_cycle_target(self) -> None:
-        cur = self._state.get("target_mode", "charge")
-        nxt = "pulse_charge" if cur == "charge" else "charge"
-        resp = self._send_cmd({"cmd": "auto_follow_set_target", "target_mode": nxt})
-        if resp and resp.get("ok"):
-            self._state = resp.get("auto_follow", self._state)
-            self._refresh()
-
-    def action_enter_up(self) -> None:
-        self._adjust(d_enter=0.001)
-
-    def action_enter_down(self) -> None:
-        self._adjust(d_enter=-0.001)
-
-    def action_exit_up(self) -> None:
-        self._adjust(d_exit=0.0005)
-
-    def action_exit_down(self) -> None:
-        self._adjust(d_exit=-0.0005)
-
-    def _adjust(self, d_enter: float = 0.0, d_exit: float = 0.0) -> None:
-        i_enter = max(0.0001, self._state.get("i_enter_a", 0.005) + d_enter)
-        i_exit = max(0.0, self._state.get("i_exit_a", 0.002) + d_exit)
-        # Maintain enter > exit by at least 0.1 mA
-        if i_enter <= i_exit:
-            i_enter = i_exit + 0.0001
-        resp = self._send_cmd({
-            "cmd": "auto_follow_set_thresholds",
-            "i_enter_a": round(i_enter, 6),
-            "i_exit_a": round(i_exit, 6),
-        })
-        if resp and resp.get("ok"):
-            self._state = resp.get("auto_follow", self._state)
-            self._refresh()
-
-    # -- live update from broadcast -----------------------------------------
-
     def on_mount(self) -> None:
-        # The modal has only non-focusable children (Label, Static), so
-        # focus would otherwise stay on the underlying app screen and
-        # our BINDINGS would never fire. Take focus explicitly.
+        # Make sure the modal screen, not the underlying app, gets keys.
         self.focus()
-        # Periodic refresh so the live current/voltage updates while the
-        # panel is open. set_interval runs on the UI thread.
+        # Seed the body
+        self._refresh()
+        # Live refresh so current/voltage update while the panel is open.
         self.set_interval(0.25, self._poll_status)
 
-    # Direct key handler. BINDINGS resolution doesn't fire reliably for
-    # this modal because (a) it has no focusable children to anchor
-    # focus on and (b) some keys collide with non-priority app
-    # bindings. on_key receives every key press while the screen is
-    # active, so we dispatch from here.
+    def _refresh(self) -> None:
+        body = self.query_one("#af-body", _AutoFollowBody)
+        # Assign a NEW dict so reactive notices the change (mutating
+        # the same dict in place won't trigger watch_state).
+        body.state = dict(self._state)
+
+    # -- key dispatch --------------------------------------------------------
+    # Direct dispatch via on_key. BINDINGS resolution is unreliable for
+    # this modal: it has no focusable children to anchor focus on, and
+    # several keys collide with non-priority app bindings.
     def on_key(self, event) -> None:
         handler = {
             "escape": self.action_close,
@@ -206,6 +145,53 @@ class AutoFollowPanel(ModalScreen[None]):
         if handler is not None:
             handler()
             event.stop()
+
+    # -- actions -------------------------------------------------------------
+
+    def action_close(self) -> None:
+        self.dismiss(None)
+
+    def action_toggle_enabled(self) -> None:
+        new = not bool(self._state.get("enabled", False))
+        resp = self._send_cmd({"cmd": "auto_follow_set_enabled", "enabled": new})
+        self._handle_resp(resp, label=f"Auto-follow {'ON' if new else 'OFF'}")
+
+    def action_cycle_target(self) -> None:
+        cur = self._state.get("target_mode", "charge")
+        nxt = "pulse_charge" if cur == "charge" else "charge"
+        resp = self._send_cmd({"cmd": "auto_follow_set_target", "target_mode": nxt})
+        self._handle_resp(resp, label=f"Target = {nxt}")
+
+    def action_enter_up(self) -> None: self._adjust(d_enter=0.001)
+    def action_enter_down(self) -> None: self._adjust(d_enter=-0.001)
+    def action_exit_up(self) -> None: self._adjust(d_exit=0.0005)
+    def action_exit_down(self) -> None: self._adjust(d_exit=-0.0005)
+
+    def _adjust(self, d_enter: float = 0.0, d_exit: float = 0.0) -> None:
+        i_enter = max(0.0001, self._state.get("i_enter_a", 0.005) + d_enter)
+        i_exit = max(0.0, self._state.get("i_exit_a", 0.002) + d_exit)
+        if i_enter <= i_exit:
+            i_enter = i_exit + 0.0001
+        resp = self._send_cmd({
+            "cmd": "auto_follow_set_thresholds",
+            "i_enter_a": round(i_enter, 6),
+            "i_exit_a": round(i_exit, 6),
+        })
+        self._handle_resp(resp, label=None)  # silent; values redraw in body
+
+    def _handle_resp(self, resp, label: Optional[str]) -> None:
+        if resp and resp.get("ok"):
+            self._state = resp.get("auto_follow", self._state)
+            self._refresh()
+            if label:
+                self.app.notify(label, title="Auto-Follow", timeout=1.0)
+        else:
+            self.app.notify(
+                f"Command failed: {resp}",
+                title="Auto-Follow", severity="warning", timeout=3.0,
+            )
+
+    # -- live status polling -------------------------------------------------
 
     def _poll_status(self) -> None:
         snap = self._get_status()

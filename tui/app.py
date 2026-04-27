@@ -781,8 +781,9 @@ class SwitchingCircuitApp(App):
         self._last_apply_time = now
         try:
             self.call_from_thread(self._apply_state, data)
-        except RuntimeError:
-            # Event loop is gone (app shutting down). Drop the frame.
+        except Exception:
+            # App is shutting down (loop closed, no active app, etc.).
+            # Fire-and-forget broadcast — drop the frame silently.
             pass
 
     def _start_offset_worker(self) -> None:
