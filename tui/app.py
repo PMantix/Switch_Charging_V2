@@ -29,7 +29,6 @@ from tui.widgets.pi_picker import PiPicker
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
 from tui.widgets.auto_panel import AutoPanel
-from tui.widgets.auto_follow_panel import AutoFollowPanel
 from tui.widgets.connection_bar import ConnectionBar
 from tui.widgets.mascot import Mascot
 from tui.widgets.schedule_screen import SchedulePickerScreen, SchedulePreviewScreen
@@ -524,7 +523,12 @@ class SwitchingCircuitApp(App):
         Binding("a", "load_schedule", "Load schedule", show=False),
         Binding("tab", "toggle_right_panel", "Toggle Panel", show=False),
         Binding("A", "ap_mode", "AP Mode", show=False),
-        Binding("F", "auto_follow_panel", "Auto-Follow", show=False),
+        Binding("F", "auto_follow_toggle", "Auto-follow toggle", show=False),
+        Binding("T", "auto_follow_cycle_target", "Auto-follow target", show=False),
+        Binding("comma", "auto_follow_enter_down", "I_enter -1mA", show=False),
+        Binding("full_stop", "auto_follow_enter_up", "I_enter +1mA", show=False),
+        Binding("semicolon", "auto_follow_exit_down", "I_exit -0.5mA", show=False),
+        Binding("apostrophe", "auto_follow_exit_up", "I_exit +0.5mA", show=False),
         Binding("M", "restart_monitor", "Restart monitor clock", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
@@ -866,6 +870,7 @@ class SwitchingCircuitApp(App):
             af = data.get("auto_follow")
             if af:
                 self._latest_auto_follow = af
+                rpanel.auto_follow = af
             monitor_data = data.get("schedule_monitor", {}) or {}
             auto_panel.monitor_data = monitor_data
 
@@ -1383,26 +1388,62 @@ class SwitchingCircuitApp(App):
 
     # -- Auto-follow (current-driven mode switching) ------------------------
 
-    def action_auto_follow_panel(self) -> None:
-        """Open the auto-follow settings modal."""
+    def _send_auto_follow(self, payload: dict) -> None:
+        """Send an auto_follow_* command and update the cached status
+        from the response so the right-panel display refreshes
+        immediately rather than waiting for the next broadcast."""
         if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
-            self.notify("Not connected", title="Auto-Follow", severity="warning")
             return
-
-        def _send(payload: dict):
+        try:
+            resp = self._client.send_command(payload)
+        except Exception as e:
+            self.notify(str(e), title="Auto-Follow", severity="error")
+            return
+        if not resp or not resp.get("ok"):
+            self.notify(f"{(resp or {}).get('error', 'failed')}",
+                        title="Auto-Follow", severity="warning")
+            return
+        af = resp.get("auto_follow")
+        if af:
+            self._latest_auto_follow = af
             try:
-                return self._client.send_command(payload)
-            except Exception as e:
-                self.notify(str(e), title="Auto-Follow", severity="error")
-                return None
+                rpanel = self.query_one("#right-panel", RightPanel)
+                rpanel.auto_follow = af
+            except Exception:
+                pass
 
-        # Seed the panel with the latest broadcast snapshot, then it polls.
-        self.push_screen(
-            AutoFollowPanel(
-                get_status=lambda: self._latest_auto_follow,
-                send_cmd=_send,
-            ),
-        )
+    def action_auto_follow_toggle(self) -> None:
+        new = not bool(self._latest_auto_follow.get("enabled", False))
+        self._send_auto_follow({"cmd": "auto_follow_set_enabled", "enabled": new})
+
+    def action_auto_follow_cycle_target(self) -> None:
+        cur = self._latest_auto_follow.get("target_mode", "charge")
+        nxt = "pulse_charge" if cur == "charge" else "charge"
+        self._send_auto_follow({"cmd": "auto_follow_set_target", "target_mode": nxt})
+
+    def action_auto_follow_enter_up(self) -> None:
+        self._adjust_auto_follow(d_enter=0.001)
+
+    def action_auto_follow_enter_down(self) -> None:
+        self._adjust_auto_follow(d_enter=-0.001)
+
+    def action_auto_follow_exit_up(self) -> None:
+        self._adjust_auto_follow(d_exit=0.0005)
+
+    def action_auto_follow_exit_down(self) -> None:
+        self._adjust_auto_follow(d_exit=-0.0005)
+
+    def _adjust_auto_follow(self, d_enter: float = 0.0, d_exit: float = 0.0) -> None:
+        af = self._latest_auto_follow or {}
+        i_enter = max(0.0001, af.get("i_enter_a", 0.005) + d_enter)
+        i_exit = max(0.0, af.get("i_exit_a", 0.002) + d_exit)
+        if i_enter <= i_exit:
+            i_enter = i_exit + 0.0001
+        self._send_auto_follow({
+            "cmd": "auto_follow_set_thresholds",
+            "i_enter_a": round(i_enter, 6),
+            "i_exit_a": round(i_exit, 6),
+        })
 
     # -- Network mode (client <-> AP) ---------------------------------------
 

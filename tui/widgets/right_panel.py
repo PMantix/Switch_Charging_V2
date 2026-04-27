@@ -64,6 +64,7 @@ class RightPanel(Widget):
     connected: reactive[bool] = reactive(False)
     conn_status: reactive[str] = reactive("Disconnected")
     current_path: reactive[str] = reactive("")
+    auto_follow: reactive[dict] = reactive({})
 
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
@@ -71,8 +72,20 @@ class RightPanel(Widget):
         self._text_cache_key = None
 
     def render(self) -> Text:
+        # Auto-follow goes into the cache key as a tuple of its load-bearing
+        # fields — the live current/voltage tick on every broadcast and we
+        # don't want to invalidate the cache for those alone.
+        af = self.auto_follow or {}
+        af_key = (
+            bool(af.get("enabled")),
+            bool(af.get("active")),
+            af.get("target_mode"),
+            round(af.get("i_enter_a", 0.0), 6),
+            round(af.get("i_exit_a", 0.0), 6),
+            round(af.get("avg_current_a", 0.0), 4),
+        )
         key = (self.mode, self.sequence, self.frequency, self.step,
-               self.connected, self.conn_status, self.current_path)
+               self.connected, self.conn_status, self.current_path, af_key)
         if key == self._text_cache_key and self._text_cache is not None:
             return self._text_cache
         t = self._render_impl()
@@ -193,6 +206,9 @@ class RightPanel(Widget):
         t.append(" 1-8 ", style="bold white on dark_blue")
         t.append(" Select sequence\n", style="dim")
 
+        # -- Auto-Follow --
+        self._render_auto_follow(t)
+
         # -- Current Path --
         if self.current_path:
             t.append("\n")
@@ -201,6 +217,63 @@ class RightPanel(Widget):
             t.append(f" {self.current_path}\n", style="dim italic")
 
         return t
+
+    def _render_auto_follow(self, t: Text) -> None:
+        af = self.auto_follow or {}
+        t.append("\n")
+        t.append(" AUTO-FOLLOW", style="bold cyan underline")
+        t.append("\n\n")
+
+        enabled = bool(af.get("enabled", False))
+        active = bool(af.get("active", False))
+        target = af.get("target_mode", "charge")
+        i_enter_ma = af.get("i_enter_a", 0.0) * 1000.0
+        i_exit_ma = af.get("i_exit_a", 0.0) * 1000.0
+        avg_i_ma = af.get("avg_current_a", 0.0) * 1000.0
+
+        t.append(" Enable ", style="dim")
+        if enabled:
+            t.append(" ON ", style="bold green reverse")
+        else:
+            t.append(" OFF ", style="dim reverse")
+        t.append("  ", style="dim")
+        t.append(" F ", style="bold white on dark_blue")
+        t.append("\n")
+
+        t.append(" Target ", style="dim")
+        t.append(f" {target:<13}", style="bold white")
+        t.append(" T ", style="bold white on dark_blue")
+        t.append("\n")
+
+        t.append(" Enter  ", style="dim")
+        t.append(f" {i_enter_ma:5.1f} mA ", style="bold white")
+        t.append("  ", style="dim")
+        t.append(" , ", style="bold white on dark_blue")
+        t.append(" / ", style="dim")
+        t.append(" . ", style="bold white on dark_blue")
+        t.append("\n")
+
+        t.append(" Exit   ", style="dim")
+        t.append(f" {i_exit_ma:5.1f} mA ", style="bold white")
+        t.append("  ", style="dim")
+        t.append(" ; ", style="bold white on dark_blue")
+        t.append(" / ", style="dim")
+        t.append(" ' ", style="bold white on dark_blue")
+        t.append("\n")
+
+        t.append(" Live i ", style="dim")
+        t.append(f" {avg_i_ma:+6.2f} mA\n", style="white")
+
+        t.append(" State  ", style="dim")
+        if not enabled:
+            t.append(" off\n", style="dim")
+        elif active:
+            t.append(" SWITCHING\n", style="bold green")
+        else:
+            t.append(" transparent\n", style="bold yellow")
+
+    def watch_auto_follow(self, _: dict) -> None:
+        self.refresh()
 
     def watch_mode(self, _: str) -> None:
         self.refresh()
