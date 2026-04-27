@@ -136,6 +136,11 @@ class AutoFollowPanel(ModalScreen[None]):
         if resp and resp.get("ok"):
             self._state = resp.get("auto_follow", self._state)
             self._refresh()
+            self.app.notify(f"Auto-follow {'ON' if new else 'OFF'}",
+                            title="Auto-Follow", timeout=1.5)
+        else:
+            self.app.notify(f"Toggle failed: {resp}",
+                            title="Auto-Follow", severity="warning", timeout=2.5)
 
     def action_cycle_target(self) -> None:
         cur = self._state.get("target_mode", "charge")
@@ -182,6 +187,25 @@ class AutoFollowPanel(ModalScreen[None]):
         # Periodic refresh so the live current/voltage updates while the
         # panel is open. set_interval runs on the UI thread.
         self.set_interval(0.25, self._poll_status)
+
+    # Direct key handler. BINDINGS resolution doesn't fire reliably for
+    # this modal because (a) it has no focusable children to anchor
+    # focus on and (b) some keys collide with non-priority app
+    # bindings. on_key receives every key press while the screen is
+    # active, so we dispatch from here.
+    def on_key(self, event) -> None:
+        handler = {
+            "escape": self.action_close,
+            "enter": self.action_toggle_enabled,
+            "t": self.action_cycle_target,
+            "]": self.action_enter_up,
+            "[": self.action_enter_down,
+            "}": self.action_exit_up,
+            "{": self.action_exit_down,
+        }.get(event.key)
+        if handler is not None:
+            handler()
+            event.stop()
 
     def _poll_status(self) -> None:
         snap = self._get_status()
