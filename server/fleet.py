@@ -14,10 +14,23 @@ import socket
 # the Pi itself reachable at 10.42.0.1 on any `pi_SW#` AP.
 AP_GATEWAY = "10.42.0.1"
 AP_PORT = 5555
+AP_PASSWORD = "raspberry"
 
 # hostname "pi-SW3"  <->  NM profile/SSID "pi_SW3"
 HOSTNAME_PREFIX = "pi-SW"
 SSID_PREFIX = "pi_SW"
+FLEET_SSID_RANGE = [f"{SSID_PREFIX}{i}" for i in range(1, 9)]
+
+
+def my_fleet_index() -> int:
+    """Numeric index of this Pi in the fleet (e.g. pi-SW3 -> 3)."""
+    hostname = socket.gethostname()
+    if hostname.startswith(HOSTNAME_PREFIX):
+        try:
+            return int(hostname[len(HOSTNAME_PREFIX):])
+        except ValueError:
+            pass
+    return 99
 
 
 def my_ap_ssid() -> str:

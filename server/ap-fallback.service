@@ -1,14 +1,15 @@
 [Unit]
-Description=Switch Charging V2 - AP fallback when no client WiFi at boot
+Description=Switch Charging V2 - Fleet network watchdog
 After=NetworkManager.service
 Wants=NetworkManager.service
 
 [Service]
-Type=oneshot
+Type=simple
 User=root
 WorkingDirectory=/home/pi/Code/Switch_Charging_V2
 ExecStart=/usr/bin/python3 -m server.ap_fallback
-RemainAfterExit=no
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
