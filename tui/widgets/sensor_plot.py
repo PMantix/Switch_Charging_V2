@@ -12,6 +12,7 @@ Uses braille characters for sub-character resolution.
 
 from collections import deque
 from time import monotonic
+from typing import Optional
 
 from textual.reactive import reactive
 from textual.widget import Widget
@@ -224,7 +225,7 @@ class SensorPlot(Widget):
     # -- Braille plot engine ---------------------------------------------------
 
     def _calc_range(self, all_series: dict[str, list[float]], data_width: int,
-                     fixed_range: tuple | None = None):
+                     fixed_range: Optional[tuple] = None):
         """Get min/max across all series for the visible window."""
         if fixed_range is not None:
             return fixed_range[0], fixed_range[1]
@@ -241,7 +242,7 @@ class SensorPlot(Widget):
 
     def _build_braille_plot(self, all_series: dict[str, list[float]],
                             width: int, height: int, connect: bool,
-                            stretch: bool = False, fixed_range: tuple | None = None):
+                            stretch: bool = False, fixed_range: Optional[tuple] = None):
         """Build a braille plot using a flat bytearray grid.
 
         ``stretch=False`` (default): each sample takes one column, anchored
@@ -357,7 +358,7 @@ class SensorPlot(Widget):
 
     def _build_bar_plot(self, all_series: dict[str, list[float]],
                         width: int, height: int, stretch: bool = False,
-                        fixed_range: tuple | None = None):
+                        fixed_range: Optional[tuple] = None):
         """Build a multi-row bar/sparkline plot.
 
         Each entry in the returned list is ``(color, [row_chars, ...])`` —
