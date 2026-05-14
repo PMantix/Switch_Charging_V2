@@ -85,6 +85,10 @@ class SensorPlot(Widget):
     # the last N switching cycles. The braille engine still slices to the
     # plot width as a final cap, so this is a wallclock filter on the deque.
     cycle_window: reactive[int] = reactive(0)
+    v_range: reactive[tuple] = reactive((2.0, 4.5))
+    i_range: reactive[tuple] = reactive((-500.0, 500.0))
+    auto_v_range: reactive[bool] = reactive(False)
+    auto_i_range: reactive[bool] = reactive(False)
     # Compact-mode sparkline height in terminal rows. Each sensor's bar is
     # rendered as bar_row_height stacked block characters (BAR_BLOCKS gives
     # 8 levels per row, so total resolution = bar_row_height * 8).
@@ -219,8 +223,11 @@ class SensorPlot(Widget):
 
     # -- Braille plot engine ---------------------------------------------------
 
-    def _calc_range(self, all_series: dict[str, list[float]], data_width: int):
+    def _calc_range(self, all_series: dict[str, list[float]], data_width: int,
+                     fixed_range: tuple | None = None):
         """Get min/max across all series for the visible window."""
+        if fixed_range is not None:
+            return fixed_range[0], fixed_range[1]
         all_vals = []
         for vals in all_series.values():
             all_vals.extend(vals[-data_width:])
@@ -234,7 +241,7 @@ class SensorPlot(Widget):
 
     def _build_braille_plot(self, all_series: dict[str, list[float]],
                             width: int, height: int, connect: bool,
-                            stretch: bool = False):
+                            stretch: bool = False, fixed_range: tuple | None = None):
         """Build a braille plot using a flat bytearray grid.
 
         ``stretch=False`` (default): each sample takes one column, anchored
@@ -249,7 +256,7 @@ class SensorPlot(Widget):
         """
         data_width = width * 2
         dot_rows = height * 4
-        mn, mx = self._calc_range(all_series, data_width)
+        mn, mx = self._calc_range(all_series, data_width, fixed_range)
         rng = mx - mn
 
         # Flat grid: grid[col * dot_rows + row] = color bit mask
@@ -349,7 +356,8 @@ class SensorPlot(Widget):
         return rows, (mn, mx)
 
     def _build_bar_plot(self, all_series: dict[str, list[float]],
-                        width: int, height: int, stretch: bool = False):
+                        width: int, height: int, stretch: bool = False,
+                        fixed_range: tuple | None = None):
         """Build a multi-row bar/sparkline plot.
 
         Each entry in the returned list is ``(color, [row_chars, ...])`` —
@@ -365,7 +373,7 @@ class SensorPlot(Widget):
         Last-write-wins per column. Used by cycle-window zoom.
         """
         data_width = width
-        mn, mx = self._calc_range(all_series, data_width)
+        mn, mx = self._calc_range(all_series, data_width, fixed_range)
         rng = mx - mn
         if rng == 0:
             rng = 1.0
@@ -517,31 +525,33 @@ class SensorPlot(Widget):
                 i_series[SENSOR_COLORS[name]] = [i * 1000 for _, _, i in hist]
 
         stretch = self._stretch_active()
+        v_fixed = None if self.auto_v_range else self.v_range
+        i_fixed = None if self.auto_i_range else self.i_range
 
         # -- Voltage --
         if mode in ("line", "dot"):
             connect = (mode == "line")
             v_rows, (v_mn, v_mx) = self._build_braille_plot(
-                v_series, pw, ph, connect, stretch=stretch)
+                v_series, pw, ph, connect, stretch=stretch, fixed_range=v_fixed)
             self._render_plot_header(t, "VOLTAGE", "bold yellow", v_mn, v_mx, "V")
             self._render_braille_rows(t, v_rows, pw)
         else:
             bh = max(1, self.bar_row_height)
             bar_data, (v_mn, v_mx) = self._build_bar_plot(
-                v_series, pw, bh, stretch=stretch)
+                v_series, pw, bh, stretch=stretch, fixed_range=v_fixed)
             self._render_plot_header(t, "VOLTAGE", "bold yellow", v_mn, v_mx, "V")
             self._render_bar_rows(t, bar_data, pw)
 
         # -- Current --
         if mode in ("line", "dot"):
             i_rows, (i_mn, i_mx) = self._build_braille_plot(
-                i_series, pw, ph, connect, stretch=stretch)
+                i_series, pw, ph, connect, stretch=stretch, fixed_range=i_fixed)
             self._render_plot_header(t, "CURRENT", "bold green", i_mn, i_mx, "mA")
             self._render_braille_rows(t, i_rows, pw)
         else:
             bh = max(1, self.bar_row_height)
             bar_data, (i_mn, i_mx) = self._build_bar_plot(
-                i_series, pw, bh, stretch=stretch)
+                i_series, pw, bh, stretch=stretch, fixed_range=i_fixed)
             self._render_plot_header(t, "CURRENT", "bold green", i_mn, i_mx, "mA")
             self._render_bar_rows(t, bar_data, pw)
 
@@ -608,6 +618,8 @@ class SensorPlot(Widget):
 
         sensor_order = ["P1", "P2", "N1", "N2"]
         stretch = self._stretch_active()
+        v_fixed = None if self.auto_v_range else self.v_range
+        i_fixed = None if self.auto_i_range else self.i_range
 
         for sensor in sensor_order:
             hist = history.get(sensor, [])
@@ -625,9 +637,9 @@ class SensorPlot(Widget):
                 # Bar mode in expanded view: each sensor gets its own block,
                 # so use the full per-block height ph (matches line/dot).
                 v_bar, (v_mn, v_mx) = self._build_bar_plot(
-                    v_series, col_w, ph, stretch=stretch)
+                    v_series, col_w, ph, stretch=stretch, fixed_range=v_fixed)
                 i_bar, (i_mn, i_mx) = self._build_bar_plot(
-                    i_series, col_w, ph, stretch=stretch)
+                    i_series, col_w, ph, stretch=stretch, fixed_range=i_fixed)
 
                 # Sensor label + range header
                 t.append(f" {label} ", style=f"bold {color}")
@@ -665,9 +677,9 @@ class SensorPlot(Widget):
             else:
                 # Line/dot mode: use braille characters
                 v_rows, (v_mn, v_mx) = self._build_braille_plot(
-                    v_series, col_w, ph, connect, stretch=stretch)
+                    v_series, col_w, ph, connect, stretch=stretch, fixed_range=v_fixed)
                 i_rows, (i_mn, i_mx) = self._build_braille_plot(
-                    i_series, col_w, ph, connect, stretch=stretch)
+                    i_series, col_w, ph, connect, stretch=stretch, fixed_range=i_fixed)
 
                 # Sensor label + range header
                 t.append(f" {label} ", style=f"bold {color}")

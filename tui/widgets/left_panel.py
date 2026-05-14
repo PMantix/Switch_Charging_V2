@@ -35,6 +35,7 @@ class LeftPanel(Widget):
                 ("  k  ", "Bus-V decim"),
                 ("  v  ", "Cycle plot mode"),
                 ("  y  ", "Cycle window N"),
+                ("  R  ", "Range auto/fixed"),
             ]),
             ("RECORD", [
                 ("  l  ", "Start/stop"),

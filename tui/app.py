@@ -536,6 +536,7 @@ class SwitchingCircuitApp(App):
         Binding("P", "switch_pi", "Switch Pi", show=True),
         Binding("O", "offload", "Offload", show=False),
         Binding("B", "calibrate", "Calibrate", show=False),
+        Binding("R", "toggle_plot_range", "Range", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -1229,6 +1230,14 @@ class SwitchingCircuitApp(App):
         small integer number of switching cycles for transient analysis."""
         plot = self.query_one("#sensor-plot", SensorPlot)
         plot.cycle_cycle_window()
+
+    def action_toggle_plot_range(self) -> None:
+        plot = self.query_one("#sensor-plot", SensorPlot)
+        auto = plot.auto_v_range
+        plot.auto_v_range = not auto
+        plot.auto_i_range = not auto
+        mode = "Auto" if not auto else "Fixed (2-4.5V, ±500mA)"
+        self.notify(f"Plot range: {mode}", title="Range")
 
     # -- Actions: INA226 Sensor Profile --------------------------------------
 
