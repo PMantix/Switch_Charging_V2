@@ -533,6 +533,7 @@ class SwitchingCircuitApp(App):
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
         Binding("P", "switch_pi", "Switch Pi", show=True),
+        Binding("O", "offload", "Offload", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -1372,6 +1373,77 @@ class SwitchingCircuitApp(App):
         self.push_screen(
             ConnectDialog(prescan=self._take_prescan()),
             self._on_connect_dialog_result,
+        )
+
+    # -- Data offload -------------------------------------------------------
+
+    def action_offload(self) -> None:
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            self.notify("Not connected to a Pi", severity="warning")
+            return
+        if self._data_logger.is_logging:
+            self.notify("Stop recording first", severity="warning")
+            return
+        self.notify("Offloading recordings from Pi...", title="Offload")
+        self.run_worker(self._offload_worker(), exclusive=True)
+
+    async def _offload_worker(self) -> None:
+        import asyncio
+        import subprocess
+        from pathlib import Path
+
+        loop = asyncio.get_event_loop()
+        host = self._client.host if self._client else ""
+        if not host:
+            return
+
+        local_dir = Path.home() / "SwitchingCircuitV2_logs"
+        local_dir.mkdir(parents=True, exist_ok=True)
+        pi_dir = "/home/pi/SwitchingCircuitV2_logs"
+        ssh_opts = ["-o", "StrictHostKeyChecking=no", "-o", "UserKnownHostsFile=/dev/null",
+                    "-o", "ConnectTimeout=5"]
+
+        # List remote files
+        result = await loop.run_in_executor(None, lambda: subprocess.run(
+            ["ssh", *ssh_opts, f"pi@{host}", f"ls {pi_dir}/pi_*.csv 2>/dev/null"],
+            capture_output=True, text=True, timeout=10,
+        ))
+        if result.returncode != 0 or not result.stdout.strip():
+            self.notify("No recordings found on Pi", title="Offload")
+            return
+        remote_files = [f.strip() for f in result.stdout.strip().splitlines()]
+
+        # SCP all files
+        copied = 0
+        for remote_path in remote_files:
+            fname = remote_path.split("/")[-1]
+            local_path = local_dir / fname
+            scp_result = await loop.run_in_executor(None, lambda rp=remote_path, lp=local_path: subprocess.run(
+                ["scp", *ssh_opts, f"pi@{host}:{rp}", str(lp)],
+                capture_output=True, timeout=30,
+            ))
+            if scp_result.returncode == 0:
+                copied += 1
+
+        if copied == 0:
+            self.notify("Failed to copy any files", title="Offload", severity="error")
+            return
+
+        # Verify and delete
+        deleted = 0
+        for remote_path in remote_files:
+            fname = remote_path.split("/")[-1]
+            local_path = local_dir / fname
+            if local_path.exists() and local_path.stat().st_size > 0:
+                await loop.run_in_executor(None, lambda rp=remote_path: subprocess.run(
+                    ["ssh", *ssh_opts, f"pi@{host}", f"rm {rp}"],
+                    capture_output=True, timeout=10,
+                ))
+                deleted += 1
+
+        self.notify(
+            f"Copied {copied} file(s) to ~/SwitchingCircuitV2_logs/\nDeleted {deleted} from Pi",
+            title="Offload complete",
         )
 
     # -- Schedule monitor ---------------------------------------------------

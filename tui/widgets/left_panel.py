@@ -64,9 +64,22 @@ class LeftPanel(Widget):
             ("RECORD", [
                 ("  l  ", "Start/stop"),
                 (" [ ] ", "Duration -/+"),
+                ("  O  ", "Offload to Mac"),
+            ]),
+            ("AUTO-FOLLOW", [
+                ("  F  ", "Toggle"),
+                ("  T  ", "Cycle target"),
+                (" ,/. ", "I_enter -/+1mA"),
+                (" ;/' ", "I_exit -/+0.5mA"),
+            ]),
+            ("NETWORK", [
+                ("  P  ", "Switch Pi"),
+                ("  r  ", "Reconnect"),
+                ("  A  ", "AP mode"),
+                ("  C  ", "Client mode"),
             ]),
             ("OTHER", [
-                ("  r  ", "Reconnect"),
+                (" Tab ", "Toggle panel"),
                 ("  ?  ", "Help"),
                 ("  q  ", "Quit"),
             ]),
