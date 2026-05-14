@@ -238,6 +238,17 @@ class PiClient:
     def list_schedules(self) -> Optional[dict]:
         return self.send_command({"cmd": "list_schedules"})
 
+    # -- Calibration ---------------------------------------------------------
+
+    def set_calibration(self, channel: int, gain: float, offset: float) -> Optional[dict]:
+        return self.send_command({"cmd": "set_calibration", "channel": channel, "gain": gain, "offset": offset})
+
+    def get_calibration(self) -> Optional[dict]:
+        return self.send_command({"cmd": "get_calibration"})
+
+    def reset_calibration(self) -> Optional[dict]:
+        return self.send_command({"cmd": "reset_calibration"})
+
     # -- Background receive --------------------------------------------------
 
     def _recv_loop(self) -> None:

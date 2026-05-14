@@ -18,7 +18,7 @@
 #define PIN_SCL       7u   // GP7 → INA226 I2C SCL (i2c1)
 
 #define PIN_NEOPIXEL  16u  // GP16 → onboard WS2812
-#define PIN_INA_ALERT 27u  // GP27 → wired-OR INA226 ALERT (open-drain)
+#define PIN_INA_ALERT 29u  // GP29 → wired-OR INA226 ALERT (open-drain)
 
 // I2C bus selection (i2c1 because GP6/GP7 are on i2c1).
 #define I2C_PORT      i2c1
@@ -29,7 +29,7 @@
 // ---------------------------------------------------------------------------
 #define INA226_ADDR_P1 0x40u
 #define INA226_ADDR_P2 0x41u
-#define INA226_ADDR_N1 0x43u
+#define INA226_ADDR_N1 0x49u
 #define INA226_ADDR_N2 0x45u
 
 #define INA226_NUM_SENSORS 4
@@ -68,6 +68,24 @@ typedef enum {
 // MASK_ENABLE bits.
 #define INA226_MASK_CNVR_BIT  (1u << 10)
 #define INA226_MASK_CVRF_BIT  (1u << 3)
+
+// ---------------------------------------------------------------------------
+// Calibration flash storage
+// ---------------------------------------------------------------------------
+#define FLASH_CALIBRATION_OFFSET  (2 * 1024 * 1024 - 4096)  // last 4KB sector
+#define FLASH_SECTOR_SIZE         4096u
+#define CALIBRATION_MAGIC         0x43414C31u  // "CAL1"
+
+typedef struct {
+    float gain;
+    float offset;
+} channel_cal_t;
+
+typedef struct {
+    uint32_t      magic;
+    uint32_t      version;
+    channel_cal_t channels[INA226_NUM_SENSORS];
+} calibration_block_t;
 
 // Build identifier — printed by the J command.
 #define FW_BUILD_NAME    "switching_circuit_v2_fw"

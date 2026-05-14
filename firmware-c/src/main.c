@@ -36,6 +36,7 @@ int main(void) {
     switching_all_off();
 
     int found = ina226_scan();
+    ina226_cal_load();
     if (found > 0) {
         // Print which sensors responded — purely informational; the
         // host's _wait_for_ready ignores everything until "OK READY".

@@ -51,6 +51,8 @@ target_link_libraries(switching_circuit_v2_fw
     hardware_timer
     hardware_irq
     hardware_dma
+    hardware_flash
+    hardware_sync
 )
 
 # Use USB CDC for stdio (matches the MicroPython firmware's transport) and

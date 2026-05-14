@@ -380,6 +380,38 @@ class GPIODriver:
         log.warning("profile_emit: unparseable reply: %s", resp)
         return None
 
+    def set_calibration(self, channel: int, gain: float, offset: float):
+        resp = self._send(f"W {channel} {gain:.6f} {offset:.6f}")
+        if resp and resp.startswith("OK W"):
+            parts = resp.split()
+            try:
+                return int(parts[2]), float(parts[3]), float(parts[4])
+            except (ValueError, IndexError):
+                pass
+        log.warning("Failed to set calibration: %s", resp)
+        return None, None, None
+
+    def get_calibration(self):
+        resp = self._send("U")
+        if resp and resp.startswith("OK U"):
+            result = {}
+            for p in resp.split()[2:]:
+                try:
+                    ch_s, g_s, o_s = p.split(":")
+                    result[int(ch_s)] = (float(g_s), float(o_s))
+                except (ValueError, IndexError):
+                    pass
+            return result
+        log.warning("Failed to get calibration: %s", resp)
+        return None
+
+    def reset_calibration(self):
+        resp = self._send("W 4 0 0")
+        if resp and resp.startswith("OK W"):
+            return True
+        log.warning("Failed to reset calibration: %s", resp)
+        return False
+
     def get_sensor_data(self):
         with self._sensor_lock:
             return dict(self._sensor_data)

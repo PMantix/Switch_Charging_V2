@@ -41,6 +41,13 @@ void ina226_read_all_fast(ina226_reading_t out[INA226_NUM_SENSORS]);
 void ina226_read_all_streaming(bool read_bus,
                                ina226_reading_t out[INA226_NUM_SENSORS]);
 
+// Calibration: two-point linear correction per channel.
+// corrected = gain * raw + offset.  Identity = gain 1.0, offset 0.0.
+void ina226_cal_load(void);
+bool ina226_cal_set(sensor_idx_t ch, float gain, float offset);
+void ina226_cal_get(sensor_idx_t ch, float *gain, float *offset);
+void ina226_cal_reset(void);
+
 // Per-sensor presence flag, indexed by sensor_idx_t.
 bool ina226_is_present(sensor_idx_t which);
 

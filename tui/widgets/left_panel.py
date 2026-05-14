@@ -1,5 +1,5 @@
 """
-Switching Circuit V2 - Left Panel: State Reference & Key Bindings.
+Switching Circuit V2 - Left Panel: Key Bindings Reference.
 """
 
 from textual.widget import Widget
@@ -7,7 +7,7 @@ from rich.text import Text
 
 
 class LeftPanel(Widget):
-    """H-bridge state reference and keyboard controls."""
+    """Keyboard controls reference (mode/sequence shown in right panel)."""
 
     DEFAULT_CSS = """
     LeftPanel {
@@ -20,39 +20,14 @@ class LeftPanel(Widget):
     def render(self) -> Text:
         t = Text()
 
-        # -- Key Bindings --
         t.append(" KEY BINDINGS\n", style="bold cyan underline")
         t.append("\n")
 
         sections = [
-            ("CONTROL", [
-                ("Space", "Start / Stop"),
-                ("  m  ", "Cycle mode"),
-            ]),
-            ("MODE", [
-                ("  c  ", "Charge"),
-                ("  i  ", "Idle"),
-                ("  x  ", "Discharge"),
-                ("  p  ", "Pulse Charge"),
-                ("  g  ", "Debug"),
-                ("  a  ", "Auto (schedule)"),
-            ]),
-            ("AUTO (a)", [
-                ("  n  ", "Skip step"),
-                ("Space", "Pause / Resume"),
-                ("  i  ", "Stop auto"),
-            ]),
             ("FREQUENCY", [
-                (" =/- ", "+/- 0.1 Hz"),
                 (" w/s ", "+/- 0.1 Hz"),
                 (" e/d ", "+/- 1.0 Hz"),
                 (" W/S ", "+/- 10 Hz"),
-            ]),
-            ("SEQUENCE", [
-                (" 1-8 ", "Select"),
-            ]),
-            ("DEBUG (g)", [
-                (" 1-4 ", "Toggle P1/P2/N1/N2"),
             ]),
             ("SENSORS", [
                 (" / * ", "Rate -/+"),
@@ -72,11 +47,12 @@ class LeftPanel(Widget):
                 (" ,/. ", "I_enter -/+1mA"),
                 (" ;/' ", "I_exit -/+0.5mA"),
             ]),
+            ("CALIBRATE", [
+                ("  B  ", "INA226 Cal Wizard"),
+            ]),
             ("NETWORK", [
                 ("  P  ", "Switch Pi"),
                 ("  r  ", "Reconnect"),
-                ("  A  ", "AP mode"),
-                ("  C  ", "Client mode"),
             ]),
             ("OTHER", [
                 (" Tab ", "Toggle panel"),

@@ -25,6 +25,7 @@ from tui import wifi_scan
 from tui.widgets.circuit_diagram import CircuitDiagram, STATE_DEFS, STATE_PATHS
 from tui.widgets.fleet_list import FleetList, FleetEntry
 from tui.widgets.left_panel import LeftPanel
+from tui.widgets.calibration_screen import CalibrationScreen
 from tui.widgets.pi_picker import PiPicker
 from tui.widgets.right_panel import RightPanel
 from tui.widgets.sensor_plot import SensorPlot
@@ -534,6 +535,7 @@ class SwitchingCircuitApp(App):
         Binding("D", "toggle_probe", "Latency", show=False),
         Binding("P", "switch_pi", "Switch Pi", show=True),
         Binding("O", "offload", "Offload", show=False),
+        Binding("B", "calibrate", "Calibrate", show=False),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -857,6 +859,12 @@ class SwitchingCircuitApp(App):
             rpanel.current_path = STATE_PATHS[state_idx] if 0 <= state_idx <= 5 else ""
 
             sensors = data.get("sensors", {})
+            cal_sink = getattr(self, "_cal_sample_sink", None)
+            if cal_sink is not None:
+                try:
+                    cal_sink(sensors)
+                except Exception:
+                    pass
             plot = self.query_one("#sensor-plot", SensorPlot)
             # Feed the live switching frequency so cycle-window mode can
             # convert "N cycles" to a wallclock filter. Cheap when the
@@ -1374,6 +1382,38 @@ class SwitchingCircuitApp(App):
             ConnectDialog(prescan=self._take_prescan()),
             self._on_connect_dialog_result,
         )
+
+    # -- Calibration --------------------------------------------------------
+
+    def action_calibrate(self) -> None:
+        if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
+            self.notify("Connect to a Pi first", severity="warning")
+            return
+        if self._data_logger.is_logging:
+            self.notify("Stop recording before calibrating", severity="warning")
+            return
+        self.push_screen(CalibrationScreen(), self._on_calibration_result)
+
+    def _on_calibration_result(self, result) -> None:
+        if result is None:
+            return
+        if result.get("reset"):
+            resp = self._client.reset_calibration()
+            if resp and resp.get("ok"):
+                self.notify("Calibration reset to defaults", title="Calibration")
+            else:
+                self.notify("Reset failed", severity="error")
+            return
+        names = ["P1", "P2", "N1", "N2"]
+        for ch, gain, offset in result.get("calibrations", []):
+            resp = self._client.set_calibration(ch, gain, offset)
+            if resp and resp.get("ok"):
+                self.notify(
+                    f"{names[ch]}: gain={gain:.4f}, offset={offset*1000:.3f}mA",
+                    title="Calibration Saved",
+                )
+            else:
+                self.notify(f"{names[ch]} calibration failed", severity="error")
 
     # -- Data offload -------------------------------------------------------
 

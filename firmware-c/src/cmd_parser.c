@@ -405,6 +405,35 @@ static void cmd_K(void) {
     printf("OK K %d\n", idx);
 }
 
+static void cmd_W(size_t nt, const token_t *tk) {
+    if (nt != 4) { puts("ERR W requires 3 args: W <ch> <gain> <offset>"); return; }
+    int ch;
+    float gain, offset;
+    if (parse_int_tok(&tk[1], &ch) != 0) { puts("ERR W ch must be 0-3 (or 4=reset)"); return; }
+    if (parse_float_tok(&tk[2], &gain) != 0) { puts("ERR W gain must be float"); return; }
+    if (parse_float_tok(&tk[3], &offset) != 0) { puts("ERR W offset must be float"); return; }
+    if (ch == 4) {
+        ina226_cal_reset();
+        puts("OK W reset");
+        return;
+    }
+    if (!ina226_cal_set((sensor_idx_t)ch, gain, offset)) {
+        puts("ERR W out of range");
+        return;
+    }
+    printf("OK W %d %.6f %.6f\n", ch, (double)gain, (double)offset);
+}
+
+static void cmd_U(void) {
+    fputs("OK U", stdout);
+    for (int i = 0; i < INA226_NUM_SENSORS; ++i) {
+        float g, o;
+        ina226_cal_get((sensor_idx_t)i, &g, &o);
+        printf(" %d:%.6f:%.6f", i, (double)g, (double)o);
+    }
+    puts("");
+}
+
 // ---------------------------------------------------------------------------
 // Dispatch
 // ---------------------------------------------------------------------------
@@ -463,6 +492,8 @@ void cmd_parser_handle_line(const char *line, size_t len) {
         case 'G': cmd_G(nt, toks); return;
         case 'H': cmd_H();         return;
         case 'K': cmd_K();         return;
+        case 'W': cmd_W(nt, toks); return;
+        case 'U': cmd_U();         return;
         default:
             printf("ERR unknown command: %c\n", verb[0]);
             return;

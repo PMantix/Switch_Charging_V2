@@ -3,7 +3,9 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "hardware/flash.h"
 #include "hardware/i2c.h"
+#include "hardware/sync.h"
 #include "pico/stdlib.h"
 
 #include "config.h"
@@ -28,6 +30,10 @@ static uint16_t s_avg          = 4;     // matches main.py default
 static bool     s_cnvr_enabled = false; // off by default (CNVR isn't on hot path)
 static float    s_last_bus_v[INA226_NUM_SENSORS] = {0.0f, 0.0f, 0.0f, 0.0f};
 static bool     s_i2c_ready    = false;
+
+static channel_cal_t s_cal[INA226_NUM_SENSORS] = {
+    {1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.0f}, {1.0f, 0.0f},
+};
 
 // ---------------------------------------------------------------------------
 // Low-level I2C helpers. Pico SDK i2c funcs return PICO_ERROR_TIMEOUT (-2)
@@ -148,9 +154,10 @@ void ina226_set_cnvr_enabled(bool enabled) {
     }
 }
 
-static inline float shunt_raw_to_amps(uint16_t raw) {
-    int16_t signed_raw = (int16_t)raw;  // INA226 shunt is two's-complement
-    return ((float)signed_raw * INA226_SHUNT_V_LSB) / SHUNT_RESISTOR_OHM;
+static inline float shunt_raw_to_amps(int idx, uint16_t raw) {
+    int16_t signed_raw = (int16_t)raw;
+    float uncal = ((float)signed_raw * INA226_SHUNT_V_LSB) / SHUNT_RESISTOR_OHM;
+    return s_cal[idx].gain * uncal + s_cal[idx].offset;
 }
 
 static inline float bus_raw_to_volts(uint16_t raw) {
@@ -166,7 +173,7 @@ void ina226_read_all_fast(ina226_reading_t out[INA226_NUM_SENSORS]) {
         if (!i2c_read_two_bytes(k_addrs[i], INA226_REG_BUS_V, &bv)) continue;
         if (!i2c_read_two_bytes(k_addrs[i], INA226_REG_SHUNT_V, &sv)) continue;
         out[i].bus_v = bus_raw_to_volts(bv);
-        out[i].current_a = shunt_raw_to_amps(sv);
+        out[i].current_a = shunt_raw_to_amps(i, sv);
         s_last_bus_v[i] = out[i].bus_v;
     }
 }
@@ -179,7 +186,7 @@ void ina226_read_all_streaming(bool read_bus,
         if (!s_present[i]) continue;
         uint16_t sv = 0;
         if (!i2c_read_two_bytes(k_addrs[i], INA226_REG_SHUNT_V, &sv)) continue;
-        out[i].current_a = shunt_raw_to_amps(sv);
+        out[i].current_a = shunt_raw_to_amps(i, sv);
         if (read_bus) {
             uint16_t bv = 0;
             if (i2c_read_two_bytes(k_addrs[i], INA226_REG_BUS_V, &bv)) {
@@ -203,4 +210,55 @@ const char *ina226_name(sensor_idx_t which) {
 uint8_t ina226_address(sensor_idx_t which) {
     if ((int)which < 0 || (int)which >= INA226_NUM_SENSORS) return 0;
     return k_addrs[which];
+}
+
+// ---------------------------------------------------------------------------
+// Calibration: flash persistence
+// ---------------------------------------------------------------------------
+static void cal_persist(void) {
+    calibration_block_t block;
+    block.magic = CALIBRATION_MAGIC;
+    block.version = 1;
+    for (int i = 0; i < INA226_NUM_SENSORS; ++i) {
+        block.channels[i] = s_cal[i];
+    }
+    uint32_t ints = save_and_disable_interrupts();
+    flash_range_erase(FLASH_CALIBRATION_OFFSET, FLASH_SECTOR_SIZE);
+    flash_range_program(FLASH_CALIBRATION_OFFSET, (const uint8_t *)&block, sizeof(block));
+    restore_interrupts(ints);
+}
+
+void ina226_cal_load(void) {
+    const calibration_block_t *fb =
+        (const calibration_block_t *)(XIP_BASE + FLASH_CALIBRATION_OFFSET);
+    if (fb->magic != CALIBRATION_MAGIC) return;
+    for (int i = 0; i < INA226_NUM_SENSORS; ++i) {
+        s_cal[i] = fb->channels[i];
+    }
+}
+
+bool ina226_cal_set(sensor_idx_t ch, float gain, float offset) {
+    if ((int)ch < 0 || (int)ch >= INA226_NUM_SENSORS) return false;
+    if (gain < 0.5f || gain > 2.0f) return false;
+    if (offset < -0.1f || offset > 0.1f) return false;
+    s_cal[ch].gain = gain;
+    s_cal[ch].offset = offset;
+    cal_persist();
+    return true;
+}
+
+void ina226_cal_get(sensor_idx_t ch, float *gain, float *offset) {
+    if ((int)ch < 0 || (int)ch >= INA226_NUM_SENSORS) {
+        *gain = 1.0f; *offset = 0.0f; return;
+    }
+    *gain = s_cal[ch].gain;
+    *offset = s_cal[ch].offset;
+}
+
+void ina226_cal_reset(void) {
+    for (int i = 0; i < INA226_NUM_SENSORS; ++i) {
+        s_cal[i].gain = 1.0f;
+        s_cal[i].offset = 0.0f;
+    }
+    cal_persist();
 }

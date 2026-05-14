@@ -299,6 +299,29 @@ class CommandServer:
                 )
                 return {"ok": True, "path": path}
 
+            elif cmd == "set_calibration":
+                ch = msg.get("channel")
+                gain = msg.get("gain")
+                offset = msg.get("offset")
+                if ch is None or gain is None or offset is None:
+                    return {"ok": False, "error": "Need channel, gain, offset"}
+                c, g, o = self._mc._gpio.set_calibration(int(ch), float(gain), float(offset))
+                if c is None:
+                    return {"ok": False, "error": "Firmware rejected calibration"}
+                return {"ok": True, "channel": c, "gain": g, "offset": o}
+
+            elif cmd == "get_calibration":
+                cal = self._mc._gpio.get_calibration()
+                if cal is None:
+                    return {"ok": False, "error": "Failed to query calibration"}
+                return {"ok": True, "calibration": cal}
+
+            elif cmd == "reset_calibration":
+                ok = self._mc._gpio.reset_calibration()
+                if not ok:
+                    return {"ok": False, "error": "Failed to reset calibration"}
+                return {"ok": True}
+
             elif cmd == "pi_record_stop":
                 path = self._recorder.stop()
                 count = self._recorder.sample_count
