@@ -213,9 +213,9 @@ class GPIODriver:
                 self._ser.flush()
                 # Wait for response (reader thread will put it in the queue)
                 try:
-                    return self._response_q.get(timeout=2.0)
+                    return self._response_q.get(timeout=0.5)
                 except queue.Empty:
-                    log.warning("No response for command: %s", cmd)
+                    log.warning("No response for command: %s (timeout 0.5s)", cmd)
                     return None
             except (serial.SerialException, OSError) as e:
                 log.error("Serial error: %s", e)

@@ -533,11 +533,11 @@ class CommandServer:
                     # hair-trigger one. (We can't retry on timeout: sendall
                     # may have partially written, which would corrupt the
                     # JSON framing on the next send.)
-                    sock.settimeout(2.0)
+                    sock.settimeout(0.5)
                     sock.sendall(line_bytes)
                 except socket.timeout:
                     log.warning(
-                        "broadcast sendall timed out >2s — dropping subscriber"
+                        "broadcast sendall timed out — dropping subscriber"
                     )
                     dead.append(sock)
                 except (OSError, BrokenPipeError):

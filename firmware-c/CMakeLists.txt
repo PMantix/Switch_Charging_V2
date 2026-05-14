@@ -59,5 +59,11 @@ target_link_libraries(switching_circuit_v2_fw
 pico_enable_stdio_usb(switching_circuit_v2_fw 1)
 pico_enable_stdio_uart(switching_circuit_v2_fw 0)
 
+# Don't let printf block when the Pi stops reading USB CDC — drop data
+# instead so the main loop stays responsive to commands at all times.
+target_compile_definitions(switching_circuit_v2_fw PRIVATE
+    PICO_STDIO_USB_STDOUT_TIMEOUT_US=0
+)
+
 # Generate UF2 + map + bin + hex outputs.
 pico_add_extra_outputs(switching_circuit_v2_fw)
