@@ -95,9 +95,14 @@ class PiClient:
         self._set_state(ConnectionState.CONNECTING)
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            try:
+                sock.setsockopt(socket.IPPROTO_TCP, 0x10, 5)  # TCP_KEEPALIVE (macOS)
+            except OSError:
+                pass
             sock.settimeout(5.0)
             sock.connect((host, port))
-            sock.settimeout(None)
+            sock.settimeout(10.0)
             self._sock = sock
             self._rfile = sock.makefile("r", encoding="utf-8")
             self._set_state(ConnectionState.CONNECTED)
@@ -237,6 +242,7 @@ class PiClient:
 
     def _recv_loop(self) -> None:
         """Read lines from the socket in a loop, dispatching state events."""
+        consecutive_timeouts = 0
         while not self._stop_event.is_set():
             try:
                 if not self._rfile:
@@ -245,15 +251,20 @@ class PiClient:
                 t_recv_ns = time.monotonic_ns()
                 if not line:
                     raise ConnectionError("Server closed connection")
+                consecutive_timeouts = 0
                 data = json.loads(line)
                 event = data.get("event")
                 if event == "state" and self._on_state:
-                    # Inject mac-side receive timestamp so the app can
-                    # measure queue and net latency without a second dict.
                     data["_t_recv_ns"] = t_recv_ns
                     self._on_state(data)
                 elif event == "pong":
                     self._handle_pong(data, t_recv_ns)
+            except socket.timeout:
+                consecutive_timeouts += 1
+                if consecutive_timeouts >= 3:
+                    log.warning("No data for %ds — connection dead", consecutive_timeouts * 10)
+                    self._handle_disconnect()
+                    break
             except (OSError, ConnectionError, json.JSONDecodeError) as exc:
                 if not self._stop_event.is_set():
                     log.warning("Receive loop error: %s", exc)
@@ -317,5 +328,26 @@ class PiClient:
             return
         old_host, old_port = self._host, self._port
         self.disconnect()
-        # Auto-reconnect
-        self.connect_with_retry(old_host, old_port)
+        self._stop_event.clear()
+        self._auto_reconnect(old_host, old_port)
+
+    def _auto_reconnect(self, host: str, port: int) -> None:
+        """Reconnect and re-subscribe in a background thread."""
+        def _loop() -> None:
+            attempts = 0
+            while not self._stop_event.is_set():
+                attempts += 1
+                if self.connect(host, port):
+                    try:
+                        self.subscribe()
+                        log.info("Auto-reconnected and re-subscribed to %s:%d", host, port)
+                    except Exception:
+                        log.warning("Re-subscribe failed after auto-reconnect")
+                    return
+                if self._max_retries and attempts >= self._max_retries:
+                    log.warning("Auto-reconnect: max retries (%d) reached", self._max_retries)
+                    return
+                self._stop_event.wait(self._retry_delay)
+
+        t = threading.Thread(target=_loop, daemon=True, name="pi-auto-reconnect")
+        t.start()
