@@ -72,9 +72,10 @@ class PiPicker(ModalScreen[str]):
     }
     """
 
-    def __init__(self, current_host: str = ""):
+    def __init__(self, current_host: str = "", cached_hits: list[FleetHit] | None = None):
         super().__init__()
         self._current_host = current_host
+        self._cached_hits = cached_hits
 
     def compose(self) -> ComposeResult:
         with Vertical(id="picker-box"):
@@ -91,7 +92,10 @@ class PiPicker(ModalScreen[str]):
             )
 
     def on_mount(self) -> None:
-        self._populate_offline_placeholders()
+        if self._cached_hits:
+            self._apply_scan_result(self._cached_hits)
+        else:
+            self._populate_offline_placeholders()
         self._start_scan()
 
     # -- scanning ------------------------------------------------------------
@@ -123,9 +127,14 @@ class PiPicker(ModalScreen[str]):
 
     def _on_scan_result(self, hits: list[FleetHit]) -> None:
         try:
-            self.app.call_from_thread(self._apply_scan_result, hits)
+            self.app.call_from_thread(self._apply_and_cache, hits)
         except Exception:
             pass
+
+    def _apply_and_cache(self, hits: list[FleetHit]) -> None:
+        self._apply_scan_result(hits)
+        if hasattr(self.app, "_fleet_cache"):
+            self.app._fleet_cache = hits
 
     def _apply_scan_result(self, hits: list[FleetHit]) -> None:
         live_hostnames = {h.hostname for h in hits}

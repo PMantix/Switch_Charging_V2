@@ -532,7 +532,7 @@ class SwitchingCircuitApp(App):
         Binding("M", "restart_monitor", "Restart monitor clock", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
-        Binding("P", "switch_pi", "Switch Pi", show=False),
+        Binding("P", "switch_pi", "Switch Pi", show=True),
     ]
 
     # During startup, limit state updates to let the layout stabilize.
@@ -559,6 +559,7 @@ class SwitchingCircuitApp(App):
         self._probe = LatencyProbe()
         self._offset_worker_started = False
         self._last_probe_display_ns = 0
+        self._fleet_cache: list = []
         # Launch-time WiFi prescan: overlaps with auto-discovery so the
         # ConnectDialog can show nearby pi_SW# APs the moment it opens.
         import threading as _threading
@@ -1516,7 +1517,7 @@ class SwitchingCircuitApp(App):
             return
         current_host = self._client.host if self._client else ""
         self.push_screen(
-            PiPicker(current_host=current_host),
+            PiPicker(current_host=current_host, cached_hits=self._fleet_cache or None),
             self._on_pi_picker_result,
         )
 
@@ -1535,11 +1536,10 @@ class SwitchingCircuitApp(App):
         if not self._client:
             return
         self._reset_pi_state()
-        conn_bar = self.query_one("#conn-bar", ConnectionBar)
-        conn_bar.host = f"{new_host}:{self._initial_port}"
-        conn_bar.conn_label = f"Switching to {new_host}..."
+        self._client.disconnect()
+        self._client._stop_event.clear()
         save_host(new_host)
-        self._client.reconnect_to(new_host, self._initial_port)
+        self._do_connect(new_host, self._initial_port)
 
     def _reset_pi_state(self) -> None:
         """Clear per-Pi cached state ahead of a Pi switch. The next

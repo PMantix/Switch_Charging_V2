@@ -38,6 +38,8 @@ POLL_INTERVAL = 10.0
 PING_TIMEOUT = 3
 PING_FAILS_BEFORE_ACTION = 3
 FAILOVER_WAIT = 20.0
+WIFI_READY_TIMEOUT = 60.0
+WIFI_READY_POLL = 3.0
 
 
 def active_client_profile() -> Optional[str]:
@@ -155,6 +157,26 @@ def _start_own_ap():
         log.error("AP activation failed: %s", result.get("error") or result.get("stderr"))
 
 
+def _wait_for_wifi_ready():
+    """Block until the radio can see at least one WiFi network."""
+    deadline = time.monotonic() + WIFI_READY_TIMEOUT
+    while time.monotonic() < deadline:
+        subprocess.run(
+            [NMCLI, "device", "wifi", "rescan"], capture_output=True, timeout=10,
+        )
+        time.sleep(WIFI_READY_POLL)
+        result = subprocess.run(
+            [NMCLI, "-t", "-f", "SSID", "device", "wifi", "list"],
+            capture_output=True, text=True, timeout=10,
+        )
+        networks = {l.strip() for l in result.stdout.splitlines() if l.strip()}
+        if networks:
+            log.info("wifi ready: %d networks visible", len(networks))
+            return
+        log.info("wifi not ready yet, waiting...")
+    log.warning("wifi ready timeout after %.0fs — proceeding anyway", WIFI_READY_TIMEOUT)
+
+
 def _ping_gateway() -> bool:
     result = subprocess.run(
         ["ping", "-c", "1", "-W", str(PING_TIMEOUT), AP_GATEWAY],
@@ -165,6 +187,26 @@ def _ping_gateway() -> bool:
 
 def boot():
     """Join any existing fleet AP, or start own."""
+    my_idx = my_fleet_index()
+
+    # Lowest-numbered Pi is always the AP — no scan needed
+    if my_idx == 1:
+        log.info("boot: I am SW1, going straight to AP")
+        if current_mode() != "ap":
+            _start_own_ap()
+        return
+
+    # Higher-numbered Pi: need to scan for an existing AP.
+    # If NM auto-activated our AP, the radio can't scan — bring it down.
+    if current_mode() == "ap":
+        log.info("boot: AP already active, bringing down to scan")
+        set_mode("client")
+        time.sleep(2)
+
+    # Wait until the radio can see any network at all before doing the
+    # fleet scan — on fresh boot the hardware may not be ready yet.
+    _wait_for_wifi_ready()
+
     fleet_aps = scan_fleet_aps()
     if fleet_aps:
         for ssid in fleet_aps:

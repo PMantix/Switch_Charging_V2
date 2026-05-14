@@ -158,6 +158,7 @@ class PiClient:
         proactively and start the retry loop against the new address.
         """
         self.disconnect()
+        self._stop_event.clear()
         self.connect_with_retry(host, port)
 
     # -- Commands ------------------------------------------------------------
