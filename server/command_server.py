@@ -291,7 +291,7 @@ class CommandServer:
                 # when sample rate happens to land on the same step every
                 # frame (e.g. 100 Hz × 10/50 sps in pulse mode). Pass null
                 # to begin recording on the first sample regardless.
-                align_to_step = msg.get("align_to_step", 1)
+                align_to_step = msg.get("align_to_step", None)
                 path = self._recorder.start(
                     max_samples, mode=rec_mode, freq=rec_freq,
                     seq=rec_seq, sensor_hz=rec_sensor_hz,

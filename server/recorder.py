@@ -80,7 +80,7 @@ class PiRecorder:
 
     def start(self, max_samples: int, mode: str = "unknown",
               freq: float = 1.0, seq: int = 0, sensor_hz: float = 15.0,
-              align_to_step: int | None = 1):
+              align_to_step: int | None = None):
         """Start recording. Returns the file path.
 
         `align_to_step` (default 1) makes the recorder wait for a transition
