@@ -763,34 +763,12 @@ class SwitchingCircuitApp(App):
                 profile = None
             # Subscribe to the state stream (also starts the recv thread).
             await loop.run_in_executor(None, self._client.subscribe)
-            # Add route to the Pi's ethernet subnet so we can reach
-            # other Pis on the switch through this one.
-            await loop.run_in_executor(None, self._add_ethernet_route, host)
             if profile:
                 try:
                     plot = self.query_one("#sensor-plot", SensorPlot)
                     self._apply_profile_reply(plot, profile)
                 except Exception:
                     pass
-
-    @staticmethod
-    def _add_ethernet_route(host: str) -> None:
-        """Try to add a route to 10.42.1.0/24 via the connected Pi so the
-        Mac can reach other Pis on the ethernet switch.  Silently ignored
-        if the route already exists or sudo isn't available."""
-        import subprocess
-        try:
-            import socket
-            ip = socket.gethostbyname(host)
-        except Exception:
-            return
-        try:
-            subprocess.run(
-                ["sudo", "-n", "route", "add", "-net", "10.42.1.0/24", ip],
-                capture_output=True, timeout=5,
-            )
-        except Exception:
-            pass
 
     # -- State stream callback (called from background thread) ---------------
 
@@ -1660,14 +1638,15 @@ class SwitchingCircuitApp(App):
             return
         current_host = self._client.host if self._client else ""
         self.push_screen(
-            PiPicker(current_host=current_host, cached_hits=self._fleet_cache or None),
+            PiPicker(current_host=current_host, cached_aps=self._fleet_cache or None),
             self._on_pi_picker_result,
         )
 
-    def _on_pi_picker_result(self, host: Optional[str]) -> None:
-        if not host:
-            return  # cancelled or no change
-        self._switch_pi(host)
+    def _on_pi_picker_result(self, ssid: Optional[str]) -> None:
+        if not ssid:
+            return
+        # WiFi already switched by the picker — reconnect to the gateway
+        self._switch_pi(AP_GATEWAY)
 
     def _switch_pi(self, new_host: str) -> None:
         """Retarget the existing PiClient at a different Pi.

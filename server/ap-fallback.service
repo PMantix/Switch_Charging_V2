@@ -1,15 +1,14 @@
 [Unit]
-Description=Switch Charging V2 - Fleet network watchdog
+Description=Switch Charging V2 - AP fallback
 After=NetworkManager.service
 Wants=NetworkManager.service
 
 [Service]
-Type=simple
+Type=oneshot
 User=root
 WorkingDirectory=/home/pi/Code/Switch_Charging_V2
 ExecStart=/usr/bin/python3 -m server.ap_fallback
-Restart=on-failure
-RestartSec=5
+RemainAfterExit=no
 
 [Install]
 WantedBy=multi-user.target

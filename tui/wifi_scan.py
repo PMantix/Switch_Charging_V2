@@ -35,7 +35,7 @@ log = logging.getLogger(__name__)
 AP_GATEWAY = "10.42.0.1"
 AP_PORT = 5555
 SSID_PATTERN = re.compile(r"^pi_SW\d+$")
-DEFAULT_AP_PASSWORD = "switching"
+DEFAULT_AP_PASSWORD = "raspberry"
 
 # system_profiler's cache is fast to read but frequently stale on recent macOS,
 # so we prefer CoreWLAN (via a tiny Swift helper) which does a real live scan.
