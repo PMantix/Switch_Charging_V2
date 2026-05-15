@@ -35,6 +35,10 @@ AP_GATEWAY = "10.42.0.1"
 # Fleet hostnames probed in parallel. Extend this when the fleet grows past 8.
 FLEET_HOSTNAMES = [f"pi-SW{i}.local" for i in range(1, 9)]
 
+# Ethernet subnet IPs to probe (SW1 ethernet DHCP range).
+# These catch Pis on the switch that aren't reachable via mDNS.
+FLEET_ETH_IPS = [f"10.42.1.{i}" for i in range(10, 255)]
+
 # Legacy name — tried last before link-local scan so un-renamed Pis still work.
 LEGACY_HOSTNAME = "raspberrypi.local"
 
@@ -140,7 +144,7 @@ def discover_fleet(
         if on_status:
             on_status(msg)
 
-    def check(hostname: str) -> Optional[FleetHit]:
+    def check_mdns(hostname: str) -> Optional[FleetHit]:
         ip = _resolve(hostname)
         if not ip:
             return None
@@ -149,14 +153,46 @@ def discover_fleet(
             return None
         return FleetHit(hostname=hostname, ip=ip, latency_ms=latency_ms)
 
+    def check_ip(ip: str) -> Optional[FleetHit]:
+        latency_ms = _probe_with_latency(ip, port)
+        if latency_ms is None:
+            return None
+        # Try reverse hostname lookup for display
+        try:
+            hostname = socket.gethostbyaddr(ip)[0]
+            if not hostname.endswith(".local"):
+                hostname = hostname.split(".")[0] + ".local"
+        except (socket.herror, OSError):
+            hostname = ip
+        return FleetHit(hostname=hostname, ip=ip, latency_ms=latency_ms)
+
     status(f"Probing fleet ({FLEET_HOSTNAMES[0]}..{FLEET_HOSTNAMES[-1]})...")
     hits: list[FleetHit] = []
+    seen_ips: set[str] = set()
+
+    # mDNS probe
     with ThreadPoolExecutor(max_workers=len(FLEET_HOSTNAMES)) as pool:
-        futures = {pool.submit(check, h): h for h in FLEET_HOSTNAMES}
+        futures = {pool.submit(check_mdns, h): h for h in FLEET_HOSTNAMES}
         for fut in as_completed(futures):
             hit = fut.result()
             if hit:
                 hits.append(hit)
+                seen_ips.add(hit.ip)
+
+    # Ethernet subnet probe (skip IPs already found via mDNS)
+    eth_candidates = [ip for ip in FLEET_ETH_IPS if ip not in seen_ips]
+    if eth_candidates:
+        status("Probing ethernet subnet...")
+        with ThreadPoolExecutor(max_workers=32) as pool:
+            futures = {pool.submit(check_ip, ip): ip for ip in eth_candidates}
+            for fut in as_completed(futures, timeout=CONNECT_TIMEOUT + 0.5):
+                try:
+                    hit = fut.result()
+                    if hit:
+                        hits.append(hit)
+                except Exception:
+                    pass
+
     hits.sort(key=lambda h: h.hostname)
     status(f"Fleet scan complete: {len(hits)} live")
     return hits
