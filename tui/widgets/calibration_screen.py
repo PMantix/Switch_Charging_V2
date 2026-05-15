@@ -119,11 +119,14 @@ class CalibrationScreen(ModalScreen[Optional[dict]]):
             lines = "[bold]Select terminal pair:[/]\n\n"
             for i, (name, _, _) in enumerate(PAIRS):
                 marker = " > " if i == self._pair_idx else "   "
-                lines += f"{marker}[bold]{i+1}[/] {name}\n"
-            lines += "\n   [bold]5[/] Reset All Calibration"
+                style = "bold" if i == self._pair_idx else ""
+                lines += f"{marker}[{style}]{i+1}  {name}[/{style}]\n"
+            reset_marker = " > " if self._pair_idx == len(PAIRS) else "   "
+            reset_style = "bold" if self._pair_idx == len(PAIRS) else ""
+            lines += f"\n{reset_marker}[{reset_style}]5  Reset All Calibration[/{reset_style}]"
             body.update(lines)
             inp.display = False
-            status.update("[dim]Press 1-4 to select pair, 5 to reset[/]")
+            status.update("[dim]↑↓ select  1-5 jump  Enter confirm  Esc cancel[/]")
 
         elif self._step == Step.LOW_ENTRY:
             pair_name = PAIRS[self._pair_idx][0]
@@ -270,6 +273,10 @@ class CalibrationScreen(ModalScreen[Optional[dict]]):
 
     def action_next_step(self) -> None:
         if self._step == Step.SELECT_PAIR:
+            if self._pair_idx < len(PAIRS):
+                _, self._ch_a, self._ch_b = PAIRS[self._pair_idx]
+                self._step = Step.LOW_ENTRY
+                self._show_step()
             return
 
         if self._step in (Step.LOW_ENTRY, Step.HIGH_ENTRY):
@@ -304,15 +311,23 @@ class CalibrationScreen(ModalScreen[Optional[dict]]):
     def on_key(self, event) -> None:
         if self._step != Step.SELECT_PAIR:
             return
-        key = event.character
-        if key in ("1", "2", "3", "4"):
-            idx = int(key) - 1
+        key = event.key
+        if key == "up":
+            self._pair_idx = max(0, self._pair_idx - 1)
+            self._show_step()
+            event.stop()
+        elif key == "down":
+            self._pair_idx = min(len(PAIRS), self._pair_idx + 1)
+            self._show_step()
+            event.stop()
+        elif event.character in ("1", "2", "3", "4"):
+            idx = int(event.character) - 1
             self._pair_idx = idx
             _, self._ch_a, self._ch_b = PAIRS[idx]
             self._step = Step.LOW_ENTRY
             self._show_step()
             event.stop()
-        elif key == "5":
+        elif event.character == "5" or (key == "enter" and self._pair_idx == len(PAIRS)):
             self.dismiss({"reset": True})
             event.stop()
 
