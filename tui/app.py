@@ -563,6 +563,7 @@ class SwitchingCircuitApp(App):
         self._probe = LatencyProbe()
         self._offset_worker_started = False
         self._last_probe_display_ns = 0
+        self._state_pending = False  # backpressure: skip if prior frame not consumed
         self._fleet_cache: list = []
         # Launch-time WiFi prescan: overlaps with auto-discovery so the
         # ConnectDialog can show nearby pi_SW# APs the moment it opens.
@@ -655,22 +656,27 @@ class SwitchingCircuitApp(App):
             )
 
     def _start_wifi_prescan(self) -> None:
-        """Kick off a WiFi scan in parallel with discovery so the dialog
-        has pi_SW# APs ready the moment it opens."""
+        """Start a periodic WiFi scan that keeps the fleet cache warm.
+        First scan runs immediately; subsequent scans every 45s so the
+        picker opens instantly with fresh data."""
         import threading
-        from time import monotonic
+        from time import monotonic, sleep
 
-        def _run() -> None:
-            try:
-                scan = wifi_scan.scan_pi_aps()
-            except Exception:
-                log.exception("prescan failed")
-                scan = None
-            with self._prescan_lock:
-                self._prescan_result = scan
-                self._prescan_at = monotonic()
+        def _loop() -> None:
+            while True:
+                try:
+                    scan = wifi_scan.scan_pi_aps()
+                except Exception:
+                    log.exception("prescan failed")
+                    scan = None
+                with self._prescan_lock:
+                    self._prescan_result = scan
+                    self._prescan_at = monotonic()
+                if scan and scan.aps:
+                    self._fleet_cache = scan.aps
+                sleep(45)
 
-        threading.Thread(target=_run, daemon=True, name="wifi-prescan").start()
+        threading.Thread(target=_loop, daemon=True, name="wifi-prescan").start()
 
     def _take_prescan(self, max_age_s: float = 60.0):
         """Return the prescan result if fresh, else None. Single-consumer."""
@@ -724,6 +730,7 @@ class SwitchingCircuitApp(App):
             self._update_connection_ui(ConnectionState.DISCONNECTED)
 
     def _do_connect(self, host: str, port: int) -> None:
+        self._probe.reset()
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
         conn_bar.host = f"{host}:{port}"
         conn_bar.conn_label = "Connecting..."
@@ -788,12 +795,13 @@ class SwitchingCircuitApp(App):
             if now - self._last_apply_time < interval:
                 return  # skip this frame
         self._last_apply_time = now
+        if self._state_pending:
+            return  # prior frame still in Textual's queue — skip this one
+        self._state_pending = True
         try:
             self.call_from_thread(self._apply_state, data)
         except Exception:
-            # App is shutting down (loop closed, no active app, etc.).
-            # Fire-and-forget broadcast — drop the frame silently.
-            pass
+            self._state_pending = False
 
     def _start_offset_worker(self) -> None:
         """Background thread that re-measures Pi↔Mac clock offset every 60s
@@ -833,6 +841,7 @@ class SwitchingCircuitApp(App):
         render pass instead of triggering 6+ separate refreshes.
         """
         from time import monotonic_ns
+        self._state_pending = False
         t_apply_start_ns = monotonic_ns()
 
         mode = data.get("mode", "idle")
@@ -922,15 +931,16 @@ class SwitchingCircuitApp(App):
             mascot = self.query_one("#mascot", Mascot)
             mascot.circuit_mode = mode
 
+        t_apply_end_ns = monotonic_ns()
+        self._probe.record(
+            t_emit_pi_ns=int(data.get("t_emit_ns", 0)),
+            t_recv_mac_ns=int(data.get("_t_recv_ns", t_apply_start_ns)),
+            t_apply_start_ns=t_apply_start_ns,
+            t_apply_end_ns=t_apply_end_ns,
+            t_plot_ns=t_plot_ns,
+            seq=int(data.get("bcast_seq", -1)),
+        )
         if self._probe.enabled:
-            t_apply_end_ns = monotonic_ns()
-            self._probe.record(
-                t_emit_pi_ns=int(data.get("t_emit_ns", 0)),
-                t_recv_mac_ns=int(data.get("_t_recv_ns", t_apply_start_ns)),
-                t_apply_start_ns=t_apply_start_ns,
-                t_apply_end_ns=t_apply_end_ns,
-                t_plot_ns=t_plot_ns,
-            )
             # Refresh the probe readout at most twice a second. Setting
             # probe_text fires a reactive watcher which triggers an extra
             # render pass per state event, making things worse when the
@@ -944,16 +954,23 @@ class SwitchingCircuitApp(App):
         s = self._probe.summary()
         if not s or s.get("_count", 0) == 0:
             return
+        net_p50 = s["net"][0]
         net_p95 = s["net"][1]
         q_p95 = s["queue"][1]
         apply_p95 = s["apply"][1]
+        total_p50 = s["total"][0]
         total_p95 = s["total"][1]
         ready = s.get("_offset_ready", False)
-        net_str = f"{net_p95:.1f}" if ready else "—"
+        hz = s.get("_hz", 0.0)
+        drops = s.get("_drops", 0)
+        net_str = f"{net_p50:.0f}/{net_p95:.0f}" if ready else "—/—"
         text = (
-            f"p95 {net_str}/{q_p95:.1f}/{apply_p95:.1f}ms "
-            f"(net/q/apply) tot {total_p95:.1f}ms"
+            f"{hz:.0f}Hz "
+            f"net:{net_str} q:{q_p95:.0f} apply:{apply_p95:.0f} "
+            f"tot:{total_p50:.0f}/{total_p95:.0f}ms"
         )
+        if drops > 0:
+            text += f" [{drops}drops]"
         try:
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             conn_bar.probe_text = text
@@ -1016,7 +1033,7 @@ class SwitchingCircuitApp(App):
 
     def _send_mode(self, mode: str) -> None:
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            self._client.set_mode(mode)
+            self._client.send_async({"cmd": "set_mode", "mode": mode})
 
     def action_toggle_run(self) -> None:
         new_mode = "charge" if self._circuit_mode == "idle" else "idle"
@@ -1120,13 +1137,13 @@ class SwitchingCircuitApp(App):
         """Toggle a single FET on/off. Only works in debug mode."""
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
             current = self._last_fets[index] if hasattr(self, "_last_fets") else False
-            self._client.set_fet(index, not current)
+            self._client.send_async({"cmd": "set_fet", "index": index, "on": not current})
 
     # -- Actions: Sequence ---------------------------------------------------
 
     def _send_sequence(self, seq: int) -> None:
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            self._client.set_sequence(seq)
+            self._client.send_async({"cmd": "set_sequence", "sequence": seq})
 
     def action_seq_1(self) -> None:
         if self._circuit_mode == "debug":
@@ -1169,7 +1186,7 @@ class SwitchingCircuitApp(App):
     def _adjust_freq(self, delta: float) -> None:
         new_freq = round(max(MIN_FREQ, min(MAX_FREQ, self._current_freq + delta)), 1)
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            self._client.set_frequency(new_freq)
+            self._client.send_async({"cmd": "set_frequency", "frequency": new_freq})
             self._current_freq = new_freq
 
     def action_freq_up_fine(self) -> None:
@@ -1202,7 +1219,7 @@ class SwitchingCircuitApp(App):
         plot = self.query_one("#sensor-plot", SensorPlot)
         plot.sensor_rate = rate
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            self._client.send_command({"cmd": "set_sensor_rate", "rate": rate})
+            self._client.send_async({"cmd": "set_sensor_rate", "rate": rate})
 
     def action_sensor_rate_up(self) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
@@ -1285,8 +1302,7 @@ class SwitchingCircuitApp(App):
         new_avg = self.INA_AVG_STEPS[(idx + 1) % len(self.INA_AVG_STEPS)]
         plot.ina_avg = new_avg
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            reply = self._client.send_command({"cmd": "set_ina226_avg", "avg": new_avg})
-            self._apply_profile_reply(plot, reply)
+            self._client.send_async({"cmd": "set_ina226_avg", "avg": new_avg})
 
     def action_cycle_bus_every(self) -> None:
         plot = self.query_one("#sensor-plot", SensorPlot)
@@ -1297,8 +1313,7 @@ class SwitchingCircuitApp(App):
         new_every = self.BUS_EVERY_STEPS[(idx + 1) % len(self.BUS_EVERY_STEPS)]
         plot.bus_every = new_every
         if self._client and self._client.connection_state == ConnectionState.CONNECTED:
-            reply = self._client.send_command({"cmd": "set_bus_every", "every": new_every})
-            self._apply_profile_reply(plot, reply)
+            self._client.send_async({"cmd": "set_bus_every", "every": new_every})
 
     LOG_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1800, 3600]
 

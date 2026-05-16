@@ -41,10 +41,10 @@ DEFAULT_AP_PASSWORD = "raspberry"
 # so we prefer CoreWLAN (via a tiny Swift helper) which does a real live scan.
 # The CoreWLAN scan sweeps all channels and can take 20-30s on dual-band radios.
 SCAN_TIMEOUT = 8.0            # system_profiler fallback — returns cached data
-SCAN_TIMEOUT_CORE = 35.0      # Swift + CoreWLAN live scan
-JOIN_TIMEOUT = 45.0           # networksetup can take a while on a cold first join
-GATEWAY_POLL_INTERVAL = 0.5
-GATEWAY_POLL_DEADLINE = 20.0  # how long to wait for AP_GATEWAY:AP_PORT TCP
+SCAN_TIMEOUT_CORE = 15.0      # Swift + CoreWLAN live scan (usually ~5-8s)
+JOIN_TIMEOUT = 20.0           # networksetup cold join
+GATEWAY_POLL_INTERVAL = 0.15
+GATEWAY_POLL_DEADLINE = 10.0  # how long to wait for AP_GATEWAY:AP_PORT TCP
 
 
 @dataclass(frozen=True)
@@ -439,7 +439,7 @@ def _wait_for_tcp(host: str, port: int, timeout_s: float) -> bool:
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         try:
-            with socket.create_connection((host, port), timeout=1.5):
+            with socket.create_connection((host, port), timeout=0.5):
                 return True
         except OSError:
             pass

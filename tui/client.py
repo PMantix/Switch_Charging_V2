@@ -7,6 +7,7 @@ and receives the ~15 Hz state stream in a background thread.
 
 import json
 import logging
+import queue
 import socket
 import threading
 import time
@@ -58,6 +59,11 @@ class PiClient:
         self._ping_t_server_ns: int = 0
         self._ping_t_recv_ns: int = 0
 
+        # Fire-and-forget send queue — UI thread drops commands here,
+        # a background thread drains them without blocking the event loop.
+        self._send_q: queue.Queue[Optional[bytes]] = queue.Queue(maxsize=32)
+        self._send_thread: Optional[threading.Thread] = None
+
     # -- Properties ----------------------------------------------------------
 
     @property
@@ -96,13 +102,14 @@ class PiClient:
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+            sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
             try:
                 sock.setsockopt(socket.IPPROTO_TCP, 0x10, 5)  # TCP_KEEPALIVE (macOS)
             except OSError:
                 pass
             sock.settimeout(5.0)
             sock.connect((host, port))
-            sock.settimeout(10.0)
+            sock.settimeout(3.0)
             self._sock = sock
             self._rfile = sock.makefile("r", encoding="utf-8")
             self._set_state(ConnectionState.CONNECTED)
@@ -125,6 +132,11 @@ class PiClient:
         """Cleanly close the connection."""
         self._stop_event.set()
         self._subscribed = False
+        # Drain + stop the async send thread
+        try:
+            self._send_q.put_nowait(None)
+        except queue.Full:
+            pass
         if self._sock:
             try:
                 self._sock.shutdown(socket.SHUT_RDWR)
@@ -192,6 +204,43 @@ class PiClient:
             log.warning("send_command failed: %s", exc)
             self._handle_disconnect()
             return {"ok": False, "error": str(exc)}
+
+    def send_async(self, cmd_dict: dict) -> None:
+        """Non-blocking send — drops the command on a queue so the UI thread
+        never waits on sendall. Silently drops if the queue is full."""
+        if self._state != ConnectionState.CONNECTED:
+            return
+        data = (json.dumps(cmd_dict) + "\n").encode("utf-8")
+        try:
+            self._send_q.put_nowait(data)
+        except queue.Full:
+            log.warning("send queue full, dropping command")
+        self._ensure_send_thread()
+
+    def _ensure_send_thread(self) -> None:
+        if self._send_thread is not None and self._send_thread.is_alive():
+            return
+        self._send_thread = threading.Thread(
+            target=self._send_drain, daemon=True, name="pi-send"
+        )
+        self._send_thread.start()
+
+    def _send_drain(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                data = self._send_q.get(timeout=1.0)
+            except queue.Empty:
+                if self._send_q.empty():
+                    break
+                continue
+            if data is None:
+                break
+            try:
+                with self._wlock:
+                    if self._sock:
+                        self._sock.sendall(data)
+            except (OSError, ConnectionError) as exc:
+                log.warning("async send failed: %s", exc)
 
     def subscribe(self) -> Optional[dict]:
         """Send the subscribe command to start the state stream."""
@@ -272,8 +321,8 @@ class PiClient:
                     self._handle_pong(data, t_recv_ns)
             except socket.timeout:
                 consecutive_timeouts += 1
-                if consecutive_timeouts >= 3:
-                    log.warning("No data for %ds — connection dead", consecutive_timeouts * 10)
+                if consecutive_timeouts >= 2:
+                    log.warning("No data for %ds — connection dead", consecutive_timeouts * 3)
                     self._handle_disconnect()
                     break
             except (OSError, ConnectionError, json.JSONDecodeError) as exc:

@@ -21,6 +21,7 @@ from typing import Iterable
 
 
 WINDOW = 100  # rolling samples per timer
+HZ_WINDOW = 30  # samples for Hz measurement
 
 
 class LatencyProbe:
@@ -37,6 +38,13 @@ class LatencyProbe:
         self._offset_set: bool = False
         self._enabled: bool = False
         self._lock = threading.Lock()
+
+        # Hz / jitter / drop tracking (always active, cheap)
+        self._inter_frame: deque[int] = deque(maxlen=HZ_WINDOW)
+        self._last_recv_ns: int = 0
+        self._frame_count: int = 0
+        self._drop_count: int = 0
+        self._last_seq: int = -1
 
     # -- control ------------------------------------------------------------
 
@@ -57,6 +65,20 @@ class LatencyProbe:
     def offset_set(self) -> bool:
         return self._offset_set
 
+    def reset(self) -> None:
+        """Clear all accumulators (e.g. on reconnect)."""
+        with self._lock:
+            self._net.clear()
+            self._queue.clear()
+            self._apply.clear()
+            self._plot.clear()
+            self._total.clear()
+            self._inter_frame.clear()
+            self._last_recv_ns = 0
+            self._frame_count = 0
+            self._drop_count = 0
+            self._last_seq = -1
+
     # -- recording ----------------------------------------------------------
 
     def record(
@@ -66,15 +88,35 @@ class LatencyProbe:
         t_apply_start_ns: int,
         t_apply_end_ns: int,
         t_plot_ns: int,
+        seq: int = -1,
     ) -> None:
         """Record timers from one state event. Safe to call from UI thread."""
+        with self._lock:
+            # Hz / inter-frame tracking (always, even when display is off)
+            self._frame_count += 1
+            if self._last_recv_ns > 0:
+                gap = t_recv_mac_ns - self._last_recv_ns
+                if gap > 0:
+                    self._inter_frame.append(gap)
+            self._last_recv_ns = t_recv_mac_ns
+
+            # Drop detection via seq gaps
+            if seq >= 0 and self._last_seq >= 0:
+                expected = (self._last_seq + 1) & 0xFFFFFFFF
+                if seq != expected:
+                    gap_size = (seq - self._last_seq) & 0xFFFFFFFF
+                    if gap_size < 10000:
+                        self._drop_count += int(gap_size - 1)
+            if seq >= 0:
+                self._last_seq = seq
+
         if not self._enabled:
             return
+
         with self._lock:
             offset = self._offset_ns
             ready = self._offset_set
-        # net latency requires offset; if not yet set, store 0 so the
-        # rest of the numbers are still visible
+
         if ready and t_emit_pi_ns > 0:
             net = max(0, t_recv_mac_ns - t_emit_pi_ns - offset)
         else:
@@ -103,7 +145,7 @@ class LatencyProbe:
         return (p50 / 1e6, p95 / 1e6, mx / 1e6)
 
     def summary(self) -> dict:
-        """Return {timer: (p50_ms, p95_ms, max_ms)} for display."""
+        """Return {timer: (p50_ms, p95_ms, max_ms)} plus hz/jitter/drops."""
         with self._lock:
             snap = {
                 "net": list(self._net),
@@ -114,7 +156,28 @@ class LatencyProbe:
             }
             n = len(self._total)
             ready = self._offset_set
+            inter = list(self._inter_frame)
+            drops = self._drop_count
+            frames = self._frame_count
+
         out = {k: self._stats_ms(v) for k, v in snap.items()}
         out["_count"] = n
         out["_offset_ready"] = ready
+        out["_drops"] = drops
+        out["_frames"] = frames
+
+        # Effective Hz from inter-frame intervals
+        if inter:
+            mean_ns = sum(inter) / len(inter)
+            out["_hz"] = 1e9 / mean_ns if mean_ns > 0 else 0.0
+            sorted_inter = sorted(inter)
+            p50_ns = sorted_inter[len(sorted_inter) // 2]
+            p95_ns = sorted_inter[min(len(sorted_inter) - 1, int(0.95 * len(sorted_inter)))]
+            out["_jitter_p50_ms"] = p50_ns / 1e6
+            out["_jitter_p95_ms"] = p95_ns / 1e6
+        else:
+            out["_hz"] = 0.0
+            out["_jitter_p50_ms"] = 0.0
+            out["_jitter_p95_ms"] = 0.0
+
         return out

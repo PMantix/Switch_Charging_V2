@@ -517,6 +517,7 @@ class CommandServer:
         """Push state snapshots to all subscribers when fresh sensor data arrives."""
         from time import monotonic
         last_broadcast = 0.0
+        bcast_seq = 0
         while not self._stop_event.is_set():
             # Wait for fresh sensor data, but enforce minimum interval
             min_interval = 1.0 / self._broadcast_hz
@@ -540,23 +541,20 @@ class CommandServer:
             # thread) at the full sensor rate — not here. The broadcast
             # loop is purely for pushing state to TUI subscribers.
             status = self._mc.get_status()
-            payload = {"event": "state", "t_emit_ns": time.monotonic_ns(), **status}
+            bcast_seq += 1
+            payload = {"event": "state", "t_emit_ns": time.monotonic_ns(),
+                       "bcast_seq": bcast_seq, **status}
 
             dead = []
             line = json.dumps(payload, separators=(",", ":")) + "\n"
             line_bytes = line.encode("utf-8")
             for sock in subscribers:
                 try:
-                    # Send with a generous timeout: transient WiFi stalls or
-                    # Mac-side render blips of 100-500ms are normal and
-                    # shouldn't murder the TCP stream. 50ms was killing
-                    # healthy connections on any brief hiccup. If a client
-                    # really is hung for >2s, we do want to evict it — so
-                    # keep the timeout as a kill signal, just not a
-                    # hair-trigger one. (We can't retry on timeout: sendall
-                    # may have partially written, which would corrupt the
-                    # JSON framing on the next send.)
-                    sock.settimeout(0.5)
+                    # 200ms send timeout: tight enough to not stall the
+                    # broadcast loop for other subscribers, loose enough
+                    # that transient WiFi jitter doesn't murder healthy
+                    # connections.
+                    sock.settimeout(0.2)
                     sock.sendall(line_bytes)
                 except socket.timeout:
                     log.warning(

@@ -41,15 +41,18 @@ Compute `<new-ssid>` = `<new-hostname>` with `-` replaced by `_` (e.g. `pi-SW3` 
    ```
    Takes effect for the fleet code after reboot (step 10). Does not drop the SSH session.
 
-3. **Create the NetworkManager AP profile** (SSID and profile name both = `<new-ssid>`):
+3. **Create the NetworkManager AP profile** (SSID and profile name both = `<new-ssid>`).
+   Assign a 5GHz channel based on the Pi number to avoid co-channel interference:
+   SW1→36, SW2→40, SW3→44, SW4→48. These are all in the UNII-1 band (no DFS/radar).
    ```
    ssh pi@<current-ip> "sudo nmcli connection add \
      type wifi ifname wlan0 con-name <new-ssid> ssid <new-ssid> \
      mode ap ipv4.method shared \
+     wifi.band a wifi.channel <channel> \
      wifi-sec.key-mgmt wpa-psk wifi-sec.psk '<AP_PASSWORD>' \
      connection.autoconnect no"
    ```
-   `autoconnect=no` is deliberate — `server/ap_fallback.py` explicitly activates the profile at boot, and `server/power_button.py` toggles it on double-press. NM auto-activation would race with that logic.
+   `wifi.band=a` selects 5GHz. `autoconnect=no` is deliberate — `server/ap_fallback.py` explicitly activates the profile at boot, and `server/power_button.py` toggles it on double-press. NM auto-activation would race with that logic.
 
 4. **Add `pi` to `netdev`** so `nmcli connection up/down` works without sudo (polkit rule on Debian):
    ```
