@@ -47,6 +47,7 @@ class LeftPanel(Widget):
                 ("  T  ", "Cycle target"),
                 (" ,/. ", "I_enter -/+1mA"),
                 (" ;/' ", "I_exit -/+0.5mA"),
+                (" </> ", "CC setpoint"),
             ]),
             ("CALIBRATE", [
                 ("  B  ", "INA226 Cal Wizard"),

@@ -423,6 +423,14 @@ class CommandServer:
                 self._mc.set_auto_follow_target(target)
                 return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
 
+            elif cmd == "auto_follow_set_cc_setpoint":
+                try:
+                    amps = float(msg["cc_setpoint_a"])
+                except (KeyError, TypeError, ValueError) as e:
+                    return {"ok": False, "error": f"Need numeric cc_setpoint_a: {e}"}
+                self._mc._auto_follow.set_cc_setpoint(amps)
+                return {"ok": True, "auto_follow": self._mc.get_auto_follow_status()}
+
             # -- schedule monitor (passive PLAN/OBSERVED tracker) ------------
 
             elif cmd == "schedule_monitor_status":

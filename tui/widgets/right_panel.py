@@ -230,6 +230,9 @@ class RightPanel(Widget):
         i_enter_ma = af.get("i_enter_a", 0.0) * 1000.0
         i_exit_ma = af.get("i_exit_a", 0.0) * 1000.0
         avg_i_ma = af.get("avg_current_a", 0.0) * 1000.0
+        cc_ma = af.get("cc_setpoint_a", 0.0) * 1000.0
+        rec_enter_ma = af.get("rec_enter_a", 0.0) * 1000.0
+        rec_exit_ma = af.get("rec_exit_a", 0.0) * 1000.0
 
         t.append(" Enable ", style="dim")
         if enabled:
@@ -260,6 +263,23 @@ class RightPanel(Widget):
         t.append(" / ", style="dim")
         t.append(" ' ", style="bold white on dark_blue")
         t.append("\n")
+
+        # CC setpoint + recommendations
+        t.append(" CC set ", style="dim")
+        if cc_ma > 0:
+            t.append(f" {cc_ma:5.0f} mA ", style="bold white")
+        else:
+            t.append("   off  ", style="dim")
+        t.append("  ", style="dim")
+        t.append(" < ", style="bold white on dark_blue")
+        t.append(" / ", style="dim")
+        t.append(" > ", style="bold white on dark_blue")
+        t.append("\n")
+
+        if cc_ma > 0:
+            t.append("  rec   ", style="dim")
+            t.append(f" {rec_enter_ma:.0f}/{rec_exit_ma:.0f} mA", style="italic yellow")
+            t.append("\n")
 
         t.append(" Live i ", style="dim")
         t.append(f" {avg_i_ma:+6.2f} mA\n", style="white")

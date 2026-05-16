@@ -63,6 +63,7 @@ class AutoFollow:
         self._is_active = False
         self._latest_avg_i = 0.0
         self._latest_avg_v = 0.0
+        self._cc_setpoint_a = 0.0  # user-specified CC setpoint for recommendations
 
         self._loop_period = 1.0 / float(loop_hz)
         self._thread: Optional[threading.Thread] = None
@@ -129,6 +130,11 @@ class AutoFollow:
         log.info("AutoFollow: thresholds enter=%.4f A exit=%.4f A",
                  i_enter_a, i_exit_a)
 
+    def set_cc_setpoint(self, amps: float):
+        with self._lock:
+            self._cc_setpoint_a = max(0.0, float(amps))
+        log.info("AutoFollow: cc_setpoint=%.4f A", amps)
+
     def set_target_mode(self, mode: str):
         """Update which switching mode auto-follow applies when active.
 
@@ -151,7 +157,8 @@ class AutoFollow:
 
     def get_status(self) -> dict:
         with self._lock:
-            return {
+            cc = self._cc_setpoint_a
+            status = {
                 "enabled": self._enabled,
                 "i_enter_a": self._i_enter_a,
                 "i_exit_a": self._i_exit_a,
@@ -159,7 +166,12 @@ class AutoFollow:
                 "active": self._is_active,
                 "avg_current_a": round(self._latest_avg_i, 6),
                 "avg_voltage_v": round(self._latest_avg_v, 4),
+                "cc_setpoint_a": cc,
             }
+            if cc > 0:
+                status["rec_enter_a"] = round(cc * 0.35, 6)
+                status["rec_exit_a"] = round(cc * 0.15, 6)
+            return status
 
     @property
     def enabled(self) -> bool:

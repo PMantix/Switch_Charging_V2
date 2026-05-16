@@ -109,12 +109,23 @@ class ModeController:
         with self._lock:
             if mode == self._mode:
                 return self._mode
-            log.info("Mode transition: %s -> %s", self._mode.value, mode.value)
+            prev = self._mode
+            log.info("Mode transition: %s -> %s", prev.value, mode.value)
 
-            # Dead-time interlock: all off -> wait -> new state
             self._engine.pause()
-            self._gpio.all_off()
-            sleep(DEAD_TIME)
+
+            # Auto-follow transitions between discharge (all-on /
+            # transparent) and switching modes only widen or narrow the
+            # set of conducting paths — no shoot-through risk either
+            # way.  Skip the dead-time all-off gap so the cycler never
+            # sees an open circuit.
+            skip_dead = (
+                (prev == Mode.DISCHARGE and mode in (Mode.CHARGE, Mode.PULSE_CHARGE))
+                or (prev in (Mode.CHARGE, Mode.PULSE_CHARGE) and mode == Mode.DISCHARGE)
+            )
+            if not skip_dead:
+                self._gpio.all_off()
+                sleep(DEAD_TIME)
 
             if mode == Mode.IDLE:
                 pass

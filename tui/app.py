@@ -530,6 +530,8 @@ class SwitchingCircuitApp(App):
         Binding("full_stop", "auto_follow_enter_up", "I_enter +1mA", show=False),
         Binding("semicolon", "auto_follow_exit_down", "I_exit -0.5mA", show=False),
         Binding("apostrophe", "auto_follow_exit_up", "I_exit +0.5mA", show=False),
+        Binding("less_than_sign", "auto_follow_cc_down", "CC setpoint -", show=False),
+        Binding("greater_than_sign", "auto_follow_cc_up", "CC setpoint +", show=False),
         Binding("M", "restart_monitor", "Restart monitor clock", show=False),
         Binding("C", "client_mode", "Client Mode", show=False),
         Binding("D", "toggle_probe", "Latency", show=False),
@@ -1526,18 +1528,11 @@ class SwitchingCircuitApp(App):
     # -- Auto-follow (current-driven mode switching) ------------------------
 
     def _send_auto_follow(self, payload: dict) -> None:
-        """Send an auto_follow_* command. Send-and-forget: the next state
-        broadcast (~33 ms later) will carry the updated status, and the
-        right-panel reactive picks it up. We don't try to read the
-        synchronous response because PiClient.send_command can't
-        correlate replies back to the caller while subscribed — it
-        returns a {"ok": True} placeholder."""
+        """Send an auto_follow_* command. Fire-and-forget: the next state
+        broadcast (~33 ms later) carries the updated status."""
         if not self._client or self._client.connection_state != ConnectionState.CONNECTED:
             return
-        try:
-            self._client.send_command(payload)
-        except Exception as e:
-            self.notify(str(e), title="Auto-Follow", severity="error")
+        self._client.send_async(payload)
 
     def action_auto_follow_toggle(self) -> None:
         new = not bool(self._latest_auto_follow.get("enabled", False))
@@ -1571,6 +1566,26 @@ class SwitchingCircuitApp(App):
             "i_enter_a": round(i_enter, 6),
             "i_exit_a": round(i_exit, 6),
         })
+
+    CC_SETPOINT_STEPS = [
+        0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0,
+    ]
+
+    def action_auto_follow_cc_up(self) -> None:
+        af = self._latest_auto_follow or {}
+        cur = af.get("cc_setpoint_a", 0.0)
+        for s in self.CC_SETPOINT_STEPS:
+            if s > cur + 0.0001:
+                self._send_auto_follow({"cmd": "auto_follow_set_cc_setpoint", "cc_setpoint_a": s})
+                return
+
+    def action_auto_follow_cc_down(self) -> None:
+        af = self._latest_auto_follow or {}
+        cur = af.get("cc_setpoint_a", 0.0)
+        for s in reversed(self.CC_SETPOINT_STEPS):
+            if s < cur - 0.0001:
+                self._send_auto_follow({"cmd": "auto_follow_set_cc_setpoint", "cc_setpoint_a": s})
+                return
 
     # -- Network mode (client <-> AP) ---------------------------------------
 

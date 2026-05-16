@@ -127,8 +127,8 @@ DEAD_TIME = 0.002    # 2 ms
 # ---------------------------------------------------------------------------
 # Auto-follow (current-threshold-driven mode switcher)
 # ---------------------------------------------------------------------------
-AUTO_FOLLOW_I_ENTER_A = 0.005    # A — enter switching when |i| rises above this
-AUTO_FOLLOW_I_EXIT_A = 0.002     # A — drop back to transparent below this (or i<=0)
+AUTO_FOLLOW_I_ENTER_A = 0.050    # A — enter switching when |i| rises above this
+AUTO_FOLLOW_I_EXIT_A = 0.020     # A — drop back to transparent below this (or i<=0)
 AUTO_FOLLOW_LOOP_HZ = 15.0       # controller poll rate
 
 # ---------------------------------------------------------------------------
