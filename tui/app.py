@@ -566,6 +566,7 @@ class SwitchingCircuitApp(App):
         self._offset_worker_started = False
         self._last_probe_display_ns = 0
         self._state_pending = False  # backpressure: skip if prior frame not consumed
+        self._current_pi_name = ""   # e.g. "SW4" — derived from SSID
         self._fleet_cache: list = []
         # Launch-time WiFi prescan: overlaps with auto-discovery so the
         # ConnectDialog can show nearby pi_SW# APs the moment it opens.
@@ -733,8 +734,13 @@ class SwitchingCircuitApp(App):
 
     def _do_connect(self, host: str, port: int) -> None:
         self._probe.reset()
+        if not self._current_pi_name:
+            ssid = wifi_scan.current_ssid() or ""
+            if ssid.startswith("pi_"):
+                self._current_pi_name = ssid.replace("pi_", "")
+        display_host = self._current_pi_name or f"{host}:{port}"
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
-        conn_bar.host = f"{host}:{port}"
+        conn_bar.host = display_host
         conn_bar.conn_label = "Connecting..."
         self._update_status_connection(False, "Connecting...")
 
@@ -1010,16 +1016,18 @@ class SwitchingCircuitApp(App):
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
         rpanel = self.query_one("#right-panel", RightPanel)
 
+        name = self._current_pi_name
         if state == ConnectionState.CONNECTED:
             conn_bar.connected = True
-            conn_bar.conn_label = "Connected"
+            conn_bar.conn_label = f"Connected — {name}" if name else "Connected"
             rpanel.connected = True
-            rpanel.conn_status = "Connected"
+            rpanel.conn_status = f"Connected — {name}" if name else "Connected"
         elif state == ConnectionState.CONNECTING:
             conn_bar.connected = False
-            conn_bar.conn_label = "Connecting..."
+            label = f"Connecting to {name}..." if name else "Connecting..."
+            conn_bar.conn_label = label
             rpanel.connected = False
-            rpanel.conn_status = "Connecting..."
+            rpanel.conn_status = label
         else:
             conn_bar.connected = False
             conn_bar.conn_label = "Disconnected"
@@ -1675,7 +1683,7 @@ class SwitchingCircuitApp(App):
     def _on_pi_picker_result(self, ssid: Optional[str]) -> None:
         if not ssid:
             return
-        # WiFi already switched by the picker — reconnect to the gateway
+        self._current_pi_name = ssid.replace("pi_", "") if ssid.startswith("pi_") else ssid
         self._switch_pi(AP_GATEWAY)
 
     def _switch_pi(self, new_host: str) -> None:
