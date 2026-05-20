@@ -37,7 +37,7 @@ from tui.widgets.schedule_screen import SchedulePickerScreen, SchedulePreviewScr
 log = logging.getLogger(__name__)
 
 MIN_FREQ = 0.1
-MAX_FREQ = 300.0
+MAX_FREQ = 1000.0
 
 CIRCUIT_MODES = ["idle", "charge", "discharge", "pulse_charge", "debug"]
 

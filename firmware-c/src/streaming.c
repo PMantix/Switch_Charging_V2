@@ -48,8 +48,8 @@ static bool        s_burst_active = false;
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-static inline uint32_t ticks_us_now_u32(void) {
-    return (uint32_t)(time_us_64() & 0xFFFFFFFFull);
+static inline uint64_t ticks_us_now(void) {
+    return time_us_64();
 }
 
 static bool decide_read_bus(void) {
@@ -66,17 +66,13 @@ static bool decide_read_bus(void) {
 // anchors recorded rows to.
 static void emit_d_line(bool read_bus) {
     ina226_reading_t r[INA226_NUM_SENSORS];
-    uint32_t t_us = ticks_us_now_u32();
+    uint64_t t_us = ticks_us_now();
     ina226_read_all_streaming(read_bus, r);
-    // Bump seq before formatting so the emitted value matches the row.
-    // Wraps at 2^32 (the host parser handles wrap; ~5.4 hr at 100 Hz,
-    // ~33 min at 800 Hz).
     s_seq = (s_seq + 1u) & 0xFFFFFFFFu;
     // Wire format MUST match server/gpio_driver.py:_handle_stream_line:
     //   D <t_us> <seq> <P1v> <P1i> <P2v> <P2i> <N1v> <N1i> <N2v> <N2i>\n
-    // 11 whitespace fields total, 4-decimal voltages, 6-decimal currents.
-    printf("D %lu %lu %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n",
-           (unsigned long)t_us,
+    printf("D %llu %lu %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n",
+           (unsigned long long)t_us,
            (unsigned long)s_seq,
            (double)r[0].bus_v, (double)r[0].current_a,
            (double)r[1].bus_v, (double)r[1].current_a,
@@ -196,8 +192,8 @@ uint32_t streaming_profile(uint32_t n,
     uint64_t t4 = time_us_64();
     for (uint32_t i = 0; i < n; ++i) {
         snprintf(scratch, sizeof(scratch),
-                 "D %lu %lu %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n",
-                 (unsigned long)ticks_us_now_u32(),
+                 "D %llu %lu %.4f %.6f %.4f %.6f %.4f %.6f %.4f %.6f\n",
+                 (unsigned long long)ticks_us_now(),
                  (unsigned long)i,
                  1.0, 0.001, 1.0, 0.001, 1.0, 0.001, 1.0, 0.001);
     }

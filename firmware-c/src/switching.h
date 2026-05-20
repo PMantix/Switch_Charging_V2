@@ -59,7 +59,7 @@ uint32_t switching_get_period_us(void);
 //   - the firmware ticks_us at the moment state 0 went on the pins is
 //     captured into *out_anchor_ticks_us (used by the OK G reply for
 //     Pi-side clock anchoring; see main.py:_switching_start docstring).
-bool switching_start(uint32_t *out_anchor_ticks_us);
+bool switching_start(uint64_t *out_anchor_ticks_us);
 
 // Halt periodic switching. All FETs go off. Idempotent.
 void switching_halt(void);

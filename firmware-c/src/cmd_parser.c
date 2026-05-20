@@ -225,10 +225,8 @@ static void cmd_L(size_t nt, const token_t *tk) {
 }
 
 static void cmd_P(void) {
-    // OK P <ticks_us>. ticks_us is u32-wrapped time_us_64 to match the
-    // MicroPython firmware's time.ticks_us() semantics.
-    uint32_t t = (uint32_t)(time_us_64() & 0xFFFFFFFFull);
-    printf("OK P %lu\n", (unsigned long)t);
+    uint64_t t = time_us_64();
+    printf("OK P %llu\n", (unsigned long long)t);
 }
 
 static void cmd_B(size_t nt, const token_t *tk) {
@@ -422,17 +420,16 @@ static void cmd_F(size_t nt, const token_t *tk) {
 static void cmd_G(size_t nt, const token_t *tk) {
     (void)nt; (void)tk;  // optional ticks_us hint per brief; firmware
                           // ignores it (no use today, would be advisory).
-    uint32_t anchor = 0;
+    uint64_t anchor = 0;
     if (!switching_start(&anchor)) {
         puts("ERR G requires C and F first");
         return;
     }
     neopixel_set_rgb(4, 0, 4);
-    // OK G <period_us> <n_states> <anchor_ticks_us>  (matches main.py).
-    printf("OK G %lu %u %lu\n",
+    printf("OK G %lu %u %llu\n",
            (unsigned long)switching_get_period_us(),
            (unsigned)switching_cycle_len(),
-           (unsigned long)anchor);
+           (unsigned long long)anchor);
 }
 
 static void cmd_H(void) {

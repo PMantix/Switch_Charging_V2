@@ -142,7 +142,7 @@ bool switching_set_period_us(uint32_t period_us) {
     if (s_running) {
         // Re-arm at the new period; preserve s_seq_idx so the cycle
         // continues from where it was. (Matches the F branch in main.py.)
-        uint32_t anchor = 0;
+        uint64_t anchor = 0;
         switching_start(&anchor);
         (void)anchor;
     }
@@ -172,7 +172,7 @@ static bool tick_isr(struct repeating_timer *t) {
 // ---------------------------------------------------------------------------
 // Start / halt
 // ---------------------------------------------------------------------------
-bool switching_start(uint32_t *out_anchor_ticks_us) {
+bool switching_start(uint64_t *out_anchor_ticks_us) {
     if (s_seq_len == 0 || s_period_us == 0) return false;
 
     // Apply state 0 (or whatever index we're holding) FIRST, then capture
@@ -180,8 +180,8 @@ bool switching_start(uint32_t *out_anchor_ticks_us) {
     // the long comment on _switching_start in main.py for why this
     // ordering matters for Pi-side step labelling.
     apply_packed_inline(s_seq[s_seq_idx]);
-    uint32_t anchor = (uint32_t)(time_us_64() & 0xFFFFFFFFull);
-    s_last_start_ticks_us = anchor;
+    uint64_t anchor = time_us_64();
+    s_last_start_ticks_us = (uint32_t)(anchor & 0xFFFFFFFFull);
 
     if (s_timer_armed) {
         cancel_repeating_timer(&s_timer);
