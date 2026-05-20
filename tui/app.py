@@ -1594,12 +1594,24 @@ class SwitchingCircuitApp(App):
         0.0, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1.0, 2.0, 5.0,
     ]
 
+    def _set_cc_setpoint(self, cc_a: float) -> None:
+        """Set CC setpoint and auto-apply recommended enter/exit thresholds."""
+        self._send_auto_follow({"cmd": "auto_follow_set_cc_setpoint", "cc_setpoint_a": cc_a})
+        if cc_a > 0:
+            i_enter = round(cc_a * 0.35, 6)
+            i_exit = round(cc_a * 0.15, 6)
+            self._send_auto_follow({
+                "cmd": "auto_follow_set_thresholds",
+                "i_enter_a": i_enter,
+                "i_exit_a": i_exit,
+            })
+
     def action_auto_follow_cc_up(self) -> None:
         af = self._latest_auto_follow or {}
         cur = af.get("cc_setpoint_a", 0.0)
         for s in self.CC_SETPOINT_STEPS:
             if s > cur + 0.0001:
-                self._send_auto_follow({"cmd": "auto_follow_set_cc_setpoint", "cc_setpoint_a": s})
+                self._set_cc_setpoint(s)
                 return
 
     def action_auto_follow_cc_down(self) -> None:
@@ -1607,7 +1619,7 @@ class SwitchingCircuitApp(App):
         cur = af.get("cc_setpoint_a", 0.0)
         for s in reversed(self.CC_SETPOINT_STEPS):
             if s < cur - 0.0001:
-                self._send_auto_follow({"cmd": "auto_follow_set_cc_setpoint", "cc_setpoint_a": s})
+                self._set_cc_setpoint(s)
                 return
 
     # -- Network mode (client <-> AP) ---------------------------------------
