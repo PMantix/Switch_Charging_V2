@@ -140,6 +140,14 @@ class SequenceEngine:
             self._gpio.stop_switching()
         log.debug("SequenceEngine paused")
 
+    def pause_silent(self):
+        """Mark engine as paused without sending H (all-off) to the RP2040.
+        Used for seamless transitions where FETs must stay conducting."""
+        with self._lock:
+            self._paused = True
+            self._cancel_flush_locked()
+        log.debug("SequenceEngine paused (silent)")
+
     def resume(self):
         """Program the current cycle + period and start switching.
         Resume is a user-initiated action — skip debounce, fire immediately.

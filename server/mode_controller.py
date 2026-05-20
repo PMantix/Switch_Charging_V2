@@ -112,37 +112,48 @@ class ModeController:
             prev = self._mode
             log.info("Mode transition: %s -> %s", prev.value, mode.value)
 
-            self._engine.pause()
-
             # Auto-follow transitions between discharge (all-on /
             # transparent) and switching modes only widen or narrow the
-            # set of conducting paths — no shoot-through risk either
-            # way.  Skip the dead-time all-off gap so the cycler never
-            # sees an open circuit.
+            # set of conducting paths — no shoot-through risk.  Skip
+            # the engine pause (which sends H = all-off) and dead-time
+            # gap so the cycler NEVER sees an open circuit.
             skip_dead = (
                 (prev == Mode.DISCHARGE and mode in (Mode.CHARGE, Mode.PULSE_CHARGE))
                 or (prev in (Mode.CHARGE, Mode.PULSE_CHARGE) and mode == Mode.DISCHARGE)
             )
-            if not skip_dead:
+
+            if skip_dead:
+                # Seamless: go directly from current FET state to new
+                # state without any all-off intermediate.
+                if mode == Mode.DISCHARGE:
+                    # Set all FETs on first (seamless), then halt the
+                    # firmware switching timer so it doesn't override.
+                    self._gpio.all_on()
+                    self._gpio.stop_switching()
+                    self._engine.pause_silent()
+                elif mode == Mode.CHARGE:
+                    self._engine.set_pulse_mode(False)
+                    self._engine.resume()
+                elif mode == Mode.PULSE_CHARGE:
+                    self._engine.set_pulse_mode(True)
+                    self._engine.resume()
+            else:
+                self._engine.pause()
                 self._gpio.all_off()
                 sleep(DEAD_TIME)
 
-            if mode == Mode.IDLE:
-                pass
-
-            elif mode == Mode.CHARGE:
-                self._engine.set_pulse_mode(False)
-                self._engine.resume()
-
-            elif mode == Mode.DISCHARGE:
-                self._gpio.all_on()
-
-            elif mode == Mode.PULSE_CHARGE:
-                self._engine.set_pulse_mode(True)
-                self._engine.resume()
-
-            elif mode == Mode.DEBUG:
-                self._debug_step = -1  # -1 = manual, 0-3 = stepping
+                if mode == Mode.IDLE:
+                    pass
+                elif mode == Mode.CHARGE:
+                    self._engine.set_pulse_mode(False)
+                    self._engine.resume()
+                elif mode == Mode.DISCHARGE:
+                    self._gpio.all_on()
+                elif mode == Mode.PULSE_CHARGE:
+                    self._engine.set_pulse_mode(True)
+                    self._engine.resume()
+                elif mode == Mode.DEBUG:
+                    self._debug_step = -1
 
             self._mode = mode
             return self._mode
