@@ -76,6 +76,16 @@ void switching_set_direct(uint8_t p1, uint8_t p2, uint8_t n1, uint8_t n2) {
     gpio_put(PIN_N2, n2 ? 1 : 0);
 }
 
+void switching_set_direct_no_halt(uint8_t p1, uint8_t p2, uint8_t n1, uint8_t n2) {
+    // Set FET pins without halting the switching timer.  If the timer
+    // is running it will override these pins on its next tick — caller
+    // must reprogram the cycle first if they want the state to stick.
+    gpio_put(PIN_P1, p1 ? 1 : 0);
+    gpio_put(PIN_P2, p2 ? 1 : 0);
+    gpio_put(PIN_N1, n1 ? 1 : 0);
+    gpio_put(PIN_N2, n2 ? 1 : 0);
+}
+
 void switching_get_states(uint8_t out[4]) {
     out[0] = (uint8_t)gpio_get(PIN_P1);
     out[1] = (uint8_t)gpio_get(PIN_P2);
@@ -104,6 +114,22 @@ bool switching_program_cycle(const uint8_t *states, uint8_t n) {
     for (uint8_t i = 0; i < n; ++i) s_seq[i] = states[i];
     s_seq_len = n;
     s_seq_idx = 0;
+    restore_interrupts(prim);
+    return true;
+}
+
+bool switching_program_cycle_live(const uint8_t *states, uint8_t n) {
+    if (n < 1 || n > CYCLE_MAX_STATES) return false;
+    for (uint8_t i = 0; i < n; ++i) {
+        if (states[i] > 15) return false;
+    }
+    // Swap the cycle buffer without halting — the ISR keeps running and
+    // picks up the new sequence on its next tick.  FETs stay in whatever
+    // state the ISR last applied; no all-off gap.
+    uint32_t prim = save_and_disable_interrupts();
+    for (uint8_t i = 0; i < n; ++i) s_seq[i] = states[i];
+    s_seq_len = n;
+    if (s_seq_idx >= n) s_seq_idx = 0;
     restore_interrupts(prim);
     return true;
 }

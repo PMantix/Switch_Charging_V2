@@ -487,7 +487,7 @@ class GPIODriver:
 
         `packed_states` is an iterable of ints (each 0-15) where bits are
         P1<<3 | P2<<2 | N1<<1 | N2. Firmware resets its step index to 0
-        on receipt.
+        on receipt.  NOTE: halts the switching timer and turns all FETs off.
         """
         parts = [str(int(s) & 0xF) for s in packed_states]
         if not parts:
@@ -496,6 +496,24 @@ class GPIODriver:
         resp = self._send(cmd)
         if resp and not resp.startswith("OK"):
             log.warning("RP2040 C error: %s", resp)
+
+    def program_sequence_live(self, packed_states):
+        """Reprogram the switching cycle without halting — FETs stay in
+        whatever state the ISR last applied.  No all-off gap."""
+        parts = [str(int(s) & 0xF) for s in packed_states]
+        if not parts:
+            raise ValueError("program_sequence_live requires at least one state")
+        cmd = "E " + str(len(parts)) + " " + " ".join(parts)
+        resp = self._send(cmd)
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 E error: %s", resp)
+
+    def all_on_no_halt(self):
+        """Set all FETs on without halting the switching timer."""
+        resp = self._send("Y 1 1 1 1")
+        self._fet_states = [True, True, True, True]
+        if resp and not resp.startswith("OK"):
+            log.warning("RP2040 Y error: %s", resp)
 
     def set_step_period_us(self, period_us):
         """Set the per-step period in microseconds. If switching is running,

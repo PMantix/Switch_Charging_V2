@@ -351,6 +351,56 @@ static void cmd_C(size_t nt, const token_t *tk) {
     printf("OK C %d\n", n);
 }
 
+static void cmd_E(size_t nt, const token_t *tk) {
+    // E = live cycle reprogram (same syntax as C, no halt)
+    if (nt < 2) { puts("ERR E requires count: E <n> <s1> ... <sn>"); return; }
+    int n;
+    if (parse_int_tok(&tk[1], &n) != 0) {
+        puts("ERR E count must be integer");
+        return;
+    }
+    if (n < 1 || n > (int)CYCLE_MAX_STATES) {
+        printf("ERR E count must be 1..%u\n", (unsigned)CYCLE_MAX_STATES);
+        return;
+    }
+    if ((int)nt != 2 + n) {
+        printf("ERR E expected %d states, got %d\n", n, (int)nt - 2);
+        return;
+    }
+    uint8_t states[CYCLE_MAX_STATES];
+    for (int i = 0; i < n; ++i) {
+        int v;
+        if (parse_int_tok(&tk[2 + i], &v) != 0) {
+            printf("ERR E state %d not numeric\n", i);
+            return;
+        }
+        if (v < 0 || v > 15) {
+            printf("ERR E state %d out of range 0..15\n", i);
+            return;
+        }
+        states[i] = (uint8_t)v;
+    }
+    if (!switching_program_cycle_live(states, (uint8_t)n)) {
+        puts("ERR E cycle program failed");
+        return;
+    }
+    printf("OK E %d\n", n);
+}
+
+static void cmd_Y(size_t nt, const token_t *tk) {
+    // Y = set FETs without halting the switching timer
+    if (nt != 5) { puts("ERR Y requires 4 args: Y P1 P2 N1 N2"); return; }
+    int vals[4];
+    for (int i = 0; i < 4; ++i) {
+        if (parse_int_tok(&tk[1 + i], &vals[i]) != 0) {
+            printf("ERR Y arg %d not numeric\n", i);
+            return;
+        }
+    }
+    switching_set_direct_no_halt(vals[0], vals[1], vals[2], vals[3]);
+    printf("OK Y %d %d %d %d\n", vals[0], vals[1], vals[2], vals[3]);
+}
+
 static void cmd_F(size_t nt, const token_t *tk) {
     if (nt != 2) { puts("ERR F requires 1 arg: F <period_us>"); return; }
     int us;
@@ -488,6 +538,8 @@ void cmd_parser_handle_line(const char *line, size_t len) {
             return;
         case 'N': cmd_N(nt, toks); return;
         case 'C': cmd_C(nt, toks); return;
+        case 'E': cmd_E(nt, toks); return;
+        case 'Y': cmd_Y(nt, toks); return;
         case 'F': cmd_F(nt, toks); return;
         case 'G': cmd_G(nt, toks); return;
         case 'H': cmd_H();         return;

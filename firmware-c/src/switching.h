@@ -16,6 +16,10 @@ void switching_init(void);
 // command's behavior).
 void switching_set_direct(uint8_t p1, uint8_t p2, uint8_t n1, uint8_t n2);
 
+// Direct FET write without halting the timer. If the timer is running
+// it will override on its next tick. Use with program_cycle_live().
+void switching_set_direct_no_halt(uint8_t p1, uint8_t p2, uint8_t n1, uint8_t n2);
+
 // All FETs off. Used by H, BOOT, and the cleanup path.
 void switching_all_off(void);
 
@@ -35,6 +39,10 @@ void switching_apply_packed(uint8_t packed);
 // Halts any in-flight timer before swapping the buffer (matches main.py).
 // Returns false on invalid input — caller emits ERR.
 bool switching_program_cycle(const uint8_t *states, uint8_t n);
+
+// Live reprogram: swap the cycle buffer without halting.  The ISR picks
+// up the new sequence on its next tick.  No all-off gap.
+bool switching_program_cycle_live(const uint8_t *states, uint8_t n);
 
 // Number of states currently programmed.
 uint8_t switching_cycle_len(void);
