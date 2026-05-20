@@ -1327,6 +1327,8 @@ class SwitchingCircuitApp(App):
 
     LOG_DURATIONS = [5, 10, 30, 60, 120, 300, 600, 1800, 3600]
 
+    _stop_in_progress = False
+
     def _on_recording_done(self, desc: Optional[str] = None) -> None:
         """Called when any recording tier finishes.
 
@@ -1336,10 +1338,14 @@ class SwitchingCircuitApp(App):
         seconds and would otherwise freeze the UI at end-of-duration.
         """
         if desc is not None:
+            self._stop_in_progress = False
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             conn_bar.conn_label = "Connected"
             self.notify(desc, title="Recording complete")
             return
+        if self._stop_in_progress:
+            return
+        self._stop_in_progress = True
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
         conn_bar.conn_label = "Finalizing log…"
         self.run_worker(self._stop_recording_worker(), exclusive=True)
@@ -1349,13 +1355,15 @@ class SwitchingCircuitApp(App):
         responsive during SCP / writer-thread drain."""
         import asyncio
         loop = asyncio.get_event_loop()
-        _, desc = await loop.run_in_executor(None, self._data_logger.stop)
         try:
+            _, desc = await loop.run_in_executor(None, self._data_logger.stop)
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             conn_bar.conn_label = "Connected"
             self.notify(desc or "done", title="Recording complete")
         except Exception:
             pass
+        finally:
+            self._stop_in_progress = False
 
     def action_toggle_log(self) -> None:
         if self._data_logger.is_logging:
@@ -1363,6 +1371,7 @@ class SwitchingCircuitApp(App):
             # the auto-stop path) so the UI doesn't block on SCP.
             self._on_recording_done()
         else:
+            self._stop_in_progress = False
             plot = self.query_one("#sensor-plot", SensorPlot)
             tier, desc = self._data_logger.start(
                 mode=self._circuit_mode,
