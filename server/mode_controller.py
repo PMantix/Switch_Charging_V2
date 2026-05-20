@@ -124,12 +124,16 @@ class ModeController:
 
             if skip_dead:
                 # Seamless: go directly from current FET state to new
-                # state without any all-off intermediate.
+                # state without any all-off intermediate.  NEVER send H
+                # (stop_switching) here — it turns all FETs off.
                 if mode == Mode.DISCHARGE:
-                    # Set all FETs on first (seamless), then halt the
-                    # firmware switching timer so it doesn't override.
+                    # Reprogram the cycle to a single all-on state so
+                    # the firmware timer applies all-on on every tick.
+                    # Then immediately set all-on via S so there's no
+                    # wait for the next timer tick.  Timer keeps running
+                    # harmlessly — resume() will reprogram it later.
+                    self._gpio.program_sequence([0xF])
                     self._gpio.all_on()
-                    self._gpio.stop_switching()
                     self._engine.pause_silent()
                 elif mode == Mode.CHARGE:
                     self._engine.set_pulse_mode(False)
