@@ -748,6 +748,7 @@ class SwitchingCircuitApp(App):
         self.run_worker(
             self._connect_worker(host, port),
             name="connect",
+            group="connect",
             exclusive=True,
         )
 
@@ -917,7 +918,7 @@ class SwitchingCircuitApp(App):
             self._prev_mode = mode
 
             # Data logging (pure computation — widget touches stay in batch)
-            if self._data_logger.is_logging and self._data_logger.tier:
+            if self._data_logger.is_logging and self._data_logger.tier and not self._stop_in_progress:
                 from tui.data_logger import RecordTier
                 tier = self._data_logger.tier
 
@@ -1348,7 +1349,7 @@ class SwitchingCircuitApp(App):
         self._stop_in_progress = True
         conn_bar = self.query_one("#conn-bar", ConnectionBar)
         conn_bar.conn_label = "Finalizing log…"
-        self.run_worker(self._stop_recording_worker(), exclusive=True)
+        self.run_worker(self._stop_recording_worker(), exclusive=True, group="recording")
 
     async def _stop_recording_worker(self) -> None:
         """Run DataLogger.stop on an executor thread so the UI stays
@@ -1360,8 +1361,13 @@ class SwitchingCircuitApp(App):
             conn_bar = self.query_one("#conn-bar", ConnectionBar)
             conn_bar.conn_label = "Connected"
             self.notify(desc or "done", title="Recording complete")
-        except Exception:
-            pass
+        except Exception as exc:
+            log.warning("stop-recording worker failed: %s", exc)
+            try:
+                conn_bar = self.query_one("#conn-bar", ConnectionBar)
+                conn_bar.conn_label = "Connected"
+            except Exception:
+                pass
         finally:
             self._stop_in_progress = False
 
@@ -1468,7 +1474,7 @@ class SwitchingCircuitApp(App):
             self.notify("Stop recording first", severity="warning")
             return
         self.notify("Offloading recordings from Pi...", title="Offload")
-        self.run_worker(self._offload_worker(), exclusive=True)
+        self.run_worker(self._offload_worker(), exclusive=True, group="offload")
 
     async def _offload_worker(self) -> None:
         import asyncio

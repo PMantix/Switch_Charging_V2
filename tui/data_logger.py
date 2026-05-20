@@ -28,6 +28,7 @@ PI_MAX_SECONDS = 600  # 10 minutes
 _DEPTH_WARN_THRESHOLD = 1000
 _STOP_SENTINEL = object()
 _STOP_JOIN_TIMEOUT = 5.0
+_DURATION_CACHE = Path.home() / ".switching-circuit-duration"
 
 
 class RecordTier(Enum):
@@ -45,7 +46,7 @@ class DataLogger:
     def __init__(self, log_dir: Path = DEFAULT_LOG_DIR):
         self._log_dir = log_dir
         self._tier: Optional[RecordTier] = None
-        self._duration_s: float = 10.0
+        self._duration_s: float = self._load_duration()
 
         # Mac-side state
         self._path: Optional[Path] = None
@@ -83,6 +84,21 @@ class DataLogger:
     @duration_s.setter
     def duration_s(self, val: float):
         self._duration_s = max(1.0, val)
+        self._save_duration(self._duration_s)
+
+    @staticmethod
+    def _load_duration() -> float:
+        try:
+            return float(_DURATION_CACHE.read_text().strip())
+        except Exception:
+            return 10.0
+
+    @staticmethod
+    def _save_duration(val: float) -> None:
+        try:
+            _DURATION_CACHE.write_text(str(val))
+        except Exception:
+            pass
 
     @property
     def tier(self) -> Optional[RecordTier]:
@@ -209,17 +225,21 @@ class DataLogger:
 
     def stop(self) -> tuple[Optional[RecordTier], str]:
         tier = self._tier
-
-        if tier == RecordTier.PI and self._pi_recording:
-            desc = self._stop_pi()
-        elif self._mac_active:
-            desc = self._stop_mac()
-        else:
-            desc = "Not recording"
-
-        self._tier = None
-        self._pi_recording = False
-        self._client = None
+        try:
+            if tier == RecordTier.PI and self._pi_recording:
+                desc = self._stop_pi()
+            elif self._mac_active:
+                desc = self._stop_mac()
+            else:
+                desc = "Not recording"
+        except Exception as exc:
+            log.warning("stop() failed: %s", exc)
+            desc = f"Stop failed: {exc}"
+        finally:
+            self._tier = None
+            self._pi_recording = False
+            self._mac_active = False
+            self._client = None
         return tier, desc
 
     def _stop_pi(self) -> str:
