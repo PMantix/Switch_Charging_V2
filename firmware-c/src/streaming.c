@@ -141,10 +141,11 @@ void streaming_tick(void) {
     if (s_stream_period_us == 0) return;
     uint64_t now = time_us_64();
     if (now - s_last_emit_us < s_stream_period_us) return;
-    s_last_emit_us += s_stream_period_us;
-    // If we fell behind by more than 2 periods, snap to now to avoid burst catch-up
-    if (now - s_last_emit_us > 2 * s_stream_period_us)
-        s_last_emit_us = now;
+    // Snap to now unconditionally — emit one sample per main-loop pass.
+    // If we fell behind (command processing, USB stall), we resume from
+    // the current time rather than burst-emitting missed samples.  The
+    // host detects the gap via fw_seq and timestamps it correctly.
+    s_last_emit_us = now;
     emit_d_line(decide_read_bus());
 }
 

@@ -288,16 +288,16 @@ class SequenceEngine:
         """Like _program_and_go but uses E (live reprogram) instead of C.
         The switching timer may already be running (from a previous all-on
         cycle); E swaps the sequence without halting, then G restarts the
-        timer with the new sequence.  No all-off gap."""
+        timer with the new sequence.  No all-off gap.
+
+        Skips sync_firmware_clock() to avoid an extra blocking round-trip
+        that causes sample gaps at high streaming rates — the clock offset
+        from the initial connect is good enough for auto-follow."""
         with self._lock:
             packed = self._current_packed_sequence_locked()
             period_us = self._period_us
         self._gpio.program_sequence_live(packed)
         self._gpio.set_step_period_us(period_us)
-        try:
-            self._gpio.sync_firmware_clock()
-        except Exception:
-            log.exception("sync_firmware_clock failed; falling back to midpoint anchor")
         anchor_pi_s, _fw_ticks = self._gpio.start_switching()
         with self._lock:
             self._step_at_resume = 0
