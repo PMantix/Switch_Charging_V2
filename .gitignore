@@ -19,6 +19,9 @@ logs/
 data/
 plots/
 
+# Datasheets (large binaries, download via BOM links)
+docs/datasheets/
+
 # C firmware build artifacts (Pico SDK)
 firmware-c/build/
 
