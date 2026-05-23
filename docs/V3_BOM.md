@@ -111,8 +111,8 @@ firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
 | L_AVDD | TAI-TECH HCB1608KF-601T20 | 0603 | 1 | [C304319](https://www.lcsc.com/product-detail/C304319.html) | Ferrite bead 600 Ω @ 100 MHz, DCR=100 mΩ, 2 A. 28,400 stock. |
 | C_AVDD1 | 10 µF X7R 10 V | 0805 | 1 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Murata. +3V3_A bulk decoupling. 153,220 stock. |
 | C_AVDD2 | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | +3V3_A close to AVDD pin. Basic part. |
-| C_DVDD | 1 µF X7R 16 V | 0603 | 1 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | DVDD to DGND (external digital/IO supply, 2.7–3.6 V). Datasheet requires 1 µF. |
-| C_CAP | 220 nF X7R 16 V | 0603 | 1 | [C1653](https://www.lcsc.com/product-detail/C1653.html) | CAP to DGND (internal 1.8 V LDO output from DVDD). Datasheet required. |
+| C_DVDD | 1 µF X5R 50 V | 0603 | 1 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | Samsung. DVDD to DGND (external digital/IO supply, 2.7–3.6 V). Datasheet requires 1 µF. 3,740,750 stock. |
+| C_CAP | 220 nF X7R 25 V | 0603 | 1 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | Samsung. CAP to DGND (internal 1.8 V LDO output from DVDD). Datasheet required. 1,237,500 stock. |
 | C_VREF | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | REFP to REFN (internal reference). |
 
 ---
@@ -305,7 +305,7 @@ insufficient under measured load.
 | 10 µF X5R 50 V | 1206 | 1 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | Bulk decoupling — +HV rail (YAGEO, 251K stock) |
 | 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input bulk ×3 converters (Samsung, 2.5M stock, basic). Datasheet recommended Cin. |
 | 2.2 µF X7R 25 V | 0805 | 3 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | B0512S output bulk ×3 converters (Samsung, 872K stock). Datasheet recommended Cout for 12 V output. |
-| 1.5 kΩ 1% | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | B0512S bleeder resistors, minimum load (YAGEO) |
+| 1.5 kΩ 1% | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | B0512S bleeder resistors, minimum load (UNI-ROYAL, 650,600 stock) |
 
 ---
 

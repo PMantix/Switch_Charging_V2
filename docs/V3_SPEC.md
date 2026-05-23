@@ -273,8 +273,8 @@ Voltage resolution: 1.2 V / 2²³ = 143 nV → 1.43 µV/bit at divider →
 |---|---|---|---|
 | C_AVDD1 | 10 µF MLCC | 0805 X7R 10 V | `+3V3_A` to `AGND` |
 | C_AVDD2 | 100 nF MLCC | 0603 X7R 50 V | `+3V3_A` to `AGND` (close to pin) |
-| C_DVDD | 1 µF MLCC | 0603 X7R 16 V | DVDD to DGND (external digital/IO supply, datasheet requires 1 µF) |
-| C_CAP | 220 nF MLCC | 0603 X7R 16 V | CAP to DGND (internal 1.8 V LDO output, datasheet required) |
+| C_DVDD | 1 µF MLCC | 0603 X5R 50 V | DVDD to DGND (external digital/IO supply, datasheet requires 1 µF) |
+| C_CAP | 220 nF MLCC | 0603 X7R 25 V | CAP to DGND (internal 1.8 V LDO output, datasheet required) |
 | L_AVDD | Ferrite bead | TAI-TECH HCB1608KF-601T20, 600 Ω @ 100 MHz, 0603 | `+3V3` → `+3V3_A` (shared, single ferrite for both devices) |
 | C_VREF | 100 nF MLCC | 0603 X7R 50 V | REFP to REFN (internal reference decoupling) |
 
