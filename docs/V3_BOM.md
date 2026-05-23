@@ -60,14 +60,15 @@ the PCB layout.
 ## 3. Power MOSFETs
 
 Retained from V2: **AO3400A** in SOT-23. Adequate for the 3 A max
-current target (rated 5.8 A continuous). JLCPCB basic part.
+current target (rated 5.7 A continuous). JLCPCB basic part.
 
 | Ref | Part | Package | Qty | LCSC # | Unit price | Notes |
 |---|---|---|---|---|---|---|
-| Q1–Q4 | AO3400A | SOT-23 | 4 | JLCPCB basic (same as V2) | ~$0.03 | N-ch, 30 V, 5.8 A, R_DS(on) ≤20 mΩ @ V_GS=10 V. |
+| Q1–Q4 | AO3400A | SOT-23 | 4 | JLCPCB basic (same as V2) | ~$0.03 | N-ch, 30 V, 5.7 A, R_DS(on) ≤26.5 mΩ (typ 18 mΩ) @ V_GS=10 V. |
 
-Thermal at 3 A: P = 3² × 0.02 = 0.18 W. SOT-23 θ_JA ≈ 312 °C/W →
-ΔT ≈ 56 °C — acceptable at lab ambient.
+Thermal at 3 A (worst-case): P = 3² × 0.0265 = 0.24 W. SOT-23
+θ_JA = 125 °C/W (steady-state, 1 in² FR-4, 2 oz Cu) → ΔT ≈ 30 °C —
+comfortable at lab ambient. θ_JA measured per datasheet Note A.
 
 ---
 
@@ -110,8 +111,8 @@ firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
 | L_AVDD | TAI-TECH HCB1608KF-601T20 | 0603 | 1 | [C304319](https://www.lcsc.com/product-detail/C304319.html) | Ferrite bead 600 Ω @ 100 MHz, DCR=100 mΩ, 2 A. 28,400 stock. |
 | C_AVDD1 | 10 µF X7R 10 V | 0805 | 1 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Murata. +3V3_A bulk decoupling. 153,220 stock. |
 | C_AVDD2 | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | +3V3_A close to AVDD pin. Basic part. |
-| C_DVDD | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | DVDD (internal LDO output). |
-| C_IOVDD | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | IOVDD decoupling. |
+| C_DVDD | 1 µF X7R 16 V | 0603 | 1 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | DVDD to DGND (external digital/IO supply, 2.7–3.6 V). Datasheet requires 1 µF. |
+| C_CAP | 220 nF X7R 16 V | 0603 | 1 | [C1653](https://www.lcsc.com/product-detail/C1653.html) | CAP to DGND (internal 1.8 V LDO output from DVDD). Datasheet required. |
 | C_VREF | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | REFP to REFN (internal reference). |
 
 ---
@@ -127,19 +128,48 @@ firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
 | Ref | Part | Package | Qty total | LCSC # | Notes |
 |---|---|---|---|---|---|
 | C_VCCI_U1–4 | 100 nF X7R 50 V | 0603 | 4 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI to GND |
-| C_VDD_U1–4_1 | 10 µF X7R 10 V | 0805 | 4 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | VDD to VSS (bulk). Note: HS drivers VDD is ~12 V — use 1206 50 V [C100122] for U1/U2. |
+| C_VDD_U1–4_1 | 10 µF X5R 50 V | 1206 | 4 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | VDD to VSS (bulk). All drivers see ~12 V across VDD-VSS — 10 V cap insufficient. Use 1206 50 V for all four. |
 | C_VDD_U1–4_2 | 100 nF X7R 50 V | 0603 | 4 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VDD to VSS (HF) |
 | R_G_U1–4 | 10 Ω 1% 0603 | 0603 | 4 | [C109318](https://www.lcsc.com/product-detail/C109318.html) | YAGEO. Gate series resistor. 3,793,600 stock. |
 
 ---
 
-## 7. Isolated gate supplies (retained from V2 — existing stock)
+## 7. Isolated gate supplies — 3× B0512S-1WR3
+
+PS1/PS2 supply floating 12 V for high-side drivers. PS3 is new for V3:
+supplies ground-referenced 12 V for low-side drivers (V2 used +5V
+which was unreliable at the UCC5304 UVLO threshold).
 
 | Ref | Part | Package | Qty | Notes |
 |---|---|---|---|---|
-| PS1, PS2 | B0512S-1WR3 (Mornsun) | SIP-4 | 2 | 5 V → 12 V, 1 W, 1.5 kV isolation |
-| C_PS1/2_IN | 4.7 µF X5R 25 V | 0805 | 2 | [C1779](https://www.lcsc.com/product-detail/C1779.html) Samsung. 2,486,420 stock. Basic part. |
-| C_PS1/2_OUT | 2.2 µF X7R 25 V | 0805 | 2 | [C19110](https://www.lcsc.com/product-detail/C19110.html) Samsung. 872,160 stock. |
+| PS1, PS2, PS3 | B0512S-1WR3 (Mornsun) | SIP-4 | 3 | 5 V → 12 V, 1 W, 1.5 kV isolation. Existing stock (need 1 more for PS3). |
+
+Decoupling per converter (×3) — upgraded from V2 per SW1 failure
+(2026-05-19: B0512S died from gate charge transient stress without
+adequate decoupling). Values match YLPTEC datasheet Table 1
+(Cin=4.7 µF for 5 V input, Cout=2.2 µF for 12 V output):
+
+| Ref | Part | Package | Qty total | LCSC # | Notes |
+|---|---|---|---|---|---|
+| C_PS*_IN1 | 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | Samsung. Input bulk, close to Vin pins. Datasheet recommended. |
+| C_PS*_IN2 | 100 nF X7R 50 V | 0603 | 3 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | Input HF, close to Vin pins. |
+| C_PS*_OUT1 | 2.2 µF X7R 25 V | 0805 | 3 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | Samsung. Output bulk, close to Vout pins. Datasheet recommended. |
+| C_PS*_OUT2 | 100 nF X7R 50 V | 0603 | 3 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | Output HF, close to Vout pins. |
+
+Max capacitive load for B0512S 12 V output: **560 µF**. Total per
+converter (2.2 µF + 0.1 µF) = 2.3 µF — well under limit.
+
+**Minimum load warning:** B0512S-1WR3 requires ≥9 mA output (10% of
+84 mA rated) for proper regulation. UCC5304 VDD draw is only ~1–2.5 mA
+per driver. Add a bleeder resistor on each converter output:
+
+| Ref | Part | Package | Qty total | LCSC # | Notes |
+|---|---|---|---|---|---|
+| R_BLEED_PS1–3 | 1.5 kΩ 1% 0603 | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | VDD to VSS per converter. I_bleed = 12 V / 1.5 kΩ = 8 mA. P = 96 mW (0603 rated 100 mW, use 0805 if margin needed). Total load with driver: ~10 mA. |
+
+**Pin mapping warning:** GDHUIZHT-brand B0512S modules have pins 1↔2
+and 3↔4 swapped vs Mornsun datasheet. Add silkscreen note on PCB.
+See `pcb/PCB_V3_CHANGELIST.md` item #1.
 
 ---
 
@@ -192,7 +222,7 @@ insufficient under measured load.
 
 | Ref | Part | Type | Qty | LCSC # | Unit price | Notes |
 |---|---|---|---|---|---|---|
-| J4 | SHOU HAN TF PUSH | Push-push microSD, SMD | 1 | [C393941](https://www.lcsc.com/product-detail/C393941.html) | ~$0.065 | No card-detect pin (detect via SPI init). 201,663 stock. |
+| J4 | SHOU HAN TF PUSH | Push-push microSD, SMD | 1 | [C393941](https://www.lcsc.com/product-detail/C393941.html) | ~$0.065 | Has Cd (card-detect) pin — wire to GPIO or leave unconnected (detect via SPI init). 201,663 stock. |
 
 ### SD power decoupling
 
@@ -224,7 +254,7 @@ insufficient under measured load.
 
 | Ref | Part | Package | Qty | LCSC # | Notes |
 |---|---|---|---|---|---|
-| D_LED_P1–N2 | Lite-On LTST-C193TGKT-5A (green) | 0603 | 4 | [C12065](https://www.lcsc.com/product-detail/C12065.html) | 525 nm, 154 mcd, Vf=2.8 V. 83,280 stock. |
+| D_LED_P1–N2 | Lite-On LTST-C193TGKT-5A (green) | 0603 | 4 | [C12065](https://www.lcsc.com/product-detail/C12065.html) | 525 nm peak, 28–280 mcd (binned), Vf=2.50–3.10 V. 83,280 stock. |
 | D_LED_PWR | Lite-On LTST-C193TGKT-5A (green) | 0603 | 1 | [C12065](https://www.lcsc.com/product-detail/C12065.html) | Power-on indicator. |
 | R_LED_P1–N2, R_LED_PWR | 1 kΩ 1% 0603 | 0603 | 5 | [C22548](https://www.lcsc.com/product-detail/C22548.html) | YAGEO. LED current limit. 3,046,400 stock. |
 
@@ -233,7 +263,7 @@ insufficient under measured load.
 | Ref | Part | Package | Qty | LCSC # | Notes |
 |---|---|---|---|---|---|
 | D_LED_REC | Lite-On LTST-C193TGKT-5A (green) | 0603 | 1 | [C12065](https://www.lcsc.com/product-detail/C12065.html) | GP22, recording active. |
-| D_LED_AUTO | NATIONSTAR NCD0603Y5 (yellow) | 0603 | 1 | [C7429912](https://www.lcsc.com/product-detail/C7429912.html) | GP0, auto-follow engaged. 590 nm, 150 mcd, Vf=1.6–2.6 V. 26,360 stock. |
+| D_LED_AUTO | NATIONSTAR NCD0603Y5 (yellow) | 0603 | 1 | [C7429912](https://www.lcsc.com/product-detail/C7429912.html) | GP0, auto-follow engaged. 595 nm peak, 40–180 mcd, Vf=1.5–2.6 V. 26,360 stock. |
 | R_LED_REC, R_LED_AUTO | 1 kΩ 1% 0603 | 0603 | 2 | [C22548](https://www.lcsc.com/product-detail/C22548.html) | YAGEO. Current limit. |
 | NEOPIXEL | WS2812B-MINI-X2 | 3535 | 1 | [C4154873](https://www.lcsc.com/product-detail/C4154873.html) | GP1, RGB mode status. 37,690 stock. |
 
@@ -273,8 +303,9 @@ insufficient under measured load.
 | 100 nF X7R 50 V | 0603 | ~20 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | Decoupling, anti-alias, debounce (YAGEO, 6.6M stock, basic) |
 | 10 µF X7R 10 V | 0805 | ~6 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Bulk decoupling — 3V3, 5V, SD rails (Murata, 153K stock) |
 | 10 µF X5R 50 V | 1206 | 1 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | Bulk decoupling — +HV rail (YAGEO, 251K stock) |
-| 4.7 µF X5R 25 V | 0805 | 2 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input (Samsung, 2.5M stock, basic) |
-| 2.2 µF X7R 25 V | 0805 | 2 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | B0512S output (Samsung, 872K stock) |
+| 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input bulk ×3 converters (Samsung, 2.5M stock, basic). Datasheet recommended Cin. |
+| 2.2 µF X7R 25 V | 0805 | 3 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | B0512S output bulk ×3 converters (Samsung, 872K stock). Datasheet recommended Cout for 12 V output. |
+| 1.5 kΩ 1% | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | B0512S bleeder resistors, minimum load (YAGEO) |
 
 ---
 
@@ -314,7 +345,7 @@ insufficient under measured load.
 ## 17. Design changes from V2 BOM review (2026-05-23)
 
 1. **Max current → 3 A** (was 5 A). AO3400A SOT-23 retained from V2
-   (rated 5.8 A, 0.18 W at 3 A — within SOT-23 limits).
+   (rated 5.7 A, 0.24 W worst-case at 3 A — within SOT-23 limits).
 
 2. **ADC → 2× ADS131M04** (was 1× ADS131M08). Same M-series register
    map, 3,520 LCSC stock vs 163 for M08. Two extra GPIO needed (CS2,
@@ -349,6 +380,5 @@ insufficient under measured load.
    ENIG vs HASL finish for Kelvin input pads. ENIG preferred for
    reliable alligator clip contact.
 
-4. **HS driver VDD decoupling** — U1/U2 VDD is ~12 V (B0512S output).
-   The 10 µF 0805 X7R 10 V (C86038) is insufficient. Use 10 µF 1206
-   X5R 50 V (C100122) for U1/U2 VDD-to-VSS bulk caps.
+4. ~~**HS driver VDD decoupling**~~ — **Resolved:** all four UCC5304
+   VDD-VSS bulk caps now use 10 µF 1206 X5R 50 V (C100122). See §6.

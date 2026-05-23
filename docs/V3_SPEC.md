@@ -95,10 +95,11 @@ Pulse charge sequence: [0, 3] (alternates P1+N1 and P2+N2).
 | `CYCLER_IN-` | Cycler negative through clip pads | ~0 V | Tied to `GND` at pad only |
 | `GND` | Star ground | 0 V | System reference |
 | `+5V` | Pico 2 VBUS pin (or optional buck from `+HV`) | 5 V | LS driver VDD, B0512S input |
-| `+3V3` | Pico 2 3V3(OUT) pin | 3.3 V | UCC5304 VCCI, ADS131M04 AVDD/IOVDD, OLED, I²C pullups, LEDs |
+| `+3V3` | Pico 2 3V3(OUT) pin | 3.3 V | UCC5304 VCCI, ADS131M04 DVDD, OLED, I²C pullups, LEDs |
 | `+3V3_A` | Filtered from `+3V3` (ferrite bead + 10 µF) | 3.3 V | ADS131M04 AVDD (analog supply, isolated from digital noise) |
 | `VCC2_P1` | B0512S #1 Vout+ (floating) | ~12 V above CELL_A_POS | U1 VDD |
 | `VCC2_P2` | B0512S #2 Vout+ (floating) | ~12 V above CELL_B_POS | U2 VDD |
+| `VCC2_LS` | B0512S #3 Vout+ (GND-referenced) | ~12 V | U3/U4 VDD (low-side drivers) |
 
 ---
 
@@ -159,12 +160,13 @@ Below that, fall back to USB VBUS.
 
 ### MOSFETs — AO3400A SOT-23 (retained from V2)
 
-Each FET: **AO3400A, N-channel SOT-23, 5.8 A, ≤20 mΩ R_DS(on), 30 V.**
+Each FET: **AO3400A, N-channel SOT-23, 5.7 A, ≤26.5 mΩ R_DS(on) (typ 18 mΩ), 30 V.**
 JLCPCB basic part (same as V2). Max continuous current: **3 A** (hard limit).
 
-Thermal check at 3 A continuous:
-- P = I²R = 9 × 0.02 = 0.18 W per FET
-- SOT-23 θ_JA ≈ 312 °C/W → ΔT ≈ 56 °C — acceptable at lab ambient
+Thermal check at 3 A continuous (worst-case R_DS(on)):
+- P = I²R = 9 × 0.0265 = 0.24 W per FET
+- SOT-23 θ_JA = 125 °C/W (steady-state, 1 in² FR-4, 2 oz Cu) → ΔT ≈ 30 °C
+- T_J = 25 + 30 = 55 °C — well under 150 °C max
 
 | Ref | Position | Drain | Source | Gate |
 |---|---|---|---|---|
@@ -207,8 +209,7 @@ per device. Both share the SPI1 bus with independent CS and DRDY lines.
 | Input range (gain=1) | ±1.2 V |
 | Input range (gain=16) | ±75 mV |
 | AVDD | 2.7–3.6 V (use `+3V3_A`) |
-| DVDD | 1.8 V (internal LDO from AVDD) |
-| IOVDD | 3.3 V (match RP2350 GPIO level) |
+| DVDD | 2.7–3.6 V external supply (use `+3V3`, also feeds internal 1.8 V LDO to CAP pin) |
 | VREF | 1.2 V internal |
 
 ### Channel assignment
@@ -238,7 +239,7 @@ At gain=16, input range ±75 mV:
 - Current LSB = 8.94 nV / 0.01 Ω = **0.894 µA/bit**
 - At 3 A: code ≈ 3,355,443 → 21.7 effective bits
 - At 100 mA: code ≈ 111,848 → 16.8 effective bits
-- RMS noise @ 4 kSPS, gain=16: ~1.6 µV → ~160 µA
+- RMS noise @ 4 kSPS, gain=16: ~1.8 µV (datasheet: 1.82 µV) → ~182 µA
 
 ### Bus voltage channel — analog front-end
 
@@ -272,8 +273,8 @@ Voltage resolution: 1.2 V / 2²³ = 143 nV → 1.43 µV/bit at divider →
 |---|---|---|---|
 | C_AVDD1 | 10 µF MLCC | 0805 X7R 10 V | `+3V3_A` to `AGND` |
 | C_AVDD2 | 100 nF MLCC | 0603 X7R 50 V | `+3V3_A` to `AGND` (close to pin) |
-| C_DVDD | 100 nF MLCC | 0603 X7R 50 V | DVDD to DGND (internal LDO output) |
-| C_IOVDD | 100 nF MLCC | 0603 X7R 50 V | `+3V3` to `DGND` |
+| C_DVDD | 1 µF MLCC | 0603 X7R 16 V | DVDD to DGND (external digital/IO supply, datasheet requires 1 µF) |
+| C_CAP | 220 nF MLCC | 0603 X7R 16 V | CAP to DGND (internal 1.8 V LDO output, datasheet required) |
 | L_AVDD | Ferrite bead | TAI-TECH HCB1608KF-601T20, 600 Ω @ 100 MHz, 0603 | `+3V3` → `+3V3_A` (shared, single ferrite for both devices) |
 | C_VREF | 100 nF MLCC | 0603 X7R 50 V | REFP to REFN (internal reference decoupling) |
 
@@ -295,7 +296,8 @@ Pin connections (both devices share SPI1 bus):
 Both devices:
 - AVDD → `+3V3_A`
 - DVDD → internal LDO (decouple with C_DVDD)
-- IOVDD → `+3V3`
+- DVDD → `+3V3`
+- CAP → 220 nF to DGND (internal 1.8 V LDO output)
 
 ---
 
@@ -305,30 +307,61 @@ Both devices:
 |---|---|---|---|---|---|---|---|
 | U1 | Q1 (P1, HS) | `GATE_P1_IN` | `+3V3` | `GND` | `CELL_A_POS` | `GATE_P1_OUT` | `VCC2_P1` |
 | U2 | Q2 (P2, HS) | `GATE_P2_IN` | `+3V3` | `GND` | `CELL_B_POS` | `GATE_P2_OUT` | `VCC2_P2` |
-| U3 | Q3 (N1, LS) | `GATE_N1_IN` | `+3V3` | `GND` | `GND` | `GATE_N1_OUT` | `+5V` |
-| U4 | Q4 (N2, LS) | `GATE_N2_IN` | `+3V3` | `GND` | `GND` | `GATE_N2_OUT` | `+5V` |
+| U3 | Q3 (N1, LS) | `GATE_N1_IN` | `+3V3` | `GND` | `GND` | `GATE_N1_OUT` | `VCC2_LS` |
+| U4 | Q4 (N2, LS) | `GATE_N2_IN` | `+3V3` | `GND` | `GND` | `GATE_N2_OUT` | `VCC2_LS` |
 
-Hand-solder from stock (DNP_JLC=TRUE, same as V2).
+Hand-solder from stock (DNP_JLC=TRUE, same as V2). Use TI recommended
+land pattern (SLUSDV5B) with extra pad margin for hand soldering —
+V2 pads were too narrow and caused solder bridges.
+
+**V2 lesson:** Low-side VDD was +5V in V2, which sits right at the
+UCC5304 UVLO threshold (5V). Breadboard testing (2026-04-29) confirmed
+this was unreliable. V3 uses `VCC2_LS` (12V from PS3) for both LS
+drivers, matching the validated breadboard architecture.
 
 ### Per-driver support components
 
 - `C_VCCI_U1..4`: 100 nF 0603 (VCCI to GND)
-- `C_VDD_U1..4_1`: 10 µF 0805 X7R 25 V (VDD to VSS)
-- `C_VDD_U1..4_2`: 100 nF 0603 X7R 25 V (VDD to VSS)
+- `C_VDD_U1..4_1`: 10 µF 0805 (VDD to VSS, bulk)
+- `C_VDD_U1..4_2`: 100 nF 0603 (VDD to VSS, close to pin 8)
 - `R_G_U1..4`: **10 Ω** 0603 (OUT to FET gate)
 
 ---
 
-## 9. Isolated gate supplies — 2× B0512S-1WR3 (retained from V2)
+## 9. Isolated gate supplies — 3× B0512S-1WR3
 
 | Ref | Pin 1 Vin+ | Pin 2 Vin- | Pin 3 Vout+ | Pin 4 Vout- | Feeds |
 |---|---|---|---|---|---|
-| PS1 | `+5V` | `GND` | `VCC2_P1` | `CELL_A_POS` | U1 VDD/VSS |
-| PS2 | `+5V` | `GND` | `VCC2_P2` | `CELL_B_POS` | U2 VDD/VSS |
+| PS1 | `+5V` | `GND` | `VCC2_P1` | `CELL_A_POS` | U1 VDD/VSS (high-side, floating) |
+| PS2 | `+5V` | `GND` | `VCC2_P2` | `CELL_B_POS` | U2 VDD/VSS (high-side, floating) |
+| PS3 | `+5V` | `GND` | `VCC2_LS` | `GND` | U3/U4 VDD (low-side, ground-referenced 12 V) |
 
-Decoupling (per Mornsun datasheet):
-- Input: `C_PS1_IN`, `C_PS2_IN` = 4.7 µF 0805 16 V
-- Output: `C_PS1_OUT`, `C_PS2_OUT` = 2.2 µF 0805 25 V
+PS3 is new for V3. V2 used +5V directly for LS driver VDD, which sat
+at the UCC5304 UVLO threshold and was unreliable. PS3 provides a clean
+12V rail for both LS drivers, matching the validated breadboard fix.
+
+**V2 failure lesson (2026-05-19, SW1):** A B0512S used for the LS 12V
+bodge died after continuous switching over a weekend — gate charge
+transient stress without adequate decoupling. V3 decoupling is
+significantly upgraded from V2.
+
+Decoupling per converter (all three), per YLPTEC datasheet Table 1:
+- Input: 4.7 µF 0805 + 100 nF 0603, close to Vin pins
+- Output: 2.2 µF 0805 + 100 nF 0603, close to Vout pins
+- Additional 100 nF 0603 at each UCC5304 pin 8 (VDD), close to the driver
+- Max capacitive load for 12 V output: 560 µF (total decoupling is ~2.3 µF — safe)
+
+**Minimum load:** B0512S requires ≥9 mA output (10% of 84 mA). UCC5304
+IVDD is only ~1–2.5 mA per driver (quiescent 1.0 mA, operating 2.5 mA
+@ 500 kHz with COUT=100 pF). AO3400A Qg = 7 nC adds negligible
+average current at our switching frequencies (≤2 kHz). Each converter
+needs a 1.5 kΩ bleeder resistor (VDD to VSS) to bring total load to
+~10 mA. P_bleeder = 96 mW per resistor.
+
+**B0512S pin mapping note:** Verify pinout matches your actual parts.
+GDHUIZHT-brand modules have pins 1↔2 and 3↔4 swapped vs Mornsun
+datasheet. Add silkscreen note on PCB indicating which brand the
+footprint matches. See `pcb/PCB_V3_CHANGELIST.md` item #1.
 
 ---
 
@@ -697,20 +730,24 @@ NeoPixel color map:
 
 ## 19. Verification checklist
 
-- [ ] ADS131M04 AVDD/DVDD/IOVDD voltage levels match RP2350 3.3 V domain
+- [ ] ADS131M04 AVDD/DVDD voltage levels match RP2350 3.3 V domain (no IOVDD pin — DVDD is I/O supply)
 - [ ] SPI1 clock ≤ 25 MHz (ADS131M04 max SCLK)
 - [ ] Both ADS131M04 CS/DRDY lines routed to correct GPIO (GP13/14 and GP26/21)
 - [ ] Shunt voltage at 3 A (30 mV) within gain=16 input range (±75 mV)
 - [ ] Bus voltage at 10 V through 10.01:1 divider (0.99 V) within gain=1 range (±1.2 V)
-- [ ] MOSFET SOA check: 3 A continuous at ambient + enclosure temp (AO3400A SOT-23)
-- [ ] UCC5304 UVLO: LS on +5 V (borderline), HS on ~12 V (OK) — same as V2
+- [ ] MOSFET SOA check: 3 A continuous at ambient + enclosure temp (AO3400A SOT-23, R_DS(on) max 26.5 mΩ, θ_JA 125 °C/W → ΔT ≈ 30 °C)
+- [ ] UCC5304 UVLO: VDD rising threshold 5.0–5.9 V — 5 V supply fails on typical/worst-case units. V3 uses 12 V from PS3 (resolved).
 - [ ] B0512S-1WR3 output floats above CELL_x_POS — verify isolation rating
 - [ ] SPI0 (SD) and SPI1 (ADS) on separate peripherals — no bus contention
 - [ ] I²C0 (OLED) does not share bus with any high-speed device
 - [ ] Total 3.3 V rail current: RP2350 (~50 mA) + 2× ADS131M04 (~16 mA) + OLED (~20 mA) + LEDs (~10 mA) + drivers VCCI (~4 mA) = ~100 mA — within Pico 2 3V3 regulator (300 mA)
-- [ ] 5 V rail: LS drivers (~10 mA each × 2) + B0512S (~200 mA each × 2) = ~420 mA — within USB 500 mA budget (marginal; verify with scope under switching load)
+- [ ] 5 V rail: 3× B0512S input current (~8 mA each quiescent + ~10 mA output load / 89% efficiency ≈ ~20 mA each = ~60 mA total) + misc (~80 mA) = ~140 mA typical — within USB 500 mA. Bleeder resistors add ~24 mA input draw total across 3 converters.
 - [ ] Optional 5 V buck: footprint present, DNP, solder jumper SJ_5V defaults to VBUS
 - [ ] Kelvin sense routing: shunt voltage traces go directly to ADS131M04 inputs, not through power traces
 - [ ] Star ground: AGND and DGND tied at one point under ADS131M04 devices
 - [ ] Kelvin clip pads: 22×8 mm per pad, ENIG finish, board edge, current/sense paths separated, ≥1 mm traces on current pads
+- [ ] B0512S minimum load: each converter needs ≥9 mA. UCC5304 draws ~1–2.5 mA → 1.5 kΩ bleeder required per converter
+- [ ] UCC5304 VDD bulk caps: all four see ~12 V across VDD-VSS — use 50 V rated (1206), not 10 V
+- [ ] ADS131M04 CAP pin: 220 nF to DGND per device (internal LDO output, datasheet required)
+- [ ] ADS131M04 DVDD decoupling: 1 µF minimum per datasheet (not 100 nF)
 - [ ] Gate drive LEDs on input nets (system-GND referenced), not floating output nets
