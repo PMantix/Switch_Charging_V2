@@ -1,0 +1,1020 @@
+=== PAGE 1 ===
+textVDD
+UVLO, 
+Level
+Shift
+and
+Control
+LogicVCC2
+INVCCI
+GND
+ISOLATION              BARRIERUVLO 
+and 
+Input 
+LogicRest of 
+Circuit
+Copyright © 2019, Texas Instruments IncorporatedOUT
+VSS
+Product
+Folder
+Order
+Now
+Technical
+Documents
+Tools &
+Software
+Support &
+Community
+AnIMPORTANT NOTICE attheend ofthisdata sheet addresses availability, warranty, changes, use insafety-critical applications,
+intellectual property matters andother important disclaimers. PRODUCTION DATA.UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+UCC5304 4-ASource, 6-ASinkSingle-Channel Reinforced Isolation GateDriver
+WithHighNoise Immunity
+11Features
+1•Reinforced isolation
+•Single channel inDWV Package with 8.5-mm
+creepage distance
+•CMTI greater than 100-V/ns
+•4-Apeak source, 6-Apeak sink output
+•Switching parameters:
+–40-ns maximum propagation delay
+–5-ns maximum delay matching
+–5.5-ns maximum pulse-width distortion
+–35-µsmaximum VDD power-up delay
+•Upto18-V VDD output drive supply
+–5-VVDD UVLO
+•Operating temp. range (TA)–40°Cto125°C
+•Rejects input pulses shorter than 5-ns
+•TTL andCMOS compatible inputs
+2Applications
+•AC-DC andDC-DC converters
+•Motor drives
+•Industrial transportation androbotics3Description
+The UCC5304 device isanisolated single-channel
+gate driver with 4-A peak-source and 6-A peak-sink
+current. Itisdesigned todrive power MOSFETs and
+GaNFETs inPFC, Isolated AC/DC, DC/DC, and
+synchronous rectification applications, with fast
+switching performance and robust ground bounce
+protection through greater than 100-V/ns common-
+mode transient immunity (CMTI).
+The UCC5304 isavailable ina8.5 mm SOIC-8
+(DWV) package and cansupport isolation voltage up
+to5-kV RMS.Compared toan optocoupler, the
+UCC5304 family has lower part-to-part skew, lower
+propagation delay, higher operating temperature, and
+higher CMTI.
+Protection features include: INpin rejects input
+transient shorter than 5-ns; both input andoutput can
+withstand –2-Vspikes for200-ns, both supplies have
+undervoltage lockout (UVLO), and active pull down
+protection clamps the output below 2.1-V when
+unpowered orfloated.
+With these features, this device enables high
+efficiency, high power density, and robustness ina
+wide variety ofpower applications.
+Device Information(1)
+PART NUMBER PACKAGE UVLO
+UCC5304 DWV-8 (SOIC) 5-V
+(1)Forallavailable packages, see theorderable addendum at
+theendofthedata sheet.
+Typical Application
+
+=== PAGE 2 ===
+2UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments IncorporatedTable ofContents
+1Features .................................................................. 1
+2Applications ........................................................... 1
+3Description ............................................................. 1
+4Revision History ..................................................... 2
+5PinConfiguration andFunctions ......................... 3
+6Specifications ......................................................... 4
+6.1 Absolute Maximum Ratings ...................................... 4
+6.2 ESD Ratings .............................................................. 4
+6.3 Recommended Operating Conditions ....................... 4
+6.4 Thermal Information ................................................. 5
+6.5 Power Ratings ........................................................... 5
+6.6 Insulation Specifications ............................................ 6
+6.7 Safety-Related Certifications ..................................... 7
+6.8 Safety-Limiting Values .............................................. 7
+6.9 Electrical Characteristics ........................................... 8
+6.10 Switching Characteristics ........................................ 9
+6.11 Typical Characteristics .......................................... 107Parameter Measurement Information ................ 13
+7.1 Rising andFalling Time ......................................... 13
+7.2 Power-up UVLO Delay toOUTPUT ........................ 13
+8Detailed Description ............................................ 14
+8.1 Overview ................................................................. 14
+8.2 Functional Block Diagram ....................................... 14
+8.3 Feature Description ................................................. 15
+8.4 Device Functional Modes ........................................ 18
+9Application andImplementation ........................ 19
+9.1 Application Information ............................................ 19
+9.2 Typical Application .................................................. 19
+10Power Supply Recommendations ..................... 22
+11Layout ................................................................... 23
+11.1 Layout Guidelines ................................................. 23
+11.2 Layout Example .................................................... 24
+12Mechanical, Packaging, andOrderable
+Information ........................................................... 24
+4Revision History
+NOTE: Page numbers forprevious revisions may differ from page numbers inthecurrent version.
+Changes from Revision A(February 2020) toRevision B Page
+•Changed marketing status from Advance Information toinitial release. ............................................................................... 1
+
+=== PAGE 3 ===
+1 IN 8 VDD
+2 VCCI 7 OUT
+3 VCCI 6 VSS
+4 GND 5 VSS
+Not to scale
+ISOLATION
+3UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) P=power, G=ground, I=input, O=output5PinConfiguration andFunctions
+DWV Package
+8-Pin SOIC
+TopView
+PinFunctions
+PIN I/O(1)DESCRIPTION
+GND 4 P Primary-side ground reference. Allsignals intheprimary side arereferenced tothisground.
+IN 1 IInput signal. INinput hasaTTL/CMOS compatible input threshold. This pinispulled lowinternally ifleft
+open. Itisrecommended totiethispintoground ifnotused toachieve better noise immunity.
+OUT 7 O Output ofdriver. Connect tothegate oftheFET orIGBT.
+VCCI 2,3 PPrimary-side supply voltage. Locally decoupled toGND using alowESR/ESL capacitor located asclose
+tothedevice aspossible.
+VDD 8 PSecondary-side power fordriver. Locally decoupled toVSS using alowESR/ESL capacitor located as
+close tothedevice aspossible.
+VSS 5,6 P Ground forsecondary-side driver.
+
+=== PAGE 4 ===
+4UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) Stresses beyond those listed under absolute maximum ratings may cause permanent damage tothedevice. These arestress ratings
+only andfunctional operation ofthedevice atthese oranyother conditions beyond those indicated under recommended operating
+conditions isnotimplied. Exposure toabsolute-maximum-rated conditions forextended periods may affect device reliability.
+(2) Values areverified bycharacterization andarenotproduction tested.
+(3) Tomaintain therecommended operating conditions forTJ,seetheThermal Information .6Specifications
+6.1 Absolute Maximum Ratings
+over operating free-air temperature range (unless otherwise noted)(1)
+MIN MAX UNIT
+Input bias pinsupply voltage VCCI toGND –0.5 6 V
+Driver bias supply VDD-VSS –0.5 20 V
+Output signal voltageOUT toVSS –0.5 VVDD+0.5 V
+OUT toVSS, Transient for200ns(2)–2 VVDD+0.5 V
+Input signal voltageINtoGND –0.5 VVCCI+0.5 V
+INTransient toGND for200ns(2)–2 VVCCI+0.5 V
+Junction temperature, TJ(3)–40 150 °C
+Storage temperature, Tstg –65 150 °C
+(1) JEDEC document JEP155 states that500-V HBM allows safe manufacturing with astandard ESD control process.
+(2) JEDEC document JEP157 states that250-V CDM allows safe manufacturing with astandard ESD control process.6.2 ESD Ratings
+VALUE UNIT
+V(ESD) Electrostatic dischargeHuman-body model (HBM), perANSI/ESDA/JEDEC JS-001(1)±4000
+V Charged-device model (CDM), perJEDEC specification JESD22-
+C101(2) ±1500
+6.3 Recommended Operating Conditions
+Over operating free-air temperature range (unless otherwise noted)
+MIN MAX UNIT
+VCCI VCCI Input supply voltage 3 5.5 V
+VDD Driver output bias supply 6.0 18 V
+TJ Junction Temperature –40 130 °C
+TA Ambient Temperature –40 125 °C
+
+=== PAGE 5 ===
+5UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) Formore information about traditional andnew thermal metrics, seetheSemiconductor andICPackage Thermal Metrics application
+report, SPRA953 .6.4 Thermal Information
+THERMAL METRIC(1)DWV (SOIC)
+UNIT
+8PINS
+RθJA Junction-to-ambient thermal resistance 108.5 °C/W
+RθJC(top) Junction-to-case (top) thermal resistance 52.0 °C/W
+RθJB Junction-to-board thermal resistance 58.6 °C/W
+ψJT Junction-to-top characterization parameter 32.7 °C/W
+ψJB Junction-to-board characterization parameter 56.6 °C/W
+6.5 Power Ratings
+VALUE UNIT
+PD Power dissipationVCCI= 5.0V;VDD =12V;IN=3.3-V, 2.36-
+MHz 50% duty cycle square wave; 1.0-nF
+load onOUT0.700 W
+PDI Power dissipation bytransmitter side 0.015 W
+PDO Power dissipation bydriver side 0.685 W
+
+=== PAGE 6 ===
+6UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) Creepage andclearance requirements should beapplied according tothespecific equipment isolation standards ofanapplication. Care
+should betaken tomaintain thecreepage andclearance distance ofaboard design toensure thatthemounting pads oftheisolator on
+theprinted-circuit board donotreduce thisdistance. Creepage andclearance onaprinted-circuit board become equal incertain cases.
+Techniques such asinserting grooves, ribs, orboth onaprinted circuit board areused tohelp increase these specifications.
+(2) This coupler issuitable forsafe electrical insulation only within thesafety ratings. Compliance with thesafety ratings shall beensured by
+means ofsuitable protective circuits.
+(3) Testing iscarried outinairoroiltodetermine theintrinsic surge immunity oftheisolation barrier.
+(4) Apparent charge iselectrical discharge caused byapartial discharge (pd).
+(5) Allpins oneach side ofthebarrier tiedtogether creating atwo-pin device.6.6 Insulation Specifications
+PARAMETER TEST CONDITIONS VALUE UNIT
+CLR External clearance(1)Shortest pin-to-pin distance through air >8.5 mm
+CPG External creepage(1)Shortest pin-to-pin distance across thepackage surface >8.5 mm
+DTIDistance through the
+insulationMinimum internal gap(internal clearance) >17 µm
+CTI Comparative tracking index DIN EN60112 (VDE 0303-11); IEC60112 >600 V
+Material group According toIEC60664-1 I
+Overvoltage category per
+IEC60664-1Rated mains voltage≤600VRMS I-IV
+Rated mains voltage≤1000 VRMS I-III
+DINVVDE V0884-11:2017-01(2)
+VIORMMaximum repetitive peak
+isolation voltageACvoltage (bipolar) 1500 VPK
+VIOWMMaximum working isolation
+voltageACvoltage (sine wave); time dependent dielectric breakdown
+(TDDB) test;1060 VRMS
+DCVoltage 1500 VDC
+VIOTMMaximum transient isolation
+voltageVTEST =VIOTM,t=60s(qualification);
+VTEST =1.2×VIOTM,t=1s(100% production)7000 VPK
+VIOSMMaximum surge isolation
+voltage(3)Test method perIEC62368-1, 1.2/50μswaveform,
+VTEST =1.6×VIOSM (qualification)8000 VPK
+qpd Apparent charge(4)Method a,After I/Osafety testsubgroup 2/3,
+Vini=VIOTM,tini=60s;
+Vpd(m) =1.2×VIORM,tm=10s≤5
+pCMethod a,After environmental tests subgroup 1,
+Vini=VIOTM,tini=60s;
+Vpd(m) =1.6×VIORM =2400 VPK,tm=10s≤5
+Method b1;Atroutine test(100% production) and
+preconditioning (type test)
+Vini=1.2×VIOTM;tini=1s;
+Vpd(m) =1.875 ×VIORM =2813 VPK,tm=1s≤5
+CIOBarrier capacitance, input to
+output(5) VIO=0.4sin(2πft),f=1MHz 0.5 pF
+RIOIsolation resistance, input to
+output(5)VIO=500VatTA=25°C >1012
+Ω VIO=500Vat100°C≤TA≤125°C >1011
+VIO=500VatTS=150 °C >109
+Pollution degree 2
+Climatic category 40/125/21
+UL1577
+VISO Withstand isolation voltageVTEST =VISO=5700 VRMS,t=60s.(qualification),
+VTEST =1.2×VISO=6840 VRMS,t=1s(100% production)5000 VRMS
+
+=== PAGE 7 ===
+7UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated6.7 Safety-Related Certifications
+VDE UL CQC
+Plan tocertify according toDIN VVDE V
+0884-11:2017-01Plan toberecognized under UL1577
+Component Recognition ProgramPlan tocertify according toGB4943.1-2011
+(1) The maximum safety temperature, TS,hasthesame value asthemaximum junction temperature, TJ,specified forthedevice. The IS
+andPSparameters represent thesafety current andsafety power respectively. The maximum limits ofISandPSshould notbe
+exceeded. These limits vary with theambient temperature, TA.
+The junction-to-air thermal resistance, RθJA,intheThermal Information table isthatofadevice installed onahigh-K testboard for
+leaded surface-mount packages. Use these equations tocalculate thevalue foreach parameter:
+TJ=TA+RθJA×P,where Pisthepower dissipated inthedevice.
+TJ(max) =TS=TA+RθJA×PS,where TJ(max) isthemaximum allowed junction temperature.
+PS=IS×VI,where VIisthemaximum input voltage.6.8 Safety-Limiting Values
+Safety limiting intends tominimize potential damage totheisolation barrier upon failure ofinput oroutput circuitry.
+PARAMETER TEST CONDITIONS SIDE MIN TYP MAX UNIT
+ISSafety output supply
+currentRθJA=108.5 ºC/W, VVDD=12V,TJ=
+150°C,TA=25°C
+SeeDRIVER side 96 mA
+PS Safety supply powerRθJA=108.5 ºC/W, VVCCI =5.5V,TJ=
+150°C,TA=25°C
+SeeINPUT side 0.015
+W DRIVER side 1.135
+TOTAL 1.150
+TS Safety temperature(1)150 °C
+
+=== PAGE 8 ===
+8UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) Current direction inthetesting conditions aredefined tobepositive intothepinandnegative outofthespecified terminal (unless
+otherwise noted).
+(2) Parameters thathasonly typical values, arenotproduction tested andguaranteed bydesign.6.9 Electrical Characteristics
+VVCCI=3.3Vor5.0V,0.1-µFcapacitor from VCCI toGND and1uF capacitor from VDD toVSS, VVDD=12V,1-µFcapacitor
+from VDD toVSS, TA=–40°Cto+125 °C,unless otherwise noted(1)(2).
+PARAMETER TEST CONDITIONS MIN TYP MAX UNIT
+SUPPLY CURRENTS
+IVCCI VCCI quiescent current VIN=0V 1.5 2.0 mA
+IVDD VDD quiescent current VIN=0V, 1.0 1.8 mA
+IVCCI VCCI operating current (f=500kHz) operating current 2.5 mA
+IVDD VDD operating current(f=500kHz) operating current
+COUT=100pF,
+VVDD=12V2.5 mA
+VCC SUPPLY VOLTAGE UNDERVOLTAGE THRESHOLDS
+VVCCI_ON UVLO Rising threshold 2.55 2.7 2.85 V
+VVCCI_OFF UVLO Falling threshold 2.35 2.5 2.65 V
+VVCCI_HYS UVLO Threshold hysteresis 0.2 V
+VDD SUPPLY VOLTAGE UNDERVOLTAGE THRESHOLDS
+VVDD UVLO Rising threshold 5.0 5.5 5.9 V
+VVDD_OFF UVLO Falling threshold 4.7 5.2 5.6 V
+VVDD_HYS UVLO Threshold hysteresis 0.3 V
+IN
+VINH Input high threshold voltage 1.6 1.8 2 V
+VINL Input lowthreshold voltage 0.8 1 1.25 V
+VIN_HYS Input threshold hysteresis 0.8 V
+OUTPUT
+IO+ Peak output source currentCVDD=10µF,CLOAD =0.18 µF,f
+=1kHz, bench measurement4 A
+IO- Peak output sink currentCVDD=10µF,CLOAD =0.18 µF,f
+=1kHz, bench measurement6 A
+ROH Output resistance athigh stateIOUT=–10mA, ROHA,ROHBdonot
+represent drive pull-up
+performance. See tRISE in
+Switching Characteristics and
+Output Stage formore details.5 Ω
+ROL Output resistance atlowstate IOUT=10mA 0.55 Ω
+VOH Output voltage athigh state VVDD=12V,IOUT=–10mA 11.95 V
+VOL Output voltage atlowstate VVDD=12V,IOUT=10mA 5.5 mV
+VOAPDDriver output (VOUT)active pull
+downVVDD,IOUT=200mA 1.75 2.1 V
+
+=== PAGE 9 ===
+9UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated(1) Parameters thathasonly typical values, arenotproduction tested andguaranteed bydesign.6.10 Switching Characteristics
+VVCCI=3.3Vor5.5V,0.1-µFcapacitor from VCCI toGND, VVDD=12V,1-µFcapacitor from VDD andVSS, load
+capacitance COUT=0pF,TJ=–40°Cto+125 °C,unless otherwise noted(1).
+PARAMETER TEST CONDITIONS MIN TYP MAX UNIT
+tRISE Output risetime, seeFigure 17 CVDD=10µF,COUT=1.8nF,
+VVDD=12V,f=1kHz5 16 ns
+tFALL Output falltime, seeFigure 17 CVDD=10µF,COUT=1.8nF,
+VVDD=12V,f=1kHz6 12 ns
+tPWmin Minimum input pulse width that
+passes tooutput,
+seeandOutput does notchange thestate if
+input signal less than tPWmin10 20 ns
+tPDHL Propagation delay atfalling edge,
+seeINxhigh threshold, VINH,to10% of
+theoutput28 40 ns
+tPDLH Propagation delay atrising edge,
+seeINxlowthreshold, VINL,to90% of
+theoutput28 40 ns
+tPWD Pulse width distortion ineach
+channel, see|tPDLH –tPDHL|5.5 ns
+tVCCI+ to
+OUTVCCI Power-up Delay Time: UVLO
+Rise toOUT,
+See Figure 18INtiedtoVCCI40 59
+µs
+tVDD+ to
+OUTVDD Power-up Delay Time: UVLO
+Rise toOUT
+See Figure 19INtied toVCCI22 35
+|CM H|High-level common-mode transient
+immunity (See )Slew rate ofGND vs.VSS, INistied
+toGND orVCCI; VCM=1000 V;100
+V/ns
+|CM L|Low-level common-mode transient
+immunity (See )Slew rate ofGND vs.VSS, INistied
+toGND orVCCI; VCM=1000 V;100
+
+=== PAGE 10 ===
+Temperature (°C)VDD Operating Current (mA)
+-40 -20 0 20 40 60 80 100 120 1400.91.21.51.82.12.42.73
+D001VDD = 12V, f S=50kHz
+VDD = 12V, f S=1.0MHz
+VDD = 15V, f S=50kHz
+VDD = 15V, f S=1.0MHz
+Frequency (kHz)VDD Operating Current (mA)
+0 100 200 300 400 500 600 700 800 900 100011.21.41.61.822.22.42.62.83
+D001VDD = 12V
+VDD = 15V
+Frequency (kHz)VCCI Operating Current (mA)
+0 100 200 300 400 500 600 700 800 900 10002.52.522.542.562.582.6
+D001VCCI = 3.3V
+VCCI = 5.0V
+Temperature (°C)Current (mA)
+-40 -20 0 20 40 60 80 100 120 1400.811.21.41.6
+D001VDD = 12V
+VDD = 18V
+Temperature (°C)Current (mA)
+-40 -20 0 20 40 60 80 100 120 1401.21.31.41.51.6
+D001VCCI = 3.3V
+VCCI = 5.0V
+Temperature (°C)VCCI Operating Current (mA)
+-40 -20 0 20 40 60 80 100 120 1402.42.442.482.522.562.62.642.68
+D001VCCI = 3.3V, f S=50kHz
+VCCI = 3.3V, f S=1.0MHz
+VCCI = 5.0V, f S=50kHz
+VCCI = 5.0V, f S=1.0MHz
+10UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated6.11 Typical Characteristics
+VDD =12V,VCCI =3.3Vor5.0V,TA=25°C,CL=0pF unless otherwise noted.
+NoLoad IN=GND
+Figure 1.VCCI Quiescent Current Figure 2.VCCI Operating Current -IVCCI
+Figure 3.VCCI Operating Current vs.FrequencyNoLoad IN=GND
+Figure 4.VDD Quiescent Current (IVDD)
+NoLoad
+Figure 5.VDD Channel Operating Current (IVDD)NoLoad INpinswitching
+Figure 6.Operating Current (IVDD)vs.Frequency
+
+=== PAGE 11 ===
+Temperature (°C)5HVLVWDQFH
+-40 -20 0 20 40 60 80 100 120 1400246810
+D001OUTPUT Pull-Up
+OUTPUT Pull-Down
+Temperature (°C)Propagation Delay (ns)
+-40 -20 0 20 40 60 80 100 120 1402022.52527.53032.53537.5
+D001Rising Edge (t PDLH)
+Falling Edge (t PDHL)
+Temperature ( qC)UVLO Thresholds (V)
+-40 -20 0 20 40 60 80 100 120 14055.25.45.65.86
+D001 UVLOVVDD_ON
+VVDD_OFF
+Temperature ( qC)UVLO Hysteresis (mV)
+-40 -20 0 20 40 60 80 100 120 140320330340350360
+D001 UVLO
+Temperature (°C)UVLO Thresholds (V)
+-40 -20 0 20 40 60 80 100 120 1402.42.52.62.72.82.9
+D001VVCCI_ON
+VVCCI_OFF
+Temperature (°C)UVLO Hysteresis (mV)
+-40 -20 0 20 40 60 80 100 120 140188192196200204208212
+D001
+11UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments IncorporatedTypical Characteristics (continued)
+VDD =12V,VCCI =3.3Vor5.0V,TA=25°C,CL=0pF unless otherwise noted.
+Figure 7.VCCI UVLO Threshold Voltage Figure 8.VCCI UVLO Threshold Hysteresis Voltage
+Figure 9.VDD Supply UVLO Threshold Voltage Figure 10.VDD Supply UVLO Threshold Hysteresis
+Figure 11.OUT Pullup andPulldown Resistance Figure 12.Propagation Delay, Rising andFalling Edge
+
+=== PAGE 12 ===
+Temperature (°C)Output Active Pull Down Voltage (V)
+-40 -20 0 20 40 60 80 100 120 14000.511.522.5
+D001VDD Open
+VDD = 0V
+Temperature (°C)Minimum Input Pulse (ns)
+-40 -20 0 20 40 60 80 100 120 14045678910
+D001
+Temperature (°C)Pulse Width Distortion (ns)
+-40 -20 0 20 40 60 80 100 120 140-3-2-10123
+D001
+Temperature (°C)Rising and Falling Time (ns)
+-40 -20 0 20 40 60 80 100 120 1400246810
+D001Rising
+Falling
+12UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments IncorporatedTypical Characteristics (continued)
+VDD =12V,VCCI =3.3Vor5.0V,TA=25°C,CL=0pF unless otherwise noted.
+tPDLH –tPDHL
+Figure 13.Pulse Width DistortionCL=1.8nF
+Figure 14.Rise Time andFallTime
+Figure 15.OUTPUT Active Pulldown Voltage Figure 16.Minimum Pulse thatChanges Output
+
+=== PAGE 13 ===
+VCCI, 
+IN
+VDDVVCCI_ON
+OUTVVCCI_OFF
+tVCCI+ to OUT
+VCCI, 
+IN
+VDD
+VVDD_ON
+OUTtVDD+ to OUTVVDD_OFF
+20%tRISE80%90%
+10%tFALL
+13UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated7Parameter Measurement Information
+7.1 Rising andFalling Time
+Figure 17shows thecriteria formeasuring rising (tRISE)and falling (tFALL)times. Formore information onhow
+short rising andfalling times areachieved seeOutput Stage
+Figure 17.Rising andFalling Time Criteria
+7.2 Power-up UVLO Delay toOUTPUT
+Before thedriver isready todeliver aproper output state, there isapower-up delay from theUVLO rising edge
+tooutput anditisdefined astVCCI+ toOUTforVCCI UVLO, which is40µstypically, andtVDD+ toOUTforVDD UVLO,
+which is22µstypically. Itisrecommended toallow proper delay margin after thedriver VCCI and VDD bias
+supplies areready before applying thePWM signal attheINpin. Figure 18and Figure 19show thepower-up
+UVLO delay timing diagram forVCCI andVDD.
+IftheINpinisactive before VCCI orVDD have crossed above their respective onthresholds, theoutput willnot
+update until tVCCI+ toOUTortVDD+ toOUTafter VCCI orVDD crossing itsUVLO rising threshold. However, when
+either VCCI orVDD receive avoltage less than their respective offthresholds, there is<1µsdelay, depending on
+thevoltage slew rate onthesupply pins, before theoutputs areheld low. This asymmetric delay isdesigned to
+ensure safe operation during VCCI orVDD brownouts.
+Figure 18.VCCI Power-up UVLO Delay Figure 19.VDD Power-up UVLO Delay
+
+=== PAGE 14 ===
+200 k:
+UVLOVCCI7
+5,68
+DriverVDD
+OUT
+VSSUVLODEMOD MOD
+GNDIN
+VCCIDeglitch
+FilterBarrier Isolation2,3
+41
+14UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated8Detailed Description
+8.1 Overview
+Inorder toswitch power transistors rapidly and reduce switching power losses, high-current gate drivers are
+often placed between theoutput ofcontrol devices and thegates ofpower transistors. There areseveral
+instances where controllers arenotcapable ofdelivering sufficient current todrive thegates ofpower transistors.
+This isespecially thecase with digital controllers, since theinput signal from thedigital controller isoften a3.3-V
+logic signal capable ofonly delivering afewmA.
+The UCC5304 isaflexible gate driver that can beconfigured tofitavariety ofpower supply and motor drive
+topologies, aswell asdrive several types oftransistors. UCC5304 has many features that allow ittointegrate
+well with control circuitry andprotect thegates itdrives such asunder voltage lock-out (UVLO) forboth input and
+output voltages. The UCC5304 holds itsoutput lowwhen theinput isleftopen orwhen theinput pulse isnot
+wide enough. The driver input pinisCMOS and TTL compatible forinterfacing with digital and analog power
+controllers alike.
+8.2 Functional Block Diagram
+
+=== PAGE 15 ===
+RHI_ZVDD
+RCLAMPOUT
+VSSRCLAMP  is activated 
+during UVLOOutput 
+Control
+15UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated8.3 Feature Description
+8.3.1 VDD, VCCI, andUnder Voltage Lock Out(UVLO)
+The UCC5304 has aninternal under voltage lock out(UVLO) protection feature onthesupply circuit blocks
+between theVDD and VSS pins. When theVDD bias voltage islower than VVDD_ON atdevice start-up orlower
+than VVDD_OFF after start-up, theVDD UVLO feature holds theeffected output low, regardless ofthestatus ofthe
+INpin.
+When theoutput stages ofthedriver areinanunbiased orUVLO condition, thedriver outputs areheld lowbyan
+active clamp circuit thatlimits thevoltage riseonthedriver outputs (Illustrated inFigure 20).Inthiscondition, the
+upper PMOS isresistively held offbyRHi-Zwhile thelower NMOS gate istiedtothedriver output through RCLAMP .
+Inthis configuration, theoutput iseffectively clamped tothethreshold voltage ofthelower NMOS device,
+typically around 1.5V, when nobias power isavailable.
+Figure 20.Simplified Representation ofActive PullDown Feature
+The VDD UVLO protection has ahysteresis feature (VVDD_HYS ).This hysteresis prevents chatter when there is
+ground noise from thepower supply. Also thisallows thedevice toaccept small drops inbias voltage, which is
+bound tohappen when thedevice starts switching andoperating current consumption increases suddenly.
+The input side oftheUCC5304 also hasaninternal under voltage lock out(UVLO) protection feature. The device
+isn't active unless theVCCI voltage exceeds VVCCI_ON onstart up.The input signal willnotbedelivered when the
+VCCI suply isless than VVCCI_OFF .And, justliketheUVLO forVDD, there ishystersis (VVCCI_HYS )toensure stable
+operation.
+Table 1.VCCI UVLO Feature Logic
+CONDITION INPUT OUTPUT
+IN OUT
+VCCI-GND <VVCCI_ON before device start up H L
+VCCI-GND <VVCCI_ON before device start up L L
+VCCI-GND <VVCCI_OFF after device start up H L
+VCCI-GND <VVCCI_OFF after device start up L L
+
+=== PAGE 16 ===
+16UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments IncorporatedTable 2.VDD UVLO Feature Logic
+CONDITION INPUT OUTPUT
+IN OUT
+VDD-VSS <VVDD_ON before device start up H L
+VDD-VSS <VVDD_ON before device start up L L
+VDD-VSS <VVDD_OFF after device start up H L
+VDD-VSS <VVDD_OFF after device start up L L
+8.3.2 Input Stage
+The input pinofUCC5304 isbased onaTTL and CMOS compatible input-threshold logic that istotally isolated
+from theVDD supply voltage. The input pins areeasy todrive with logic-level control signals (such asthose from
+3.3-V micro-controllers), since theUCC5304 has atypical high threshold (VINAH)of1.8Vand atypical low
+threshold of1V,which vary little with temperature (see and ).Awide hysterisis (VINA_HYS )of0.8Vmakes for
+good noise immunity and stable operation. Iftheinput isever leftopen, aninternal pull-down resistor forces the
+pinlow. This resistance istypically 200kΩ(see Functional Block Diagram ).
+Since theinput side ofUCC5304 isisolated from theoutput drivers, theinput signal amplitude canbelarger or
+smaller than VDD, provided that itdoesn ’texceed therecommended limit. This allows greater flexibility when
+integrating with control signal sources, and allows the user tochoose the most efficient VDD fortheir
+MOSFET/IGBT gate. That said, theamplitude ofanysignal applied toINmust notexceed VCCI.
+
+=== PAGE 17 ===
+VDD
+OUT
+VSSPull UpShoot-
+Through 
+Prevention 
+CircuitryInput 
+SignalROH
+ROLRNMOS
+17UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated8.3.3 Output Stage
+The UCC5304 output stage features apull-up structure which delivers thehighest peak-source current when itis
+most needed —during theMiller plateau region ofthepower-switch turn ontransition (when thepower switch
+drain orcollector voltage experiences dV/dt). The output stage pull-up structure features aP-channel MOSFET
+andanadditional Pull-Up N-channel MOSFET inparallel. The function oftheN-channel MOSFET istoprovide a
+boost inthepeak-sourcing current, enabling fast turn on.This isaccomplished bybriefly turning ontheN-
+channel MOSFET during anarrow instant when theoutput ischanging states from lowtohigh. The on-resistance
+ofthisN-channel MOSFET (RNMOS )isapproximately 1.47Ωwhen activated.
+The ROHparameter isaDCmeasurement and itisrepresentative oftheon-resistance oftheP-channel device
+only. This isbecause thePull-Up N-channel device isheld intheoffstate inDCcondition and isturned ononly
+forabrief instant when theoutput ischanging states from lowtohigh. Therefore theeffective resistance ofthe
+UCC5304 pull-up stage during this brief turn-on phase ismuch lower than what isrepresented bytheROH
+parameter.
+The pull-down structure oftheUCC5304 iscomprised ofanN-channel MOSFET. The ROLparameter, which is
+also aDCmeasurement, isrepresentative oftheimpedance ofthepull-down state inthedevice. The output of
+theUCC5304 iscapable ofdelivering 4-Apeak source and 6-Apeak sink current pulses. The output voltage
+swings between VDD and VSS provides rail-to-rail operation, thanks totheMOS-out stage which delivers very
+lowdrop-out.
+Figure 21.Output Stage
+
+=== PAGE 18 ===
+18UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated8.4 Device Functional Modes
+Assume VCCI andVDD arepowered up.See VDD, VCCI, andUnder Voltage Lock Out(UVLO) formore information on
+UVLO operation modes. Table 3lists theUCC5304 'sfunctional modes.
+Table 3.INPUT/OUTPUT Logic Table
+IN OUT NOTE
+L L
+H H
+OPEN LItisrecommended topullINtoground toachieve better noise immunity ifthesystem
+hasanoperational mode thatdoes notassert theinput either HIGH orLOW
+
+=== PAGE 19 ===
+VDD
+OUTL
+VSS7
+5,68VBOOT
+OUTH
+SWBarrierInput Logic2,31
+4CBOOT
+CVDD
+VSSROFF
+RON
+RGS
+ROFF
+RONCIN
+VDDRBOOTVDD
+HV DC-Link
+SW GNDVCCIIN
+PCCVCCVCC
+VCC
+PWM-A
+PWM-B
+RGSIsolationCIN  RIN
+7
+5,68BarrierInput Logic2,31
+4
+GNDVCCIIN
+CVCCVCC
+IsolationCIN  RIN
+19UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated9Application andImplementation
+NOTE
+Information inthe following applications sections isnot part ofthe TIcomponent
+specification, and TIdoes notwarrant itsaccuracy orcompleteness. TI’scustomers are
+responsible fordetermining suitability ofcomponents fortheir purposes. Customers should
+validate andtesttheir design implementation toconfirm system functionality.
+9.1 Application Information
+The UCC5304 effectively combines both isolation and buffer-drive functions. The flexible, universal capability of
+theUCC5304 (with upto5.5-V VCCI and 18-V VDD) allows thedevice tobeused asalow-side orhigh-side
+gate driver forMOSFETs, IGBTs orGaN transistors. With integrated components, advanced protection features
+(UVLO and disable) and optimized switching performance; theUCC5304 enables designers tobuild smaller,
+more robust designs forenterprise, telecom, automotive, andindustrial applications with afaster time tomarket.
+9.2 Typical Application
+The circuit inFigure 22shows areference design with two UCC5304 devices driving atypical half-bridge
+configuration which could beused inseveral popular power converter topologies such assynchronous buck,
+synchronous boost, half-bridge/full bridge isolated topologies, and3-phase motor drive applications.
+Figure 22.Typical Application Schematic
+
+=== PAGE 20 ===
+J C JT GDT T P < u
+20UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments IncorporatedTypical Application (continued)
+9.2.1 Design Requirements
+Table 4lists reference design parameters foranexample application: UCC5304 driving a650-V MOSFET.
+Table 4.UCC5304 Design Requirements
+PARAMETER VALUE UNITS
+Power transistor IPP65R150CFD -
+VCC 5.0 V
+VDD 12 V
+Input signal amplitude 3.3 V
+Switching frequency (fs) 100 kHz
+DClinkvoltage 400 V
+9.2.2 Detailed Design Procedure
+9.2.2.1 Designing INpinInput Filter
+Itisrecommended that users avoid shaping thesignal tothegate driver inanattempt toslow down (ordelay)
+thesignal attheoutput. However, asmall input RIN-CINfilter canbeused tofilter outtheringing introduced by
+non-ideal layout orlong PCB traces.
+Such afilter should use anRINintherange of0Ωto100Ωand aCINbetween 10pFand 100 pF.Inthe
+example, anRIN=51ΩandaCIN=33pFareselected, with acorner frequency ofapproximately 100MHz.
+When selecting these components, itisimportant topayattention tothetrade-off between good noise immunity
+andpropagation delay.
+9.2.2.2 Estimating Junction Temperature
+The junction temperature (TJ)oftheUCC5304 canbeestimated with:
+where
+•TCistheUCC5304 case-top temperature measured with athermocouple orsome other instrument, ψJTisthe
+junction-to-top characterization parameter from theThermal Information table. Importantly, ψJTisdeveloped
+based onJEDEC standard PCB board anditissubject tochange when thePCB board layout isdifferent. For
+more information, please visit application report -semiconductor andICpackage thermal metrics . (1)
+Using thejunction-to-top characterization parameter (ΨJT)instead ofthejunction-to-case thermal resistance
+(RΘJC)can greatly improve theaccuracy ofthejunction temperature estimation. The majority ofthethermal
+energy ofmost ICsisreleased intothePCB through thepackage leads, whereas only asmall percentage ofthe
+total energy isreleased through thetopofthecase (where thermocouple measurements areusually conducted).
+RΘJCcanonly beused effectively when most ofthethermal energy isreleased through thecase, such aswith
+metal packages orwhen aheatsink isapplied toanICpackage. Inallother cases, useofRΘJCwillinaccurately
+estimate thetrue junction temperature. ΨJTisexperimentally derived byassuming that theamount ofenergy
+leaving through thetopoftheICwillbesimilar inboth thetesting environment and theapplication environment.
+Aslong astherecommended layout guidelines areobserved, junction temperature estimates can bemade
+accurately towithin afewdegrees Celsius. Formore information, seetheLayout Guidelines andSemiconductor
+andICPackage Thermal Metrics application report .
+9.2.2.3 Selecting VCCI and VDD Capacitors
+Bypass capacitors forVCCI and VDD areessential forachieving reliable performance. Itisrecommended that
+one choose lowESR and lowESL surface-mount multi-layer ceramic capacitors (MLCC) with sufficient voltage
+ratings, temperature coefficients and capacitance tolerances. Importantly, DCbias onanMLCC willimpact the
+actual capacitance value. Forexample, a25-V, 1-µFX7R capacitor ismeasured tobeonly 500 nFwhen aDC
+bias of15VDCisapplied.
+
+=== PAGE 21 ===
+21UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated9.2.2.3.1 Selecting aVCCI Capacitor
+Abypass capacitor connected toVCCI supports thetransient current needed fortheprimary logic and thetotal
+current consumption, which isonly afewmA. Therefore, a25-V MLCC with over 100nFisrecommended forthis
+application. Ifthebias power supply output isarelatively long distance from theVCCI pin, atantalum or
+electrolytic capacitor, with avalue over 1µF,should beplaced inparallel with theMLCC.
+9.2.2.3.2 Selecting aVDD Capacitor
+A50-V, 10-µFMLCC and a50-V, 220-nF MLCC arechosen forCVDD.Ifthebias power supply output isa
+relatively long distance from theVDD pin,atantalum orelectrolytic capacitor with avalue over 10µF,should be
+used inparallel with CVDD.
+
+=== PAGE 22 ===
+22UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated10Power Supply Recommendations
+The recommended input supply voltage (VCCI) forUCC5304 isbetween 3Vand 5.5V.The output bias supply
+voltage (VDD) range from 9.2V to18V. The lower endofthisbias supply range isgoverned bytheinternal under
+voltage lockout (UVLO) protection feature ofeach device. One mustn ’tletVDD orVCCI fallbelow their
+respective UVLO thresholds (For more information onUVLO see VDD, VCCI, and Under Voltage Lock Out
+(UVLO) ).The upper end oftheVDD range depends onthemaximum gate voltage ofthepower device being
+driven byUCC5304. The UCC5304 hasarecommended maximum VDD of18V.
+Alocal bypass capacitor should beplaced between theVDD andVSS pins. This capacitor should bepositioned
+asclose tothedevice aspossible. AlowESR, ceramic surface mount capacitor isrecommended. Itisfurther
+suggested that one place twosuch capacitors: one with avalue of≈10-µFfordevice biasing, and anadditional
+≤100-nF capacitor inparallel forhigh frequency filtering..
+Similarly, abypass capacitor should also beplaced between theVCCI andGND pins. Given thesmall amount of
+current drawn bythelogic circuitry within theinput side ofUCC5304, this bypass capacitor has aminimum
+recommended value of100nF.
+
+=== PAGE 23 ===
+23UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated11Layout
+11.1 Layout Guidelines
+Consider these PCB layout guidelines forinorder toachieve optimum performance fortheUCC5304.
+11.1.1 Component Placement Considerations
+•Low-ESR and low-ESL capacitors must beconnected close tothedevice between theVCCI and GND pins
+and between theVDD and VSS pins tosupport high peak currents when turning ontheexternal power
+transistor.
+•Toavoid large negative transients ontheswitch node VSS pininahalf-bridge application, theparasitic
+inductances between thesource ofthetoptransistor and thesource ofthebottom transistor must be
+minimized.
+11.1.2 Grounding Considerations
+•Itisessential toconfine thehigh peak currents that charge and discharge thetransistor gates toaminimal
+physical area. This willdecrease theloop inductance and minimize noise onthegate terminals ofthe
+transistors. The gate driver must beplaced asclose aspossible tothetransistors.
+11.1.3 High-Voltage Considerations
+•Toensure isolation performance between theprimary andsecondary side, oneshould avoid placing anyPCB
+traces orcopper below thedriver device. APCB cutout isrecommended inorder toprevent contamination
+thatmay compromise theUCC5304 isolation performance.
+•Forhalf-bridge, orhigh-side/low-side configurations, one should trytoincrease theclearance distance ofthe
+PCB layout between thehigh andlow-side PCB traces.
+11.1.4 Thermal Considerations
+•Alarge amount ofpower may bedissipated bytheUCC5304 ifthedriving voltage ishigh, theload isheavy,
+ortheswitching frequency ishigh (Refer toformore details). Proper PCB layout canhelp dissipate heat from
+thedevice tothePCB andminimize junction toboard thermal impedance (θJB).
+•Increasing thePCB copper connecting toVDD andVSS pins isrecommended, with priority onmaximizing the
+connection toVSS (See and ).However, high voltage PCB considerations mentioned above must be
+maintained.
+•Ifthere aremultiple layers inthesystem, itisalso recommended toconnect theVDD and VSS pins to
+internal ground orpower planes through multiple vias ofadequate size. Ensure thatnotraces orcoppers from
+different high-voltage planes overlap.
+
+=== PAGE 24 ===
+24UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated11.2 Layout Example
+Figure 23shows a2-layer PCB layout example.
+Figure 23.Layout Example
+12Mechanical, Packaging, andOrderable Information
+The following pages include mechanical, packaging, and orderable information. This information isthemost
+current data available forthedesignated devices. This data issubject tochange without notice and revision of
+thisdocument. Forbrowser-based versions ofthisdata sheet, refer totheleft-hand navigation.
+
+=== PAGE 25 ===
+www.ti.comPACKAGE OUTLINE
+C
+TYP11.5 0.25
+2.8 MAX
+TYP0.33
+0.13
+0-86X 1.27
+8X0.51
+0.312X
+3.81
+0.46
+0.36
+1.0
+0.50.25
+GAGE PLANEANOTE 35.95
+5.75
+B
+NOTE 47.6
+7.4
+(2.286)
+(2)
+4218796/A 09/2013SOIC - 2.8 mm max height DWV0008A
+SOIC
+NOTES:
+1. All linear dimensions are in millimeters. Dimensions in parenthesis are for reference only. Dimensioning and tolerancing
+per ASME Y14.5M.
+2. This drawing is subject to change without notice.
+3. This dimension does not include mold flash, protrusions, or gate burrs. Mold flash, protrusions, or gate burrs shall not
+exceed 0.15 mm, per side.
+4. This dimension does not include interlead flash. Interlead flash shall not exceed 0.25 mm, per side.18
+0.25 C A B54AREAPIN 1 IDSEATING PLANE
+0.1 C
+SEE DETAIL A
+TYPICALDETAIL ASCALE  2.000
+25UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated
+
+=== PAGE 26 ===
+www.ti.comEXAMPLE BOARD LAYOUT
+(10.9)
+0.07 MAX
+ALL AROUND0.07 MIN
+ALL AROUND8X (1.8)
+8X (0.6)
+6X (1.27)
+4218796/A 09/2013SYMMSOIC - 2.8 mm max height DWV0008A
+SOIC
+SYMMSEE DETAILS
+9.1 mm NOMINAL CLEARANCE/CREEPAGELAND PATTERN EXAMPLE
+SCALE:6X
+NOTES: (continued)
+5. Publication IPC-7351 may have alternate designs.
+6. Solder mask tolerances between and around signal pads can vary based on board fabrication site.METALSOLDER MASK
+OPENING
+NON SOLDER MASK
+DEFINEDOPENING
+SOLDER MASK DETAILSSOLDER MASK METAL
+SOLDER MASK
+DEFINED
+26UCC5304
+SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020 www.ti.com
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated
+
+=== PAGE 27 ===
+www.ti.comEXAMPLE STENCIL DESIGN
+8X (1.8)
+8X (0.6)
+6X (1.27)
+(10.9)
+4218796/A 09/2013SOIC - 2.8 mm max height DWV0008A
+SOIC
+NOTES: (continued)
+7. Laser cutting apertures with trapezoidal walls and rounded corners may offer better paste release. IPC-7525 may have alternate
+design recommendations.
+8. Board assembly site may have different recommendations for stencil design.SOLDER PASTE EXAMPLE
+BASED ON 0.125 mm THICK STENCIL
+SCALE:6XSYMM
+SYMM
+27UCC5304
+www.ti.com SLUSDV5B –OCTOBER 2019 –REVISED APRIL 2020
+Product Folder Links: UCC5304Submit Documentation Feedback Copyright ©2019 –2020, Texas Instruments Incorporated
+
+=== PAGE 28 ===
+PACKAGE OPTION ADDENDUM
+www.ti.com 6-Feb-2026
+PACKAGING INFORMATION
+Orderable part number Status
+(1)Material type
+(2)Package | Pins Package qty | Carrier RoHS
+(3)Lead finish/
+Ball material
+(4)MSL rating/
+Peak reflow
+(5)Op temp (°C) Part marking
+(6)
+UCC5304DWV Obsolete Production SOIC (DWV) | 8 - - Call TI Call TI -40 to 125 UCC5304
+UCC5304DWVR Active Production SOIC (DWV) | 8 1000 | LARGE T&R Yes NIPDAU Level-2-260C-1 YEAR -40 to 125 UCC5304
+UCC5304DWVR.A Active Production SOIC (DWV) | 8 1000 | LARGE T&R Yes NIPDAU Level-2-260C-1 YEAR -40 to 125 UCC5304
+UCC5304DWVRG4 Active Production SOIC (DWV) | 8 1000 | LARGE T&R Yes NIPDAU Level-2-260C-1 YEAR -40 to 125 UCC5304
+UCC5304DWVRG4.A Active Production SOIC (DWV) | 8 1000 | LARGE T&R Yes NIPDAU Level-2-260C-1 YEAR -40 to 125 UCC5304
+ 
+(1) Status:  For more details on status, see our product life cycle .
+ 
+(2) Material type:  When designated, preproduction parts are prototypes/experimental devices, and are not yet approved or released for full production. Testing and final process, including without limitation quality assurance,
+reliability performance testing, and/or process qualification, may not yet be complete, and this item is subject to further changes or possible discontinuation. If available for ordering, purchases will be subject to an additional
+waiver at checkout, and are intended for early internal evaluation purposes only. These items are sold without warranties of any kind.
+ 
+(3) RoHS values:  Yes, No, RoHS Exempt. See the TI RoHS Statement  for additional information and value definition.
+ 
+(4) Lead finish/Ball material:  Parts may have multiple material finish options. Finish options are separated by a vertical ruled line. Lead finish/Ball material values may wrap to two lines if the finish value exceeds the maximum
+column width.
+ 
+(5) MSL rating/Peak reflow:  The moisture sensitivity level ratings and peak solder (reflow) temperatures. In the event that a part has multiple moisture sensitivity ratings, only the lowest level per JEDEC standards is shown.
+Refer to the shipping label for the actual reflow temperature that will be used to mount the part to the printed circuit board.
+ 
+(6) Part marking:  There may be an additional marking, which relates to the logo, the lot trace code information, or the environmental category of the part.
+ 
+Multiple part markings will be inside parentheses. Only one part marking contained in parentheses and separated by a "~" will appear on a part. If a line is indented then it is a continuation of the previous line and the two
+combined represent the entire part marking for that device.
+ 
+Important Information and Disclaimer: The information provided on this page represents TI's knowledge and belief as of the date that it is provided. TI bases its knowledge and belief on information provided by third parties, and
+makes no representation or warranty as to the accuracy of such information. Efforts are underway to better integrate information from third parties. TI has taken and continues to take reasonable steps to provide representative
+and accurate information but may not have conducted destructive testing or chemical analysis on incoming materials and chemicals. TI and TI suppliers consider certain information to be proprietary, and thus CAS numbers
+and other limited information may not be available for release.
+ 
+In no event shall TI's liability arising out of such information exceed the total purchase price of the TI part(s) at issue in this document sold by TI to Customer on an annual basis.
+ 
+Addendum-Page 1
+
+=== PAGE 29 ===
+www.ti.comPACKAGE OUTLINE
+C
+TYP11.5 0.25
+2.8 MAX
+ TYP0.33
+0.13
+0-86X 1.27
+8X 0.510.312X
+3.81
+0.460.36
+1.00.50.25
+GAGE PLANEANOTE 35.95
+5.75
+B
+NOTE 47.6
+7.4
+(2.286)
+(2)
+4218796/A   09/2013SOIC - 2.8 mm max height DWV0008A
+SOIC
+NOTES:  1. All linear dimensions are in millimeters. Dimensions in parenthesis are for reference only. Dimensioning and tolerancing    per ASME Y14.5M. 2. This drawing is subject to change without notice. 3. This dimension does not include mold flash, protrusions, or gate burrs. Mold flash, protrusions, or gate burrs shall not    exceed 0.15 mm, per side. 4. This dimension does not include interlead flash. Interlead flash shall not exceed 0.25 mm, per side. 18
+0.25 CA B54AREAPIN 1 IDSEATING PLANE
+0.1C
+ SEE DETAIL A
+DETAIL A
+TYPICALSCALE  2.000
+
+=== PAGE 30 ===
+www.ti.comEXAMPLE BOARD LAYOUT
+(10.9)
+0.07 MAX
+ALL AROUND0.07 MINALL AROUND 8X (1.8)
+8X (0.6)
+6X (1.27)
+4218796/A   09/2013SOIC - 2.8 mm max height DWV0008A
+SOIC
+SYMM
+SYMMSEE DETAILS
+LAND PATTERN EXAMPLE
+9.1 mm NOMINAL CLEARANCE/CREEPAGE
+SCALE:6X
+NOTES: (continued) 5. Publication IPC-7351 may have alternate designs. 6. Solder mask tolerances between and around signal pads can vary based on board fabrication site. METALSOLDER MASKOPENING
+NON SOLDER MASK
+DEFINED
+SOLDER MASK DETAILSOPENINGSOLDER MASK METAL
+SOLDER MASK
+DEFINED
+
+=== PAGE 31 ===
+www.ti.comEXAMPLE STENCIL DESIGN
+8X (1.8)
+8X (0.6)
+6X (1.27)
+(10.9)
+4218796/A   09/2013SOIC - 2.8 mm max height DWV0008A
+SOIC
+NOTES: (continued)
+ 7. Laser cutting apertures with trapezoidal walls and rounded corners may offer better paste release. IPC-7525 may have alternate    design recommendations.   8. Board assembly site may have different recommendations for stencil design. SOLDER PASTE EXAMPLE
+BASED ON 0.125 mm THICK STENCIL
+SCALE:6XSYMM
+SYMM
+
+=== PAGE 32 ===
+IMPORTANT NOTICE AND DISCLAIMER
+TI PROVIDES TECHNICAL AND RELIABILITY DATA (INCLUDING DATASHEETS), DESIGN RESOURCES (INCLUDING REFERENCE 
+DESIGNS), APPLICATION OR OTHER DESIGN ADVICE, WEB TOOLS, SAFETY INFORMATION, AND OTHER RESOURCES “AS IS” 
+AND WITH ALL FAULTS, AND DISCLAIMS ALL WARRANTIES, EXPRESS AND IMPLIED, INCLUDING WITHOUT LIMITATION ANY 
+IMPLIED WARRANTIES OF MERCHANTABILIT Y, FITNESS FOR A PARTICULAR PURPOSE OR NON-INFRINGEMENT OF THIRD 
+PARTY INTELLECTUAL PROPERTY RIGHTS.
+These resources are intended for skilled developers designing with TI products. Y ou are solely responsible for (1) selecting the appropriate 
+TI products for your application, (2) designing, validating and testing your application, and (3) ensuring your application meets applicable 
+standards, and any other safety, security, regulatory or other requirements.
+These resources are subject to change without notice. TI grants you permission to use these resources only for development of an 
+application that uses the TI products described in the resource. Other reproduction and display of these resources is prohibited. No license 
+is granted to any other TI intellectual property right or to any third party intellectual property right. TI disclaims responsibility for , and you fully 
+indemnify TI and its representatives against any claims, damages, costs, losses, and liabilities arising out of your use of these resources.
+TI’s products are provided subject to TI’s Terms of Sale, TI’s General Quality Guidelines , or other applicable terms available either on 
+ti.com  or provided in conjunction with such TI products. TI’s provision of these resources does not expand or otherwise alter TI’s applicable 
+warranties or warranty disclaimers for TI products. Unless TI explicitly designates a product as custom or customer-specified, TI products 
+are standard, catalog, general purpose devices.
+TI objects to and rejects any additional or different terms you may propose.
+IMPORTANT NOTICE
+Copyright © 202 6, Texas Instruments Incorporated
+Last updated 10/2025

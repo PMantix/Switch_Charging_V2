@@ -1,0 +1,29 @@
+TS-1187A-B-A-B — Specs from LCSC product page C318884
+Source: https://www.lcsc.com/product-detail/C318884.html (fetched 2026-05-23)
+NOTE: PDF datasheet is image-only (no extractable text). These specs come from the LCSC product listing.
+
+Manufacturer: XKB Connection
+Part Number: TS-1187A-B-A-B
+LCSC Part #: C318884
+Description: SWITCH TACTILE SPST 160gf SMD
+
+Dimensions:
+  Length: 5.1 mm
+  Width: 5.1 mm
+  Height: 1.5 mm
+  Package: SMD-4P, 5.1x5.1 mm
+
+Actuating Force: 1.6 N (160 gf)
+Cycle Life: 100,000 cycles
+Circuit Type: SPST (Single Pole Single Throw)
+
+Electrical:
+  Voltage Rating: 12 V
+  Contact Current: 50 mA
+  Operating Temperature: -30C to +85C
+
+Installation: Surface Mount, Vertical
+Actuator Style: Round Button
+RoHS Compliant: Yes
+
+Stock (as of 2026-05-23): 1,004,720 units

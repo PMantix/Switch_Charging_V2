@@ -1,0 +1,386 @@
+=== PAGE 1 ===
+T-FlashRECOMMENDED P.C.B HOLE LAYOUT
+COMPONENT SIDE VIEW(TOLERANCE:+/-0.05)
+11
+22
+初版发行 
+ 12345678Cd
+ÂÞÐ¢½ð
+ÖÓ»ª»ª
+Àî´º·ïÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+TF PUSH
+
+=== PAGE 2 ===
+深圳市首韩科技有限公司
+SHENZHEN SHOUHAN TECHNOLOGYCO.,LTD
+Tel: 0755-27597601 Fax: 0755-27597491
+承
+SPECIFICATION认书
+客户Customer：
+产品名称Project：
+规格型号 PartNo：
+贵公司承认印 Approalslgnatures
+料 号/Part No. 签章/Signatures
+日期 Date:
+拟制/Drawn 李春风
+审核/Check ÖÓ»ª»ª
+批准/Approved 罗孝金
+1
+FOR APPROVAL
+TF PUSHTF¿¨×ù
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 3 ===
+ProductName Rev. PageNo.
+A/0 1/8
+1；SCOPE（适用范围）......................................................................................3
+2；REFERENCEDOCUMENTS（参考文件）...............................................3
+3；FEATURE&DIMENSIONS（特征及尺寸）...........................................3
+3.1.PRODUCTDIMENSION（产品尺寸）...................................................................3
+3.2.PCB/PANELLAYOUT（印刷电路板布局）........................................................3
+3.3.MATERIAL（材料）..................................................................................................3
+3.4.MECHANICAL&ELECTRICALCHARACTERISTIC（机械及电气特性）...3
+3.5.PACKAGING（包装）..............................................................................................3
+3.6.MARKING（标识）...................................................................................................3
+3.7TRANSPORTATION（运输）..................................................................................3
+3.8STORAGE（存贮）..................................................................................................4
+4.ENVIRONMENTAL（环境要求）.................................................................4
+4.1.SOLDERABILITY（可焊性）..................................................................................4
+4.2.RESISTANCETOSOLDERHEAT（耐焊接热）...............................................4
+4.2.1.WaveSoldering（波峰焊）....................................................................................................4
+4.2.1.1.Preheat（预热）...........................................................................................................4
+4.2.1.2.Soldering（焊接） .........................................................................................................4
+4.2.1.3.CoolDown（冷却） ....................................................................................................4
+4.2.2.INFRAREDREFLOW（红外线回流焊） ..............................................................................4
+4.2.2.1.Preheat（预热） .........................................................................................................4
+4.2.2.2.Soldering（焊接） .........................................................................................................4
+4.2.2.3.CoolDown（冷却）......................................................................................................4
+4.3.CLEANING（清洗）..............................................................................................4
+5.PERFORMANCEANDTESTDESCRIPTION（性能及测试）.............5
+5.1.REQUIREMENT（要求）.......................................................................................5
+5.2.TESTCONDITION（测试条件）............................................................................5
+5.3.SAMPLESELECTION（样品选择）.......................................................................5
+5.4.TESTSEQUENCE（测试顺序）............................................................................5
+6.QUALITYASSURANCEPROVISIONS（品质保证）.............................5
+TABLEI：PERFORMANCEREQUIREMENTS............................................6
+TABLEII：PRODUCTQUALIFICATIONTESTSEQUENCE ..................8
+TABLEIII：REFLOWSOLDERINGPROFILE................................................9
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 4 ===
+ProductName Rev. PageNo.
+A/0 2/8
+1.SCOPE（适用范围）
+Thisproductspecificationdefinestheproductperformanceandthetestmethodstoascertainthe
+performanceoftheT-FLASH外焊.,whichisdesignedandmanufacturedbyCompany.
+本产品规格书规定了由本公司设计生产的T-FLASH外焊连接器产品的特性及测试方法.
+2.REFERENCEDOCUMENTS（参考文件）
+MIL-STD-1344ATestmethodforelectricalconnector（电子连接器测试方法）
+MIL-STD-202FTestmethodforelectricalcomponents（电子零件测试方法）
+EIA364Testmethodforelectricalcomponents（电子零件测试方法）
+JISC0051Testmethodforelectricalcomponents（电子零件测试方法）
+MIL-G-45204CSpecificationforgoldplating（镀金规格）
+IEC-512-3IECstandardforcurrentcarryingcapacitytests（IEC电流测试标准）
+QQ-N-290ASpecificationfornickelplating（镀镍规格）
+MIL-P-81728ASpecificationfortin/leadplating（镀锡铅规格）
+MIL-T-10727BSpecificationfortinplating（镀锡规格）
+UL498ULstandardforsafetyofattachmentplugandreceptacle（UL安规要求标准）
+EN/ISO5961Determinationoftotallead&cadmiumcontent(总铅和总镉含量测定)
+EN1122Determinationoftotallead&cadmiumcontent(总铅和总镉含量测定)
+EN13346Determinationofheavymetalscontent(重金属含量测定)
+EPA3052Determinationoftotallead&cadmiumcontent(总铅和总镉含量测定)
+3.FEATURE&DIMENSIONS（特征及尺寸）
+3.1.PRODUCTDIMENSION（产品尺寸）
+Theseconnectorsshallhavethedimensionsasshownincustomerdrawing。
+本产品的相关尺寸参见客户图面。
+3.2.PCB/PANELLAYOUT（印刷电路板布局）
+TherecommendedPCBlayoutisshownincustomerdrawing
+本产品适用的PCBlayout参见客户图面。
+3.3.MATERIAL（材料）
+TheharmfulmaterialcanfollowtherequirementofRoHS.
+本产品使用的材料符合RoHS指令要求。
+3.4.MECHANICAL&ELECTRICALCHARACTERISTIC（机械及电气特性）
+TheconnectorshallhavethemechanicalandelectricalperformanceasdescribedintableI：
+本产品的机械及电气特性见附表I。
+3.5.PACKAGING（包装）
+Productsshallbepackagedaccordingtorequirementsspecifiedinpurchaseorderforsafe
+delivery.Productsrequiredtrayorcarriertapeshouldmeettheproperspecificationper
+purchaseorder.Connectorcontainerandthepackagingspecificationisshownincustomer
+drawing。
+产品包装可依客户指定要求。本产品采用卷带包装，具体规格见客户图面。
+3.6.MARKING（标识）
+Manufacturer’sname,industryrecognizedlogo,orcustomerapprovedmarks。
+标示制造商的名称，或客户认可的相关标志。
+3.7.TRANSPORTATION（运输）
+Anyvehiclecanbeadoptedforthetransportation,butmoisture-proofandnomechanical
+damage.
+可采用任何运输工具运输，勿淋湿及机械性损伤。
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 5 ===
+ProductName Rev. PageNo.
+A/0 3/8
+3.8.STORAGE（存贮）
+4.1.SOLDERABILITY（可焊性Temperature:-25℃~+85℃,Relativehumidity:≤80%，Nottostorageincorrosive
+environmentsAre-qualificationtestshallbeconductedimmediatelywhilethestorageduration
+exceed6months.
+温度：-25℃~+85℃;相对湿度：≤80%；勿贮存于腐蚀环境内。贮存期超过6个月后需重新进行
+品质确认。
+4.ENVIRONMENTAL（环境要求）
+）
+Connector’ssolderabilitycanmeetMIL-STD-202Fstandard.Finishshallbefreeof
+contaminants.
+产品可焊性符合MIL-STD-202F标准规定的相关要求，表面不得有污染物.
+4.2.RESISTANCETOSOLDERHEAT（耐焊接热）
+4.2.1.WaveSoldering（波峰焊）
+Consistsofthreeconsecutivephases.包括三个连续的阶段完成；
+4.2.1.1.Preheat（预热）
+Increaseintemperaturenottoexceed4℃persecond.Finalpreheattemperaturewillbe
+within125℃ofsoldertemperature.温度增加不超过4℃/秒，最终预热温度不超过125℃.
+4.2.1.2.Soldering（焊接）
+Deviceleadswillbeexposedtosolderwaveat250℃foramaximumof5seconds.设备中
+的引导焊接温度最高250℃不超过5秒.
+4.2.1.3.CoolDown（冷却）
+Cooldowninambientairatapproximately20℃to25℃.冷却到周围环境温度20℃~25℃.
+4.2.2.INFRAREDREFLOW（红外线回流焊）
+Threecycles.Eachcycleconsistingofthreeconsecutivephased.三个周期，每个周期包括
+三个连续的阶段完成；
+4.2.2.1.Preheat（预热）
+Increaseintemperaturenottoexceed4℃persecond.温度增加不超过4℃/秒，
+4.2.2.2.Soldering（焊接）
+Maximumallowabletimeabovereflowtemperatureof183℃is90seconds.Maximum
+temperatureinthisintervalis260℃,nottoexceed10seconds.回流焊温度183℃以上的
+时最长不超过90秒.最高温度260℃时间不超过10秒.
+4.2.2.3.CoolDown（冷却）
+Cooldownshallnotexceed6℃persecond.冷却速度不超过6℃/秒.Note:（注）Device
+temperaturemeasurementsarereferencedfromthetop-centerofthepackageouter
+surface.设备温度量测时以从顶部中间位置测量为准；
+4.3.CLEANING（清洗）
+Connectorsresisttocleaningprocess.AqueousCleaning:Threecycles;eachcycleconsisting
+ofamaximumofoneminuteexposureto54℃to66℃demineralizedtapwateratamaximum
+pressureof30psi;followedbyairdryingfor60℃to90secondsat93℃to121℃.
+产品本身可以承受清洗制程.水洗：包含三个循环；每个循环包括以下：以最大压力30帕，温度54
+℃~66℃,去除矿物质的水，用水龙头冲洗最多一分钟，然后用温度93℃~121℃的空气吹60到
+90秒；
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 6 ===
+ProductName Rev. PageNo.
+A/0 4/8
+5.PERFORMANCEANDTESTDESCRIPTION（性能及测试）
+5.1.REQUIREMENT（要求）
+Productisdesignedtomeetelectrical,mechanical,andenvironmentalperformance
+requirementsspecifiedinTableI.
+本产品设计符合附表一所列的机械，电气及环境要求.
+5.2.TESTCONDITION（测试条件）
+Unlessotherwisespecified,alltestsshallbeperformedatambientenvironmentalconditions.
+除非特别注明，所有测试在室温条件下完成；
+5.3.SAMPLESELECTION（样品选择）
+Testsamplesshallbeselectedatrandomfromcurrentproduction.Notestsamplesshallbe
+reused.Samplesarepre-conditionedwith10cyclesofdurability.Eachgroupshallbe
+containing5testsamples.
+测试样品从现生产的产品中随机抽取，所有测试过的样品不得重复使用.样品已预先插拔10次，
+每组测试有5个样品；
+5.4.TESTSEQUENCE（测试顺序）
+ProductsqualificationtestsequenceasshowninTableII.
+产品品质测试顺序见附表二.
+6.QUALITYASSURANCEPROVISIONS（品质保证）
+Companyisresponsibleforthequalityofthepartasitisdeliveredtocustomer.Failinglotswillbe
+returnorothersuppliercorrectiveaction.
+本公司对出给客户的所有产品品质负责，不良批次的产品退回或由供应商做矫正；
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 7 ===
+ProductName Rev. PageNo.
+A/0 5/8
+TABLEI:PERFORMANCEREQUIREMENTS
+Items Requirements TestMethods
+1.Confirmationof
+Product产品确认Productshallbeconformingto
+therequirementsofapplicable
+productdrawing.
+产品必须满足相关文件的规定Visually,dimensionsandfunctionally
+inspectedperapplicableproductdrawing.
+目视，尺寸及功能依照客户图面检查。
+2.Contactresistance
+(LowLevel)接触阻抗40mΩMax.initial40mΩ最
+大.初态Subjectmatedcontactsassembledinhousing
+toclosedcircuitof10mAmax.atopencircuit
+voltageof20mVmax.所述固定在外壳里的端
+子联结到一个封闭回路中测试：电流10mA，电
+压20mVmax.。
+3.Insulation
+resistance绝缘阻抗1000MΩMin.1000MΩ最小 Measurebyapplyingtestpotentialbetween
+theadjacentcontacts,andbetweenthe
+contactsandgroundinthematedconnector.
+MIL-STD-202,Method302,ConditionB(500
+VDC±10%).测试产品端子间以及端子与接地
+间的电阻，适用：MIL-STD-202,方法302，条
+件B(500VDC±10%)。
+4.DielectricStrength
+耐电压Connectormustwithstandtest
+potentialof500VACfor1
+minute.Currentleakagemust
+be1.0mAmax..样品必须承受
+测试电500VAC，时间一分钟，
+漏电流不大于1.0mA.Measurebyapplyingtestpotentialbetween
+theadjacentcontacts,andbetweenthe
+contactsandgroundinthematedconnector.
+MIL-STD-202,Method301.测试产品端子间以
+及端子与接地间的电压，适用：MIL-STD-202，
+方法301。
+5.Durability
+(Repeated
+Mating/Unmating)耐
+久力ContactResistance:100mΩ
+Max.aftertesting完成插拨测
+试后接触阻抗不大于100mΩMateandunmateconnectorfor5000cycle.
+同配合产品进行5000次插拔。
+6.Temperaturerise
+温度急变30°CMax.不高于30°C Carryratedcurrentload.0.3Apercontact.
+（UL498）每根端子负载0.3A电流。（UL498）
+7.Vibration
+SinusoidalLow
+Frequency低频正弦
+振动Noelectricaldiscontinuity
+greaterthen1μsec(s)shall
+occur.Contactresistance:100
+mΩmax.不允许出现超过1μ
+sec(s)的瞬间断开，接触阻抗：
+100mΩ最大；Subjectmatedconnectorto10-55-10Hz
+traversedin1minuteat1.5mmamplitude2
+hourseachof3mutuallyperpendicularplane,
+10mAappliedMIL-STD-202,Method201.对
+测试样品，在频率变化每分钟从10-55-10Hz，
+振幅1.5mm条件下，在互相垂直的三个面上，
+每个面2小时下测量，电流10mA；适用：
+MIL-STD-202，方法201。
+8.Shock冲击 Noelectricaldiscontinuity
+greaterthan1μsec.shall
+occur.Nodamagetoproduct.
+不允许出现超过1μsec(s)的
+瞬间断开，产品无损坏；Applyinganappropriateholderisallowedin
+vibrationtestandshocktest.MIL-STD-202,
+Method213,490m/s2,3axes.使用合适的固定
+方式，适用方法.MIL-STD-202，方法213，加
+速度490m/s2，三个轴上均做测试。
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 8 ===
+ProductName Rev. PageNo.
+A/0 6/8
+Items Requirements TestMethods
+9.Thermalshock热
+冲击Nodamage,Contact
+Resistance(LowLevel)(Final)
+100mΩmax.产品无损坏，接触
+阻抗：100mΩ最大Temperaturerangefrom-55°Cto+85°C.Start
+from-55°C.After30min.changeto+85°C,
+changetimeisnomorethan30seconds.
+Total5cycles.MIL-STD-202,Method
+107D,conditionA.温度变化范围：-55°C~
++85°C；从-55°C开始，30分钟后换到
++85°C；转换时间不超过30秒；共5个循环。
+适用：MIL-STD-202，方法107D，条件A。
+10.Humidity恒温恒
+湿Nodamage,Contact
+Resistance(LowLevel)(Final)
+100mΩmax..Dielectric
+StrengthshouldbeOK,
+InsulationResistanceshould
+be100MΩmin.产品无损坏，
+接触阻抗：100mΩ最大；耐电
+压测试OK,绝缘阻抗100MΩ最
+小；Temperature:40±2°C96hours.Relative
+humidity:90-95%;Duration:96Hours.
+MIL-STD-202,Method103,温度：40±2°C
+96小时；相对湿度：90-95%；时间：96小
+时；MIL-STD-202，方法103。
+11.Solderability可焊
+性Appearanceofthespecimen
+shallbeinspectedafterthetest
+withtheassistanceofa
+magnifiercapableofgivinga
+magnificationof10Xforany
+damagesuchaspinholes,void
+orroughsurface.样品在测试完
+成后，用放大倍数为10倍的显
+微镜，检查外观损坏如：小孔，
+空焊，外观粗糙度；Solderingtime:3to5SecondsTemperature:
+255±5°C.焊接时间：3~5秒，温度：255±
+5°C。
+12.Resistanceto
+solderingheat耐焊
+接热Nodamage产品无损坏 Leavesubjectproductinthe255±5°C
+chamberfor2minutes.产品置于255±5°C烘
+箱内2分钟。
+13.SaltSpray盐雾ContactResistance(Low
+Level)(Final)100mΩmax.接
+触阻抗(末态)100mΩmax.5±1%saltconcentration24±4hours35±
+2°CMIL-STD-202,Method101ConditionB.
+盐水浓度（重量比）5±1%，镀金区域时间24
+小时，镀锡区域时间8小时。温度35±2°C；
+MIL-STD-202，方法101，条件B。
+14.Hightemperature
+高温Contactresistance:100mΩ
+max.接触阻抗100mΩmax.Subjectproductto85±2°Cfor96hours
+continuously.MIL-STD-202,Method108.产
+品置于85±2°C连续96小时，适用
+MIL-STD-202,方法108。
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 9 ===
+ProductName Rev. PageNo.
+A/0 7/8
+TABLEII:PRODUCTQUALIFICATIONTESTSEQUENCE
+TestDescriptionTestGroup
+A B C D E F G H I
+1.ExaminationofProduct外观 1,71,41,51,51,101 11,91,9
+2.ContactResistance(LowLevel)接
+触阻抗2,622,42,4,2,8 2,62,6
+3.InsulationResistance绝缘阻抗 33,6,
+93,73,7
+4.DielectricStrength耐电压 4 4 4,84,8
+5.Durability耐久力 5
+6.Temperaturerise温度急变 3
+7.VibrationSinusoidalLow
+Frequency低频正弦振动3
+8.Shock冲击 3
+9.Thermalshock热冲击 5
+10.Humidity恒温恒湿 7
+11.Solderability可焊性 2
+12.Resistancetosolderingheat耐焊
+接热2
+13.SaltSpray盐雾 5
+14.Hightemperature高温 5
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾
+
+=== PAGE 10 ===
+ProductName Rev. PageNo.
+A/0 8/8
+TABLEIII:
+REFLOWSOLDERINGPROFILE
+profilerequirements:
+Parameter Reference Specification
+Averagetemperaturegradientin
+preheating2.5°C/s
+Soaktime tsoak 2-3minutes
+Timeabove217°C t1 60s
+Timeabove230°C t2 50s
+Timeabove255°C t3 5s
+Peaktemperatureinreflow Tpeak 255°C(+5/-0°C)
+Temperaturegradientincooling Max-5°C/s
+Thisprofileistheminimumrequirementforevaluatingsolderingheatresistanceof
+components.Heattransfermethodusedforreflowsolderingishotairconvection.The
+actualairtemperaturesusedtoachievethespecifiedprofileishigherandlargely
+dependentonthereflowequipment.Pb-freereflow
+TF PUSH
+ÉîÛÚÊÐÊ×º«¿Æ¼¼ÓÐÏÞ¹«Ë¾

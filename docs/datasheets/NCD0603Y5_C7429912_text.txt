@@ -1,0 +1,74 @@
+=== PAGE 1 ===
+表单编号：FGH/BD-0053.01-21B
+保存期限：长期片式发光二极管
+1/2NCD0603Y5
+光电参数
+Electro-OpticalCharacteristics
+极限参数（温度=25℃）
+AbsoluteMaximumRatings(Temperature=25°C)
+参数名称
+Parameter符号
+Symbol数值
+Rating单位
+Unit
+正向电流ForwardCurrent IF 25 mA
+正向脉冲电流*
+PulseForwardCurrent*IFP 50 mA
+反向电压ReverseVoltage VR 5 V
+工作温度OperatingTemperature TOPR -30~+85 ℃
+贮存温度StorageTemperature Tstg -40~+100 ℃
+功耗PowerDissipation PD 65 mW
+*注：脉冲宽度≤0.1ms，占空比≤1/10 *Note:PulseWidth≤0.1ms,Duty≤1/10
+光电参数（温度=25℃）
+Electro-OpticalCharacteristics(Temperature=25°C)
+参数名称
+Parameter符号
+Symbol条件
+Condition最小值
+Min.典型值
+Typ.最大值
+Max.单位
+Unit
+反向电流ReverseCurrent IR VR=5V - - 10 μA
+视角度ViewAngle 2θ1/2 - - 140 - deg.
+正向电压ForwardVoltage VF
+IF=15mA2. 1.5 0 2.6 V
+峰值波长PeakWavelength λP 595 nm
+主波长DominantWavelength λd 58 583 9 595 nm
+半波宽度
+SpectrumRadiationBandwidthΔλ 15 nm
+光强LuminousIntensity IV 10 40 0 mc 180 d
+*注1：光强偏差±15%；压降偏差±0.1V；(X,Y)坐标偏差±0.01；单色光波长偏差±1nm。
+*Note1:ToleranceoneachLuminousIntensitybinis±15%;ToleranceoneachForwardVoltagebinis±0.1V;Toleranceon
+eachHue(X,Y)binis±0.01;ToleranceofDominantWavelength±1nm.
+*注2：以上参数仅供参考，请以实物标签为准。我司给出的参数均由国星测试系统测得。
+*Note2:Theparametersaboveareonlyforyourreference.Incaseofanydiscrepancy,pleaseadheretothelabelofouractual
+products.AllparametersaretestedbythestandardtestingsystemofNationStar.
+
+
+=== PAGE 2 ===
+表单编号：FGH/BD-0053.01-21B
+保存期限：长期片式发光二极管
+2/2包装
+Packaging
+载带CarrierTape
+单位：mm，未注公差：±0.1mm
+Alldimensionsinmm,tolerancesunlessmentionedis±0.1mm.
+编带细节DetailsOfCarrierTape
+前进方向ProgressiveDirection
+A：盖带，200mm；B：引导，空带，100mm；C：编载产品4000只；D：尾部，空带，100mm
+A:TopCoverTape,200mm;B:Leader,Empty,100mm;C:4000LampsLoaded;D:Trailer,Empty,100mm.
+外形尺寸
+OutlineDimension
+    负极标志
+Cathode Mark
+敷铜区域：
+Cuprum Area:
+阻焊丝印区域：
+Solder Resist:
+*无特别规定时，公差:±0.1mm
+* The Tolerances Unless Mentioned is : ±0.1mm推荐焊盘尺寸
+Recommended Soldering Pad极性
+Polarity- +
+① ②① ②
+4

@@ -1,0 +1,3345 @@
+=== PAGE 1 ===
+SOLOMON SYSTECH  
+SEMICONDUCTOR TECHNICAL DATA  
+ 
+This document contains information on a new product. Specifications a nd information herein are subject to change without 
+notice. 
+ 
+http://www.solomon-systech.com 
+SSD1306 Rev 1.1 P 1/59 Apr 2008  Copyright © 2008 Solomon Systech Limited  
+  
+  
+    
+            
+Advance Information  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   
+ 
+  SSD1306 
+128 x 64 Dot Matrix 
+OLED/PLED Segment/Common Driver with Controller  
+
+=== PAGE 2 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 2/59 Rev 1.1 SSD1306  
+  CONTENTS 
+1 GENERAL DESCRIPTION ....................................................................................................... 6 
+2 FEATURES....................................................................................................................... ............ 6 
+3 ORDERING INFORMATION ................................................................................................... 6 
+4 BLOCK DIAGRAM .................................................................................................................. ..7 
+5 DIE PAD FLOOR PLAN ............................................................................................................ 8 
+6 PIN ARRANGEMENT.............................................................................................................. 11 
+6.1 SSD1306TR1  PIN ASSIGNMENT .......................................................................................................................... 11 
+7 PIN DESCRIPTION ................................................................................................................ ..13 
+8 FUNCTIONAL BLOCK  DESCRIPTIONS............................................................................. 15 
+8.1 MCU  INTERFACE SELECTION .............................................................................................................................. 15 
+8.1.1 MCU Parallel 6800-s eries Interface............................................................................................. ............. 15 
+8.1.2 MCU Parallel 8080-s eries Interface............................................................................................. ............. 16 
+8.1.3 MCU Serial Interf ace (4-wire SPI).............................................................................................. .............. 17 
+8.1.4 MCU Serial Interf ace (3-wire SPI).............................................................................................. .............. 18 
+8.1.5 MCU I2C Interface.................................................................................................................... ................. 19 
+8.2 COMMAND DECODER ............................................................................................................................... .......... 22 
+8.3 OSCILLATOR CIRCUIT AND DISPLAY TIME GENERATOR ..................................................................................... 22 
+8.4 FR SYNCHRONIZATION ............................................................................................................................... ........ 23 
+8.5 RESET CIRCUIT ............................................................................................................................... .................... 23 
+8.6 SEGMENT DRIVERS / COMMON DRIVERS ............................................................................................................ 24 
+8.7 GRAPHIC DISPLAY DATA RAM  (GDDRAM)..................................................................................................... 25 
+8.8 SEG/COM  DRIVING BLOCK ............................................................................................................................... 26 
+8.9 POWER ON AND OFF  SEQUENCE ........................................................................................................................ 27 
+9 COMMAND TABLE ................................................................................................................. 28 
+9.1 DATA READ / WRITE ............................................................................................................................... ........... 33 
+10 COMMAND DESCRIPTIONS ............................................................................................. 34 
+10.1 FUNDAMENTAL COMMAND ............................................................................................................................... .34 
+10.1.1  Set Lower Column Start Address for Page Addressing Mode (00h~0Fh) ................................................. 34 
+10.1.2  Set Higher Column Start Address for Page Addressing Mode (10h~1Fh) ................................................ 34 
+10.1.3  Set Memory Addressi ng Mode (20h)............................................................................................... ........... 34 
+10.1.4  Set Column Ad dress (21h) ....................................................................................................... .................. 35 
+10.1.5  Set Page Address (22h)......................................................................................................... ..................... 36 
+10.1.6  Set Display Start Line (40h~7Fh) ............................................................................................... ............... 36 
+10.1.7  Set Contrast Contro l for BANK0 (81h)........................................................................................... ........... 36 
+10.1.8  Set Segment Re-map (A0h/A1h) ................................................................................................... .............. 36 
+10.1.9  Entire Display ON    (A4h/A5h) .................................................................................................. ................ 37 
+10.1.10  Set Normal/Inverse Display (A6h/A7h)........................................................................................... ....... 37 
+10.1.11  Set Multiplex Ratio (A8h)...................................................................................................... ................. 37 
+10.1.12  Set Display ON/O FF (AEh/AFh) ................................................................................................... ........ 37 
+10.1.13  Set Page Start Address for Page  Addressing Mo de (B0h~B7h)............................................................. 37 
+10.1.14  Set COM Output Scan Direction (C0h/C8h)........................................................................................ ..37 
+10.1.15  Set Display Of fset (D3h) ....................................................................................................... ................. 37 
+10.1.16  Set Display Clock Divide Ratio/  Oscillator Freq uency (D5h) ............................................................... 40 
+10.1.17  Set Pre-charge Period (D9h) .................................................................................................... ............. 40 
+10.1.18  Set COM Pins Hardware Configuration (DAh)..................................................................................... 40 
+10.1.19  Set V COMH   Deselect Level (DBh) ......................................................................................................... ..43 
+
+=== PAGE 3 ===
+ 
+ 
+SSD1306 Rev 1.1 P 3/59 Apr 2008  Solomon Systech
+ 10.1.20  NOP (E3h) ...................................................................................................................... ....................... 43 
+10.1.21  Status regi ster Read ........................................................................................................... .................... 43 
+10.2 GRAPHIC ACCELERATION COMMAND ................................................................................................................. 44 
+10.2.1  Horizontal Scroll Setup (26h/27h) .............................................................................................. ............... 44 
+10.2.2  Continuous Vertical and Horiz ontal Scroll Setup (29h/2Ah)..................................................................... 45 
+10.2.3  Deactivate Sc roll (2Eh)........................................................................................................ ...................... 46 
+10.2.4  Activate Scro ll (2Fh).......................................................................................................... ........................ 46 
+10.2.5  Set Vertical Sc roll Area(A3h) .................................................................................................. .................. 46 
+11 MAXIMUM RATINGS.......................................................................................................... 47 
+12 DC CHARACTERISTICS..................................................................................................... 48 
+13 AC CHARACTERISTICS..................................................................................................... 49 
+14 APPLICATION EXAMPLE.................................................................................................. 55 
+15 PACKAGE INFORMATION................................................................................................ 56 
+15.1 SSD1306TR1  DETAIL DIMENSION ..................................................................................................................... 56 
+15.2 SSD1306Z  DIE TRAY INFORMATION .................................................................................................................. 58 
+
+=== PAGE 4 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 4/59 Rev 1.1 SSD1306  
+ TABLES 
+TABLE 5-1 : SSD1306Z  BUMP DIE PAD COORDINATES ...................................................................................................... 10 
+TABLE 6-1 : SSD1306TR1  PIN ASSIGNMENT TABLE .......................................................................................................... 12 
+TABLE 7-1 : MCU  BUS INTERFACE PIN SELECTION ............................................................................................................ 14 
+TABLE 8-1 : MCU  INTERFACE ASSIGNMENT UNDER DIFFERENT BUS INTERFACE MODE ...................................................... 15 
+TABLE 8-2 : CONTROL PINS OF 6800  INTERFACE ................................................................................................................. 15 
+TABLE 8-3 : CONTROL PINS OF 8080  INTERFACE ................................................................................................................. 17 
+TABLE 8-4 : CONTROL PINS OF 4-WIRE SERIAL INTERFACE ................................................................................................. 17 
+TABLE 8-5 : CONTROL PINS OF 3-WIRE SERIAL INTERFACE ................................................................................................. 18 
+TABLE 9-1:  COMMAND TABLE ............................................................................................................................... ............ 28 
+TABLE 9-2 : READ COMMAND TABLE ............................................................................................................................... ..33 
+TABLE 9-3 : ADDRESS INCREMENT TABLE (AUTOMATIC ) ................................................................................................... 33 
+TABLE 10-1  : EXAMPLE OF SET DISPLAY OFFSET AND DISPLAY START LINE WITH NO REMAP .......................................... 38 
+TABLE 10-2  :EXAMPLE OF SET DISPLAY OFFSET AND DISPLAY START LINE WITH REMAP ................................................ 39 
+TABLE 10-3  : COM  PINS HARDWARE CONFIGURATION ..................................................................................................... 40 
+TABLE 11-1  : MAXIMUM RATINGS (VOLTAGE REFERENCED TO VSS)................................................................................ 47 
+TABLE 12-1  : DC CHARACTERISTICS ............................................................................................................................... ...48 
+TABLE 13-1  : AC CHARACTERISTICS ............................................................................................................................... ...49 
+TABLE 13-2  : 6800-S ERIES MCU  PARALLEL INTERFACE TIMING CHARACTERISTICS ......................................................... 50 
+TABLE 13-3  : 8080-S ERIES MCU  PARALLEL INTERFACE TIMING CHARACTERISTICS ......................................................... 51 
+TABLE 13-4  : 4-WIRE SERIAL INTERFACE TIMING CHARACTERISTICS ................................................................................ 52 
+TABLE 13-5  : 3-WIRE SERIAL INTERFACE TIMING CHARACTERISTICS ................................................................................ 53 
+TABLE 13-6  :I2C INTERFACE TIMING CHARACTERISTICS .................................................................................................... 54 
+
+=== PAGE 5 ===
+ 
+ 
+SSD1306 Rev 1.1 P 5/59 Apr 2008  Solomon Systech
+ FIGURES 
+FIGURE 4-1 SSD1306  BLOCK DIAGRAM .............................................................................................................................. 7 
+FIGURE 5-1 : SSD1306Z  DIE DRAWING ............................................................................................................................... 8 
+FIGURE 5-2 : SSD1306Z  ALIGNMENT MARK DIMENSIONS .................................................................................................... 9 
+FIGURE 6-1 : SSD1306TR1  PIN ASSIGNMENT ................................................................................................................. 11 
+FIGURE 7-1 PIN DESCRIPTION ............................................................................................................................... .............. 13 
+FIGURE 8-1 : DATA READ BACK PROCEDURE - INSERTION OF DUMMY READ ....................................................................... 16 
+FIGURE 8-2 : EXAMPLE OF WRITE PROCEDURE IN 8080  PARALLEL INTERFACE MODE ......................................................... 16 
+FIGURE 8-3 : EXAMPLE OF READ PROCEDURE IN 8080  PARALLEL INTERFACE MODE .......................................................... 16 
+FIGURE 8-4 : DISPLAY DATA READ BACK PROCEDURE - INSERTION OF DUMMY READ ......................................................... 17 
+FIGURE 8-5 : WRITE PROCEDURE IN 4-WIRE SERIAL INTERFACE MODE ............................................................................... 18 
+FIGURE 8-6 : WRITE PROCEDURE IN 3-WIRE SERIAL INTERFACE MODE ............................................................................... 18 
+FIGURE 8-7 : I2C-BUS DATA FORMAT ............................................................................................................................... ...20 
+FIGURE 8-8 : DEFINITION OF THE START AND STOP CONDITION ......................................................................................... 21 
+FIGURE 8-9 : DEFINITION OF THE ACKNOWLEDGEMENT CONDITION ................................................................................... 21 
+FIGURE 8-10  : DEFINITION OF THE DATA TRANSFER CONDITION ......................................................................................... 21 
+FIGURE 8-11  : OSCILLATOR CIRCUIT AND DISPLAY TIME GENERATOR .............................................................................. 22 
+FIGURE 8-12  : SEGMENT OUTPUT WAVEFORM IN THREE PHASES ....................................................................................... 24 
+FIGURE 8-13  : GDDRAM  PAGES STRUCTURE OF SSD1306................................................................................................ 25 
+FIGURE 8-14  : ENLARGEMENT OF GDDRAM  (NO ROW RE -MAPPING AND COLUMN -REMAPPING )...................................... 25 
+FIGURE 8-15  : IREF  CURRENT SETTING BY RESISTOR VALUE ............................................................................................. 26 
+FIGURE 8-16  : THE POWER ON SEQUENCE .......................................................................................................................... 27 
+FIGURE 8-17  : THE POWER OFF  SEQUENCE ........................................................................................................................ 27 
+FIGURE 10-1  : ADDRESS POINTER MOVEMENT OF PAGE ADDRESSING MODE ..................................................................... 34 
+FIGURE 10-2  : EXAMPLE OF GDDRAM  ACCESS POINTER SETTING IN PAGE ADDRESSING MODE (NO ROW AND COLUMN -
+REMAPPING ) .............................................................................................................................. ................................. 34 
+FIGURE 10-3  : ADDRESS POINTER MOVEMENT OF HORIZONTAL ADDRESSING MODE ......................................................... 35 
+FIGURE 10-4  : ADDRESS POINTER MOVEMENT OF VERTICAL ADDRESSING MODE .............................................................. 35 
+FIGURE 10-5  : EXAMPLE OF COLUMN AND ROW ADDRESS POINTER MOVEMENT .............................................................. 36 
+FIGURE 10-6  :TRANSITION BETWEEN DIFFERENT MODES .................................................................................................... 37 
+FIGURE 10-7  : HORIZONTAL SCROLL EXAMPLE : SCROLL RIGHT  BY 1 COLUMN ................................................................. 44 
+FIGURE 10-8  : HORIZONTAL SCROLL EXAMPLE : SCROLL LEFT  BY 1 COLUMN ................................................................... 44 
+FIGURE 10-9  : HORIZONTAL SCROLLING SETUP EXAMPLE ................................................................................................... 44 
+FIGURE 10-10  : CONTINUOUS VERTICAL AND HORIZONTAL SCROLLING SETUP EXAMPLE .................................................. 45 
+FIGURE 13-1  : 6800- SERIES MCU  PARALLEL INTERFACE CHARACTERISTICS ...................................................................... 50 
+FIGURE 13-2  : 8080- SERIES PARALLEL INTERFACE CHARACTERISTICS ................................................................................ 51 
+FIGURE 13-3  : 4-WIRE SERIAL INTERFACE CHARACTERISTICS ............................................................................................. 52 
+FIGURE 13-4  : 3-WIRE SERIAL INTERFACE CHARACTERISTICS ............................................................................................. 53 
+ FIGURE 13-5  : I2C INTERFACE TIMING CHARACTERISTICS .................................................................................................. 54 
+FIGURE 14-1  : APPLICATION EXAMPLE OF SSD1306Z ....................................................................................................... 55 
+FIGURE 15-1  SSD1306TR1  DETAIL DIMENSION ................................................................................................................ 56 
+FIGURE 15-2  : SSD1306Z  DIE TRAY INFORMATION ............................................................................................................ 58 
+  
+
+=== PAGE 6 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 6/59 Rev 1.1 SSD1306  
+ 1 GENERAL DESCRIPTION 
+SSD1306 is a single-chip CMOS OLED/PLED driver w ith controller for organic / polymer light emitting 
+diode dot-matrix graphic display system. It consis ts of 128 segments and 64commons. This IC is 
+designed for Common Cathode type OLED panel. 
+ 
+The SSD1306 embeds with contrast control, displa y RAM and oscillator, wh ich reduces the number of 
+external components and power consumption. It h as 256-step brightness control. Data/Commands are 
+sent from general MCU through the hardware selectab le 6800/8000 series compatible Parallel Interface, 
+I2C interface or Serial Peripheral Interface. It is suita ble for many compact portable applications, such as 
+mobile phone sub-display, MP3 player and calculator, etc. 
+ 
+2 FEATURES 
+• Resolution: 128 x 64 dot matrix panel 
+• Power supply 
+o VDD = 1.65V to 3.3V   for IC logic 
+o VCC = 7V to 15V       for Panel driving   
+• For matrix display 
+o OLED driving output voltage, 15V maximum   
+o Segment maximum source current: 100uA 
+o Common maximum sink current: 15mA  
+o 256 step contrast brightness current control  
+• Embedded 128 x 64 bit SRAM display buffer 
+• Pin selectable MCU Interfaces: 
+o 8-bit 6800/8080-series parallel interface 
+o 3 /4 wire Serial Peripheral Interface 
+o I2C Interface 
+• Screen saving continuous scrolling function in  both horizontal and vertical direction 
+• RAM write synchronization signal 
+• Programmable Frame Rate and Multiplexing Ratio                                                     
+• Row Re-mapping and Column Re-mapping 
+• On-Chip Oscillator 
+• Chip layout for COG & COF 
+• Wide range of operating temperature: -40 °C to 85 °C 
+ 
+3 ORDERING INFORMATION  
+Table 3-1: Ordering Information 
+Ordering Part Number SEG COM Package Form Reference Remark 
+SSD1306Z 128 64 COG 8 o Min SEG pad pitch : 47um 
+o Min COM pad pitch : 40um 
+o Die thickness: 300 +/- 25um  
+SSD1306TR1 104 48 TAB 11, 56 o 35mm film, 4 sprocket hole, Folding TAB
+o 8-bit 80 / 8-bit 68 / SPI / I2C interface  
+o SEG, COM lead pitch 0.1mm x 0.997 
+=0.0997mm 
+o Die thickness: 457 +/- 25um  
+ 
+
+=== PAGE 7 ===
+ 
+ 
+SSD1306 Rev 1.1 P 7/59 Apr 2008  Solomon Systech
+ 4 BLOCK DIAGRAM 
+ 
+Figure 4-1 SSD1306 Block Diagram  
+ 
+Common
+DriverOscillatorGraphic Display Data
+RAM (GDDRAM)MCU
+InterfaceCommand
+DecoderRES#
+CS#
+D/C#
+E (RD#)
+R/W#(WR#)
+BS2
+BS1
+BS0
+D7D6D5D4D3D2D1D0
+Current Control
+Voltage ControlVDDSEG0
+SEG1
+|
+|
+SEG126
+SEG127CL
+CLSCOM1COM3|
+|COM61COM63COM62
+COM60
+|
+|
+COM2
+COM0Display ControllerFRVSSVLSS
+Common
+DriverSegment
+Driver
+VCC
+VCOMHIREF
+                      
+
+=== PAGE 8 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 8/59 Rev 1.1 SSD1306  
+ 5 DIE PAD FLOOR PLAN 
+Figure 5-1 : SSD1306Z Die Drawing 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+              
+  
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Pad 1 SSD1306ZDie size 6.76mm x 0.86mm 
+Die thickness 300 +/- 25um 
+Min I/O pad pitch 60um 
+Min SEG pad pitch 47um 
+Min COM pad pitch 40um 
+Bump height Nominal 15um 
+ 
+ 
+Bump size   
+Pad 1, 106, 124, 256 80um x 50um 
+Pad 2-18, 89-105, 107-123, 257-273 25ium x 80um 
+Pad 19-88 40um x 89um 
+Pad 125-255 31um x 59um 
+Pad 274-281 (TR pads) 30um x 50um 
+ 
+Alignment 
+mark Position Size 
++ shape (-2973, 0) 75um x 75um 
++ shape (2973, 0) 75um x 75um 
+Circle (2466.665, 7.575) R37.5um, inner 18um 
+SSL Logo (-2862.35, 144.82) - 
+(For details dimension please see p.9 ) 
+ 
+Note 
+(1)  Diagram showing the Gold bumps face up. 
+(2)  Coordinates are referenced to center of the chip. 
+(3)  Coordinate units and size of all alignment marks are in um. 
+(4)  All alignment keys do not contain gold 
+ 
+Pad 1,2,3,…->281
+Gold Bumps face upSSD1306XY
+
+=== PAGE 9 ===
+ 
+ 
+SSD1306 Rev 1.1 P 9/59 Apr 2008  Solomon Systech
+  
+ 
+Figure 5-2 : SSD1306Z alignment mark dimensions 
+ 
+ 
+  
+ 
+ 
+ 
+ 
+T shape 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
++ shape 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+Circle 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+*All units are in um 
+ 
+ 
+ 
+
+=== PAGE 10 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 10/59 Rev 1.1 SSD1306  
+ Table 5-1 : SSD1306Z Bump Die Pad Coordinates 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Pad no. Pad Name X- pos Y- pos Pad no. Pad Name X- pos Y- pos Pad no. Pad Name X- pos Y- pos Pad no. Pad Name X- pos Y- pos
+1N C -3315 -377.5 81 VCOMH 1875.585 -352.83 161 SEG35 1364.5 356 241 SEG114 -2398.5 356
+2 VSS -3084.77 -362.5 82 VC C 1967.185 -352.83 162 SEG36 1317.5 356 242 SEG115 -2445.5 356
+3 COM49 -3044.77 -362.5 83 VC C 2027.185 -352.83 163 SEG37 1270.5 356 243 SEG116 -2492.5 356
+4 COM50 -3004.77 -362.5 8 4 VLSS 2109.185 -352.83 16 4 SEG38 1223.5 356 244 SEG117 -2539.5 356
+5 COM51 -2964.77 -362.5 85 VLSS 2169.185 -352.83 165 SEG39 1176.5 356 245 SEG118 -2586.5 356
+6 COM52 -2924.77 -362.5 86 VLSS 2254.185 -352.83 166 SEG4 0 1129.5 356 246 SEG119 -2633.5 356
+7 COM53 -2884.77 -362.5 87 N C 2314.185 -352.83 167 SEG41 1082.5 356 247 SEG120 -2680.5 356
+8 COM54 -2844.77 -362.5 88 N C 2374.185 -352.83 168 SEG42 1035.5 356 248 SEG121 -2727.5 356
+9 COM55 -2804.77 -362.5 89 VSS 2444.77 -362.5 169 SEG43 988.5 356 249 SEG122 -2774.5 356
+10 COM56 -2764.77 -362.5 9 0 COM31 2484.77 -362.5 17 0 SEG4 4 941.5 356 250 SEG123 -2821.5 356
+11 COM57 -2724.77 -362.5 91 COM30 2524.77 -362.5 171 SEG45 894.5 356 251 SEG124 -2868.5 356
+12 COM58 -2684.77 -362.5 92 COM29 2564.77 -362.5 172 SEG46 847.5 356 252 SEG125 -2915.5 356
+13 COM59 -2644.77 -362.5 93 COM28 2604.77 -362.5 173 SEG47 800.5 356 253 SEG126 -2962.5 3561
+4 COM60 -2604.77 -362.5 9 4 COM27 2644.77 -362.5 17 4 SEG48 753.5 356 254 SEG127 -3009.5 356
+15 COM61 -2564.77 -362.5 95 COM26 2684.77 -362.5 175 SEG49 706.5 356 255 N C -3056.5 356
+16 COM62 -2524.77 -362.5 96 COM25 2724.77 -362.5 176 SEG5 0 659.5 356 256 N C -3315 367.5
+17 COM63 -2484.77 -362.5 97 COM24 2764.77 -362.5 177 SEG51 612.5 356 257 COM32 -3315 315
+18 VCOMH -2444.77 -362.5 98 COM23 2804.77 -362.5 178 SEG52 565.5 356 258 COM33 -3315 275
+19 N C -2334.965 -352.83 99 COM22 2844.77 -362.5 179 SEG53 518.5 356 259 COM34 -3315 235
+20 C2P -2278.265 -352.83 100 COM21 2884.77 -362.5 18 0 SEG5 4 471.5 356 260 COM35 -3315 195
+21 C2P -2218.265 -352.83 101 COM20 2924.77 -362.5 181 SEG55 424.5 356 261 COM36 -3315 155
+22 C2N -2136.715 -352.83 102 COM19 2964.77 -362.5 182 SEG56 377.5 356 262 COM37 -3315 115
+23 C2N -2055.465 -352.83 103 COM18 3004.77 -362.5 183 SEG57 330.5 356 263 COM38 -3315 75
+24 C1P -1995.465 -352.83 104 COM17 3044.77 -362.5 18 4 SEG58 283.5 356 264 COM39 -3315 35
+25 C1P -1904.115 -352.83 105 VSS 3084.77 -362.5 185 SEG59 236.5 356 265 COM40 -3315 -5
+26 C1N -1844.115 -352.83 106 N C 3315 -377.5 186 SEG6 0 189.5 356 266 COM41 -3315 -45
+27 C1N -1762.865 -352.83 107 COM16 3315 -325 187 SEG61 142.5 356 267 COM42 -3315 -85
+28 VBAT -1679.31 -352.83 108 COM15 3315 -285 188 SEG62 95.5 356 268 COM43 -3315 -125
+29 VBAT -1619.31 -352.83 109 COM14 3315 -245 189 SEG63 48.5 356 269 COM44 -3315 -165
+30 VBREF -1537.51 -352.83 110 COM13 3315 -205 19 0 SEG6 4 1.5 356 270 COM45 -3315 -205
+31 BGGND -1477.51 -352.83 111 COM12 3315 -165 191 SEG65 -45.5 356 271 COM46 -3315 -245
+32 VC C -1416.01 -352.83 112 COM11 3315 -125 192 SEG66 -92.5 356 272 COM47 -3315 -285
+33 VC C -1356.01 -352.83 113 COM10 3315 -85 193 SEG67 -139.5 356 273 COM48 -3315 -325
+34 VCOMH -1266.955 -352.83 114 COM9 3315 -45 19 4 SEG68 -186.5 356
+35 VCOMH -1206.955 -352.83 115 COM8 3315 -5 195 SEG69 -233.5 356 Pad no. Pad Name X- pos Y- pos
+36 VLSS -1125.155 -352.83 116 COM7 3315 35 196 SEG7 0 -280.5 356 Pin# Pin name X-di r Y-d ir
+37 VLSS -1043.355 -352.83 117 COM6 3315 75 197 SEG71 -327.5 356 274 TR 0 2757.05 114.8
+38 VLSS -983.355 -352.83 118 COM5 3315 115 198 SEG72 -374.5 356 275 TR1 2697.05 114.8
+39 VSS -92 0 -352.83 119 COM 4 3315 155 199 SEG73 -421.5 356 276 TR2 2637.05 114.8
+40 VSS -856 -352.83 120 COM3 3315 195 20 0 SEG7 4 -468.5 356 277 TR3 2577.05 114.8
+41 VSS -796 -352.83 121 COM2 3315 235 201 SEG75 -515.5 356 278 VSS 2517.05 114.8
+42 VDD -732.645 -352.83 122 COM1 3315 275 202 SEG76 -562.5 356 279 TR 4 2457.05 114.8
+43 VDD -672.645 -352.83 123 COM 0 3315 315 203 SEG77 -609.5 356 280 TR5 2397.05 114.8
+44 BS0 -595.655 -352.83 124 N C 3315 367.5 20 4 SEG78 -656.5 356 281 TR6 2337.05 114.8
+45 VSS -531.955 -352.83 125 N C 3055.5 356 205 SEG79 -703.5 356
+46 BS1 -467.655 -352.83 126 SEG0 3009.5 356 206 SEG8 0 -750.5 356
+47 VDD -403.155 -352.83 127 SEG1 2962.5 356 207 SEG81 -797.5 35648 VDD -342.555 -352.83 128 SEG2 2915.5 356 208 SEG82 -844.5 356
+49 BS2 -279.705 -352.83 129 SEG3 2868.5 356 209 SEG83 -891.5 3565
+0 VSS -215.705 -352.83 130 SEG4 2821.5 356 21 0 NC -940 356
+51 FR -151.955 -352.83 131 SEG5 2774.5 356 211 SEG8 4 -988.5 356
+52 C L -89.815 -352.83 132 SEG6 2727.5 356 212 SEG85 -1035.5 356
+53 VSS -25.665 -352.83 133 SEG7 2680.5 356 213 SEG86 -1082.5 356
+54 CS# 38.635 -352.83 134 SEG8 2633.5 356 21 4 SEG87 -1129.5 356
+55 RES# 109.835 -352.83 135 SEG9 2586.5 356 215 SEG88 -1176.5 35656 D/C# 182.425 -352.83 136 SEG1
+0 2539.5 356 216 SEG89 -1223.5 356
+57 VSS 246.125 -352.83 137 SEG11 2492.5 356 217 SEG9 0-1270.5 356
+58 R/W# 310.425 -352.83 138 SEG12 2445.5 356 218 SEG91 -1317.5 356
+59 E 373.125 -352.83 139 SEG13 2398.5 356 219 SEG92 -1364.5 356
+60 VDD 457.175 -352.83 140 SEG1 4 2351.5 356 22 0 SEG93 -1411.5 356
+61 VDD 517.175 -352.83 141 SEG15 2304.5 356 221 SEG9 4-1458.5 356
+62 D0 609.275 -352.83 142 SEG16 2257.5 356 222 SEG95 -1505.5 35663 D1 692.475 -352.83 143 SEG17 2210.5 356 223 SEG96 -1552.5 356
+6
+4 D2 765.675 -352.83 144 SEG18 2163.5 356 22 4 SEG97 -1599.5 356
+65 D3 828.875 -352.83 145 SEG19 2116.5 356 225 SEG98 -1646.5 356
+66 VSS 890.325 -352.83 146 SEG2 0 2069.5 356 226 SEG99 -1693.5 356
+67 D4 951.275 -352.83 147 SEG21 2022.5 356 227 SEG100 -1740.5 35668 D5 1013.315 -352.83 148 SEG22 1975.5 356 228 SEG101 -1787.5 356
+69 D6 1075.355 -352.83 149 SEG23 1928.5 356 229 SEG102 -1834.5 3567
+0 D7 1137.395 -352.83 150 SEG2 4 1881.5 356 23 0 SEG103 -1881.5 356
+71 VSS 1220.735 -352.83 151 SEG25 1834.5 356 231 SEG104 -1928.5 356
+72 VSS 1280.735 -352.83 152 SEG26 1787.5 356 232 SEG105 -1975.5 356
+73 CLS 1362.585 -352.83 153 SEG27 1740.5 356 233 SEG106 -2022.5 3567
+4 VDD 1425.285 -352.83 154 SEG28 1693.5 356 23 4 SEG107 -2069.5 356
+75 VDD 1485.885 -352.83 155 SEG29 1646.5 356 235 SEG108 -2116.5 356
+76 VDD 1553.185 -352.83 156 SEG3 0 1599.5 356 236 SEG109 -2163.5 356
+77 VDD 1613.185 -352.83 157 SEG31 1552.5 356 237 SEG110 -2210.5 35678 IREF 1684.585 -352.83 158 SEG32 1505.5 356 238 SEG111 -2257.5 356
+79 IREF 1744.585 -352.83 159 SEG33 1458.5 356 239 SEG112 -2304.5 356
+8
+0 VCOMH 1815.585 -352.83 160 SEG3 4 1411.5 356 24 0 SEG113 -2351.5 356
+
+=== PAGE 11 ===
+ 
+ 
+SSD1306 Rev 1.1 P 11/59 Apr 2008  Solomon Systech
+ 6 PIN ARRANGEMENT 
+6.1 SSD1306TR1 pin assignment 
+ 
+ 
+Figure 6-1 : SSD1306TR1 Pin Assignment 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+Note: 
+(1) COM sequence (Split) is under command setting: DAh, 12h 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 12 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 12/59 Rev 1.1 SSD1306  
+ Table 6-1 : SSD1306TR1 Pin Assignment Table 
+ Pin no. Pin Name Pin no. Pin Name Pin no. Pin Name
+1 NC 81 SEG90 161 SEG10
+2 VCC 82 SEG89 162 SEG9
+3 VCOMH 83 SEG88 163 SEG84 IREF 84 SEG87 164 SEG75 D7 85 SEG86 165 SEG6
+6 D6 86 SEG85 166 SEG5
+7 D5 87 SEG84 167 SEG4
+8 D4 88 SEG83 168 SEG39 D3 89 SEG82 169 SEG2
+10 D2 90 SEG81 170 SEG111 D1 91 SEG80 171 SEG012 D0 92 SEG79 172 NC
+13 E/RD# 93 SEG78 173 NC
+14 R/W# 94 SEG77 174 NC15 D/C# 95 SEG76 175 NC16 RES# 96 SEG75 176 NC17 CS# 97 SEG74 177 NC18 NC 98 SEG73 178 NC19 BS2 99 SEG72 179 NC20 BS1 100 SEG71 180 NC21 VDD 101 SEG70 181 NC22 NC 102 SEG69 182 COM023 NC 103 SEG68 183 COM224 NC 104 SEG67 184 COM425 NC 105 SEG66 185 COM626 NC 106 SEG65 186 COM827 NC 107 SEG64 187 COM1028 NC 108 SEG63 188 COM1229 NC 109 SEG62 189 COM1430 VSS 110 SEG61 190 COM1631 NC 111 SEG60 191 COM1832 NC 112 SEG59 192 COM2033 NC 113 SEG58 193 COM2234 COM47 114 SEG57 194 COM2435 COM45 115 SEG56 195 COM2636 COM43 116 SEG55 196 COM2837 COM41 117 SEG54 197 COM3038 COM39 118 SEG53 198 COM3239 COM37 119 SEG52 199 COM3440 COM35 120 SEG51 200 COM3641 COM33 121 SEG50 201 COM3842 COM31 122 SEG49 202 COM4043 COM29 123 SEG48 203 COM4244 COM27 124 SEG47 204 COM4445 COM25 125 SEG46 205 COM46
+46 COM23 126 SEG45 206 NC
+47 COM21 127 SEG44 207 NC
+48 COM19 128 SEG43
+49 COM17 129 SEG4250 COM15 130 SEG4151 COM13 131 SEG40
+52 COM11 132 SEG39
+53 COM9 133 SEG3854 COM7 134 SEG3755 COM5 135 SEG3656 COM3 136 SEG3557 COM1 137 SEG3458 NC 138 SEG3359 NC 139 SEG3260 NC 140 SEG3161 NC 141 SEG3062 NC 142 SEG2963 NC 143 SEG2864 NC 144 SEG2765 NC 145 SEG2666 NC 146 SEG2567 NC 147 SEG2468 SEG103 148 SEG2369 SEG102 149 SEG2270 SEG101 150 SEG21
+71 SEG100 151 SEG20
+72 SEG99 152 SEG1973 SEG98 153 SEG1874 SEG97 154 SEG1775 SEG96 155 SEG1676 SEG95 156 SEG1577 SEG94 157 SEG1478 SEG93 158 SEG1379 SEG92 159 SEG12
+80 SEG91 160 SEG11
+
+=== PAGE 13 ===
+ 
+ 
+SSD1306 Rev 1.1 P 13/59 Apr 2008  Solomon Systech
+  
+7 PIN DESCRIPTION 
+ 
+Key: 
+I = Input NC = Not Connected 
+O =Output Pull LOW= connect to Ground 
+I/O = Bi-directional (input/output) Pull HIGH= connect to V DD 
+P = Power pin  
+ 
+Figure 7-1 Pin Description 
+Pin Name Type Description 
+VDD P Power supply pin for core logic operation. 
+VCC P Power supply for panel driving voltage.  This is also the most positive power voltage 
+supply pin.  
+ 
+VSS P This is a ground pin.   
+ 
+VLSS P This is an analog ground pin. It should be connected to V SS externally. 
+ 
+VCOMH  O The pin for COM signal deselected voltage level.   
+A capacitor should be connected between this pin and V SS.   
+ 
+VBAT P Reserved pin.  It should be connected to V DD. 
+ 
+BGGND P Reserved pin.  It should be connected to ground. 
+ 
+C1P/C1N 
+C2P/C2N I Reserved pin.  It should be kept NC. 
+ 
+VBREF P Reserved pin.  It should be kept NC.   
+ 
+BS[2:0] 
+ I MCU bus interface selection pins. Please refer to Table 7-1  for the details of setting. 
+ 
+IREF 
+ I This is segment output current reference pin.   
+A resistor should be connected between this pin and V SS to maintain the I REF current at 
+12.5 uA.  Please refer to Figure 8-15  for the details of resistor value. 
+ 
+FR O This pin outputs RAM write synchronization signal.  Proper timing between MCU data 
+writing and frame display timing can be ac hieved to prevent tearing effect.  
+It should be kept NC if it is not used. Please refer to Section 8.4 for details usage. 
+ 
+CL I This is external clock input pin. 
+When internal clock is enabled (i.e. HIGH in CLS pin), this pin is not used and should be 
+connected to V SS. When internal clock is disabled (i.e. LOW in CLS pin), this pin is the 
+external clock source input pin. 
+ 
+CLS I This is internal clock enable pin. When it is pulled HIGH (i.e. connect to V DD), internal 
+clock is enabled. When it is pulled LOW, the internal clock is disabled; an external clock source must be connected to the CL pin for normal operation. 
+ 
+RES# 
+I This pin is reset signal input.  When the pi n is pulled LOW, initialization of the chip is 
+executed. Keep this pin HIGH (i.e. connect to V DD) during normal operation.  
+ 
+CS# I This pin is the chip select input. (active LOW). 
+ 
+
+=== PAGE 14 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 14/59 Rev 1.1 SSD1306  
+ Pin Name Type Description 
+D/C# I This is Data/Command control pin. When it is pulled HIGH (i.e. connect to V DD), the data 
+at D[7:0] is treated as data. When it is pulle d LOW, the data at D[7:0] will be transferred 
+to the command register.  
+In I2C mode, this pin acts as SA0 for slave address selection. 
+When 3-wire serial interface is select ed, this pin must be connected to V SS. 
+ 
+For detail relationship to MCU interface signals, please refer to the Timing Characteristics 
+Diagrams: Figure 13-1  to  Figure 13-5 . 
+ 
+E (RD#) I When interfacing to a 6800-series micropro cessor, this pin will be used as the Enable (E) 
+signal. Read/write operation is initiated when this pin is pulled HIGH (i.e. connect to V DD) 
+and the chip is selected. When connecting to an 8080-s eries microprocessor, this pin receives the Read (RD#) 
+signal. Read operation is initiated when this pin is pulled LOW and the chip is selected.  When serial or I
+2C interface is selected, this pin must be connected to V SS. 
+ 
+R/W#(WR#) I This is read / write control input pin connecting to the MCU interface.  
+When interfacing to a 6800-series microprocesso r, this pin will be used as Read/Write 
+(R/W#) selection input. Read mode will be carried out when this pin is pulled HIGH (i.e. connect to V
+DD) and write mode when LOW.  
+When 8080 interface mode is selected, this pi n will be the Write (WR# ) input. Data write 
+operation is initiated when this pin is pulled LOW and the chip is selected. 
+When serial or I2C interface is selected, this pin must be connected to V SS. 
+ 
+D[7:0] IO These are 8-bit bi-directional data bus to  be connected to the mi croprocessor’s data bus. 
+When serial interface mode is selected, D0 will be the serial clock input: SCLK; D1 will 
+be the serial data input: SDIN and D2 should be kept NC. 
+When I2C mode is selected, D2, D1 should be tied together and serve as SDA out, SDA in in 
+application and D0 is the serial clock input, SCL.  
+TR0-TR6 - Testing reserved pins. It should be kept NC. 
+ 
+SEG0 ~ 
+SEG127 O These pins provide Segment switch signals to OLED panel. These pins are V SS state when 
+display is OFF. 
+ 
+COM0 ~ 
+COM63 O These pins provide Common switch signals to OLED panel. They are in high impedance 
+state when display is OFF.  
+ 
+NC - This is dummy pin. Do not group or short NC pins together. 
+ 
+ 
+ 
+Table 7-1 : MCU Bus Interface Pin Selection 
+SSD1306            
+Pin Name I2C Interface 6800-parallel 
+interface  
+(8 bit) 8080-parallel 
+interface 
+(8 bit) 4-wire Serial 
+interface 3-wire Serial interface 
+BS0 0 0 0 0 1 
+BS1 1 0 1 0 0 
+BS2 0 1 1 0 0 
+ 
+Note 
+(1) 0 is connected to V SS 
+(2) 1 is connected to V DD 
+ 
+
+=== PAGE 15 ===
+ 
+ 
+SSD1306 Rev 1.1 P 15/59 Apr 2008  Solomon Systech
+ 8 FUNCTIONAL BLOCK  DESCRIPTIONS 
+8.1 MCU Interface selection  
+SSD1306 MCU interface consist of 8 data pins and 5 control pins.  The pin assignment at different interface 
+mode is summarized in Table 8-1. Different MCU mode can be set  by hardware selection on BS[2:0] pins 
+(please refer to  Table 7-1  for BS[2:0] setting). 
+ 
+Table 8-1 : MCU interface assignmen t under different bus interface mode 
+Data/Command Interface Control Signal       Pin Name  
+Bus         
+Interface D7 D6 D5 D4 D3 D2 D1 D0 E R/W# CS# D/C# RES# 
+8-bit 8080 D[7:0] RD# WR# CS# D/C# RES# 
+8-bit 6800  D[7:0] E R/W# CS# D/C# RES# 
+3-wire SPI Tie LOW NC SDIN SCLK Tie LOW CS#  Tie LOW RES#  
+4-wire SPI Tie LOW NC SDIN SCLK Tie LOW CS# D/C# RES# 
+I2C  Tie LOW SDA OUTSDA INSCL Tie LOW SA0 RES# 
+ 
+ 
+8.1.1 MCU Parallel 6800-series Interface  
+The parallel interface consists of  8 bi-directional data pins ( D[7:0] ), R/W#, D/C#, E  and CS#.  
+ 
+A LOW in R/W# indicates WRITE operation and HIGH in R/W# indicates READ operation. 
+A LOW in D/C# indicates COMMAND read/write and HIGH in D/C# indicates DATA read/write. 
+The E input serves as data latch signal while CS# is LOW.   Data is latched at th e falling edge of E signal. 
+ 
+Table 8-2 : Control pins of 6800 interface 
+Function E R/W# CS# D/C#
+Write command ↓ L L L 
+Read status ↓ H L L 
+Write data ↓ L L H 
+Read data ↓ H L H 
+ 
+Note 
+(1) ↓ stands for falling edge of signal 
+   H stands for HIGH in signal 
+   L stands for LOW in signal 
+ 
+In order to match the operating frequency of display RAM with that of the microprocessor, some pipeline 
+processing is internally performed which requires the inser tion of a dummy read before the first actual display 
+data read. This is shown in Figure 8-1. 
+ 
+ 
+
+=== PAGE 16 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 16/59 Rev 1.1 SSD1306  
+ Figure 8-1 : Data read back pro cedure - insertion of dummy read 
+N n n+1 n+2R/W#
+E
+Databus
+Write column
+addressRead 1st  data Dummy read Read 2nd  data Read 3rd  data 
+ 
+8.1.2 MCU Parallel 8080-series Interface  
+The parallel interface consists of 8 bi -directional data pins (D[7:0]), RD #, WR#, D/C# and CS#.      
+ 
+A LOW in D/C# indicates COMMAND read/write and HIGH in D/C# indicates DATA read/write. 
+A rising edge of RD# input serves as a data RE AD latch signal while CS# is kept LOW.   
+A rising edge of WR# input serves as a data/command  WRITE latch signal while CS# is kept LOW.   
+ 
+Figure 8-2 : Example of Write procedur e in 8080 parallel interface mode 
+CS#
+WR#
+D[7:0]
+D/C#
+RD#high
+low 
+ 
+Figure 8-3 : Example of Read proce dure in 8080 parallel interface mode 
+CS#
+WR#D[7:0]
+D/C#RD#
+high
+low 
+ 
+
+=== PAGE 17 ===
+ 
+ 
+SSD1306 Rev 1.1 P 17/59 Apr 2008  Solomon Systech
+ Table 8-3 : Control pins of 8080 interface 
+Function RD# WR# CS# D/C# 
+Write command H ↑ L L 
+Read status ↑ H L L 
+Write data H ↑ L H 
+Read data ↑ H L H 
+Note 
+(1) ↑ stands for rising edge of signal 
+(2)  H stands for HIGH in signal 
+(3)  L stands for LOW in signal 
+ 
+In order to match the operating frequency of display RAM with that of the microprocessor, some pipeline 
+processing is internally performed which requires the inser tion of a dummy read before the first actual display 
+data read. This is shown in Figure 8-4 . 
+Figure 8-4 : Display data read back procedure - insertion of dummy read 
+ 
+ N n n+1 n+2WR#
+RD#
+Databus
+Write column
+addressRead 1st  data Dummy read Read 2nd  data Read 3rd  data
+ 
+ 
+ 
+ 
+8.1.3 MCU Serial Interface (4-wire SPI) 
+  
+The 4-wire serial interface consists of serial clock: SCLK, serial data: SDIN, D/C#, CS#. In 4-wire SPI mode, 
+D0 acts as SCLK, D1 acts as SDIN. For the unused data pins , D2 should be left open. The pins from D3 to 
+D7, E and R/W# (WR#)# can be connected to an external ground. 
+Table 8-4 : Control pins of  4-wire Serial interface 
+Function E(RD#) R/W#(WR#) CS# D/C# D0 
+Write command Tie LOW Tie LOW L L ↑ 
+Write data Tie LOW Tie LOW L H ↑ 
+ 
+Note 
+(1) H stands for HIGH in signal 
+(2) L stands for LOW in signal 
+ 
+SDIN is shifted into an 8-bit shift register on every ri sing edge of SCLK in the order of D7, D6, ... D0. D/C# 
+is sampled on every eighth clock and the data byte in th e shift register is written to the Graphic Display Data 
+RAM (GDDRAM) or command register in the same clock.  
+ 
+Under serial mode, only write operations are allowed.  
+
+=== PAGE 18 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 18/59 Rev 1.1 SSD1306  
+ Figure 8-5 : Write procedure in 4-wire Serial interface mode 
+ 
+ 
+ 
+8.1.4 MCU Serial Interface (3-wire SPI) 
+The 3-wire serial interface consists of seri al clock SCLK, serial data SDIN and CS#.  
+In 3-wire SPI mode, D0 acts as SCLK, D1 acts as SDIN. For the unused data pins, D2 should be left open. 
+The pins from D3 to D7, R/W# (WR#)#, E and D/ C# can be connected to an external ground. 
+ 
+The operation is similar to 4-wire serial interface while D/ C# pin is not used. There are altogether 9-bits will 
+be shifted into the shift register on every ninth clock in sequence: D/C# bit, D7 to D0 bit. The D/C# bit (first 
+bit of the sequential data) will determine the following data  byte in the shift register is written to the Display 
+Data RAM (D/C# bit = 1) or the command register (D /C# bit = 0). Under serial mode, only write operations 
+are allowed.  
+Table 8-5 : Control pins of  3-wire Serial interface 
+Function E(RD#) R/W#(WR#) CS# D/C# D0
+Write command Tie LOW Tie LOW L Tie LOW ↑
+Write data Tie LOW Tie LOW L Tie LOW ↑Note 
+(1) L stands for LOW in signal
+ 
+Figure 8-6 : Write procedure in 3-wire Serial interface mode 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ D7 D6 D5 D4 D3 D2 D1 D0 SCLK 
+(D0) 
+SDIN(D1)  DB1 DB2 DBnCS# 
+D/C# SDIN/  
+SCLK  D7 D6 D5 D4 D3 D2 D1 D0 SCLK (D0) 
+SDIN(D1)
+ DB1 DB2 DBnCS# 
+D/C# 
+SDIN/  
+SCLK  
+
+=== PAGE 19 ===
+ 
+ 
+SSD1306 Rev 1.1 P 19/59 Apr 2008  Solomon Systech
+  
+8.1.5 MCU I2C Interface  
+The I2C communication interface consists of slave address bit SA0, I2C-bus data signal SDA (SDA OUT/D2 for 
+output and SDA IN/D1 for input) and I2C-bus clock signal SCL (D 0). Both the data and clock signals must be 
+connected to pull-up resistors. RES# is  used for the initialization of device. 
+ 
+a) Slave address bit (SA0) 
+SSD1306 has to recognize the slave address before transmitting or receiving any information by the 
+I2C-bus. The device will respond to the slave address following by the slave address bit (“SA0” bit) 
+and the read/write select bit (“R/W#” b it) with the following byte format,  
+b7 b6 b5 b4 b3 b2 b1     b 0  
+0  1  1   1  1   0  SA0 R/W# “SA0” bit provides an extension bit for the slav e address. Either “0111100” or “0111101”, can be 
+selected as the slave address of SSD1306. D/C# pin acts as SA0 for slave address selection. “R/W#” bit is used to determine the operation mode of the I
+2C-bus interface.  R/W#=1, it is in read 
+mode.  R/W#=0, it is in write mode.   
+b) I2C-bus data signal (SDA) 
+SDA acts as a communication channel between the transmitter and the receiver. The data and the acknowledgement are sent through the SDA.   
+It should be noticed that the ITO track resistance and the pulled-up resistance at “SDA” pin becomes 
+a voltage potential divider. As a result, the acknowle dgement would not be possible to attain a valid 
+logic 0 level in “SDA”.  
+“SDA
+IN” and “SDA OUT” are tied together and serve as SDA. The “SDA IN” pin must be connected to 
+act as SDA. The “SDA OUT” pin may be disconnected. When “SDA OUT” pin is disconnected, the 
+acknowledgement signal will be ignored in the I2C-bus.  
+c) I2C-bus clock signal (SCL) 
+The transmission of information in the I2C-bus is following a clock signal, SCL. Each transmission of 
+data bit is taken place during a single clock period of SCL. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 20 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 20/59 Rev 1.1 SSD1306  
+  
+ 
+8.1.5.1  I2C-bus Write data  
+ 
+The I2C-bus interface gives access to write data and command into the device. Please refer to Figure 8-7 for 
+the write mode of I2C-bus in chronological order. 
+ Figure 8-7 : I2C-bus data format 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+8.1.5.2  Write mode for I2C    
+1) The master device initiates the data communication by  a start condition. The definition of the start 
+condition is shown in Figure 8-8. The start condition is established by pulling the SDA from HIGH to 
+LOW while the SCL stays HIGH.  
+2) The slave address is following the start condition for recognition use. For the SSD1306, the slave 
+address is either “b0111100” or “b0111101” by changing the SA0 to LOW or HIGH (D/C pin acts as 
+SA0).   
+3) The write mode is established by se tting the R/W# bit to logic “0”.  
+4) An acknowledgement signal will be generated after receiving one byte of data, including the slave 
+address and the R/W# bit. Please refer to the Figure 8-9 for the graphical representation of the 
+acknowledge signal. The acknowledge  bit is defined as the SDA line is pulled down during the HIGH 
+period of the acknowledgement  related clock pulse.  
+5) After the transmission of the slave address, either th e control byte or the data byte may be sent across 
+the SDA. A control byte mainly consists of  Co and D/C# bits following by six “0” ‘s. 
+a. If the Co bit is set as logic “0”, the transm ission of the following information will contain 
+data bytes only.  
+b. The D/C# bit determines the next data byte is acted as a command or a data. If the D/C# bit is 
+set to logic “0”, it defines the following data byte as a command. If the D/C# bit is set to 
+logic “1”, it defines the following data byte as a data which will be stored at the GDDRAM. 
+The GDDRAM column address pointer will be increased by one automatically after each 
+data write. 
+6) Acknowledge bit will be generated after r eceiving each control byte or data byte. 
+7) The write mode will be finished when a stop conditi on is applied. The stop c ondition is also defined 
+in Figure 8-8. The stop condition is established by pulling the “SDA in” from LOW to HIGH while 
+the “SCL” stays HIGH. 01111P
+Slave Address m ≥ 0 words n  ≥  0 bytes 
+MSB ……………….LSB   1 byte Write mode 
+SSD1306 
+Slave Address 
+R/W#  D/C#
+Co
+ACKACK
+Control b yte Data b yte Control b yte  ACK
+Data byte ACK
+S 0  1  1  1  1  0   SA0  R/W#
+CoD/CACK
+Control byte Note: Co – Continuation bit 
+D/C# – Data / Command Selection bit 
+ACK – Acknowledgement SA0 – Slave address bit R/W# – Read / Write Selection bit 
+S – Start Condition / P – Stop Condition
+ 
+ 0  0  0  0  0  0  0 1 1 1 1 0 
+D/C#
+Co
+ACK
+
+=== PAGE 21 ===
+ 
+ 
+SSD1306 Rev 1.1 P 21/59 Apr 2008  Solomon Systech
+ Figure 8-8 : Definition of the Start and Stop Condition 
+ 
+ 
+Figure 8-9 : Definition of the acknowledgement condition 
+ 
+ 
+ 
+Please be noted that the transmission of the data bit has some limitations. 
+1. The data bit, which is transmitted during each SCL pulse,  must keep at a stable state within the “HIGH” 
+period of the clock pulse. Please refer to the  Figure  8-10  for graphical representations. Except in start or 
+stop conditions, the data line can be switched only when the SCL is LOW. 
+2. Both the data line (SDA) and the clock line (SCL) should be pulled up by external resistors.  
+ 
+ 
+ Figure 8-10 : Definition of  the data transfer condition  
+ SDA 
+SCL 
+Data line is 
+stable Change 
+of dataDATA OUTPUT  
+BY RECEIVER DATA OUTPUT  
+BY TRANSMITTER 
+SCL FROM  
+MASTER 
+S 
+ 
+START 
+Condition  Clock pulse for acknowledgement 1 8 9 Non-acknowledge 
+2Acknowledge S 
+ 
+START  condition SDA 
+SCL 
+P 
+ 
+STOP conditionSDA
+SCLtHSTART tSSTOP  
+
+=== PAGE 22 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 22/59 Rev 1.1 SSD1306  
+ 8.2 Command Decoder 
+This module determines whether the input data is interp reted as data or command. Da ta is interpreted based 
+upon the input of the D/C# pin. 
+ 
+If D/C# pin is HIGH, D[7:0] is interpreted as displa y data written to Graphic Display Data RAM (GDDRAM). 
+If it is LOW, the input at D[7:0] is interpreted as a co mmand.  Then data input will be decoded and written to 
+the corresponding command register. 
+  
+8.3 Oscillator Circuit and Display Time Generator 
+Figure 8-11 : Oscillator Circuit and Display Time Generator 
+DividerInternal
+Oscillator
+Fosc
+M
+U
+X CLCLK DCLK
+Display
+Clock
+CLS
+ 
+ 
+This module is an on-chip LOW power RC oscillator circ uitry.  The operation clock (CLK) can be generated 
+either from internal oscillator or external source CL pi n.  This selection is done by CLS pin.  If CLS pin is 
+pulled HIGH, internal oscillator is chosen and CL should be left open.  Pulling CLS pin LOW disables 
+internal oscillator and external clock must be connected to CL pins for proper operation.  When the internal 
+oscillator is selected, its output frequency Fosc can be changed by command D5h A[7:4]. 
+ 
+The display clock (DCLK) for the Display Timing Gene rator is derived from CLK. The division factor “D” 
+can be programmed from 1 to 16 by command D5h  
+DCLK = F OSC / D 
+ 
+The frame frequency of display is de termined by the following formula. 
+MuxofNo.K DFFosc
+FRM××=  
+where 
+• D stands for clock divide ratio. It is set by command D5h A[3:0]. The divide ratio has the range from 1 to 
+16. 
+• K is the number of display clocks pe r row.  The value is derived by  
+K = Phase 1 period + Phase 2 period + BANK0 pulse width 
+   =  2 + 2 + 50 = 54 at power on reset 
+(Please refer to Section 8.6 “ Segment Drivers / Common Drivers” for the details of the “Phase”) 
+• Number of multiplex ratio is set by command A8h.   The power on reset value is 63 (i.e. 64MUX). 
+• FOSC is the oscillator frequency. It can be change d by command D5h A[7:4]. The higher the register 
+setting results in higher frequency. 
+ 
+ 
+
+=== PAGE 23 ===
+ 
+ 
+SSD1306 Rev 1.1 P 23/59 Apr 2008  Solomon Systech
+ 8.4 FR synchronization 
+FR synchronization signal can be u sed to prevent tearing effect. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ 
+ 
+The starting time to write a new image to OLED dr iver is depended on the MCU writing speed.  If MCU can 
+finish writing a frame image within one frame period, it is classified as fast write MCU.  For MCU needs 
+longer writing time to complete (more than one frame  but within two frames), it is a slow write one. 
+ 
+For fast write MCU: MCU should start to write new frame of ram da ta just after rising edge of FR pulse and 
+should be finished well before the rising edge of the next FR pulse. 
+ 
+For slow write MCU : MCU should start to write new frame ram data after the falling edge of the 1st FR 
+pulse and must be finished before the rising edge of the 3rd FR pulse. 
+  
+8.5 Reset Circuit 
+When RES# input is LOW, the chip is  initialized with the following status: 
+1. Display is OFF 
+2. 128 x 64 Display Mode 
+3. Normal segment and display data column address and row address mapping (SEG0 mapped to 
+address 00h and COM0 mapped to address 00h) 
+4. Shift register data clear in serial interface 
+5. Display start line is set at display RAM address 0 
+6. Column address counter is set at 0 
+7. Normal scan direction of the COM outputs 
+8. Contrast control register is set at 7Fh 
+9. Normal display mode (Equivalent to A4h command) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ Fast write MCU 
+Slow write MCU 
+SSD1306 displaying memory updates to OLED screen One frame 
+FR 
+100% 
+ 
+ 
+ 
+ 
+0% Memory 
+Access 
+Process 
+Time 
+
+=== PAGE 24 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 24/59 Rev 1.1 SSD1306  
+ 8.6 Segment Drivers / Common Drivers 
+Segment drivers deliver 128 current sources to drive th e OLED panel. The driving current can be adjusted 
+from 0 to 100uA with 256 steps. Common drivers generate voltage-scanning pulses. 
+ 
+The segment driving waveform is divided into three phases:  
+1. In phase 1, the OLED pixel charges of previous im age are discharged in order to prepare for next 
+image content display. 
+2. In phase 2, the OLED pixel is driven to the targ eted voltage. The pixel is driven to attain the 
+corresponding voltage level from V SS.  The period of phase 2 can be programmed in length from 1 to 
+15 DCLKs.  If the capacitance value of the pixel of  OLED panel is larger, a longer period is required 
+to charge up the capacitor to reach the desired voltage. 
+3. In phase 3, the OLED driver switches to use current source to drive the OLED pixels and this is the 
+current drive stage.  
+ 
+Figure 8-12 : Segment Output Waveform in three phases 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+After finishing phase 3, the driver IC will go back to ph ase 1 to display the next row image data.  This three-
+step cycle is run continuously to refresh image display on OLED panel. 
+ 
+ 
+In phase 3, if the length of current drive pulse width is set to 50, after finishing 50 DCLKs in current drive 
+phase, the driver IC will go back to phase 1 for next row display. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+  
+ 
+ Segment  
+VSS  
+Phase:   1 2                      3 Time 
+
+=== PAGE 25 ===
+ 
+ 
+SSD1306 Rev 1.1 P 25/59 Apr 2008  Solomon Systech
+ 8.7 Graphic Display Data RAM (GDDRAM) 
+The GDDRAM is a bit mapped static RAM holding the bit pattern to be displayed. The size of the RAM is 
+128 x 64 bits and the RAM is divided into eight pages, from PAGE0 to PAGE7, which are used for 
+monochrome 128x64 dot matrix display, as shown in Figure 8-13.    
+ 
+Figure 8-13 : GDDRAM pages structure of SSD1306 
+ 
+  Row re-mapping 
+PAGE0 (COM0-COM7)  Page 0 PAGE0 (COM 63-COM56) 
+PAGE1 (COM8-COM15)  Page 1 PAGE1 (COM 55-COM48) 
+PAGE2 (COM16-COM23) Page 2 PAGE2 (COM47-COM40) 
+PAGE3 (COM24-COM31) Page 3 PAGE3 (COM39-COM32) 
+PAGE4 (COM32-COM39)  Page 4 PAGE4 (COM31-COM24) 
+PAGE5 (COM40-COM47)  Page 5 PAGE5 (COM23-COM16) 
+PAGE6 (COM48–COM55) Page 6 PAGE6 (COM15-COM8) 
+PAGE7 (COM56-COM63) Page 7 PAGE7 (COM 7-COM0) 
+ SEG0 --------------- ------------------ ------------SEG127 
+Column re-mapping  SEG127 --------------- ----------------- -------------SEG0 
+ 
+  
+ 
+When one data byte is written into GDDRAM, all the ro ws image data of the same page of the current 
+column are filled (i.e. the whole column  (8 bits) pointed by the column address pointer is filled.). Data bit D0 
+is written into the top row, while data b it D7 is written into bottom row as shown in Figure 8-14. 
+ 
+ 
+Figure 8-14 : Enlargement of GDDRAM (N o row re-mapping and column-remapping) 
+ 
+ 
+For mechanical flexibility, re-mapping on both Segment and Common outputs can be selected by software as 
+shown in Figure 8-13. 
+ For vertical shifting of the display, an internal register  storing the display start line can be set to control the 
+portion of the RAM data to be mappe d to the display (command D3h).  
+ LSB D0  
+MSB D7  
+Each box represents one bit of image data .................... PAGE2  COM16
+COM17
+: 
+: 
+: 
+: 
+: 
+COM23SEG0 
+SEG1 SEG2 
+SEG3 
+SEG4 
+SEG123 
+SEG134 
+SEG125 
+SEG126 SEG127 ....................
+
+=== PAGE 26 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 26/59 Rev 1.1 SSD1306  
+ 8.8 SEG/COM Driving block 
+This block is used to derive the incoming power sources into the different levels of internal use voltage and 
+current.  
+• VCC is the most positive voltage supply.   
+• VCOMH  is the Common deselected level.  It is internally regulated. 
+• VLSS is the ground path of the analog and panel current. 
+• IREF is a reference current source for segment current drivers I SEG.  The relationship between reference 
+current and segment current of a color is:   
+ 
+ISEG = Contrast / 256 x I REF x scale factor  
+ 
+in which  
+the contrast (0~255) is set by Set Contrast command 81h; and  
+the scale factor is 8 by default. 
+ 
+The magnitude of I REF is controlled by the value of resistor, which is connected between I REF pin and 
+VSS as shown in Figure 8-15.  It is recommended to set I REF to 12.5 ± 2uA so as to achieve I SEG = 
+100uA at maximum contrast 255.  
+ 
+Figure 8-15 : IREF  Current Setting by Resistor Value 
+ 
+ 
+ 
+ 
+ 
+Since the voltage at I REF pin is V CC – 2.5V, the value of resistor R1 can be found as below: 
+ 
+For I REF = 12.5uA, V CC =12V: 
+ 
+R1 = (Voltage at I REF – V SS) / I REF 
+ =  (12 – 2.5) / 12.5uA  =  760K
+Ω 
+ SSD1306 
+IREF (voltage at 
+this pin = 
+VCC – 2.5) 
+R1
+VSSIREF ~ 12.5uA
+
+=== PAGE 27 ===
+ 
+ 
+SSD1306 Rev 1.1 P 27/59 Apr 2008  Solomon Systech
+ 8.9 Power ON and OFF sequence 
+The following figures illustrate the recommende d power ON and power OFF sequence of SSD1306  
+ 
+Power ON sequence : 
+1. Power ON V DD  
+2. After V DD become stable, set RES# pin LOW (logic low) for at least 3us (t 1) (4) and then HIGH (logic 
+high). 
+3. After set RES# pin LOW (logic low), wait for at least 3us (t 2). Then Power ON V CC.(1) 
+4. After V CC become stable, send command AFh for display ON. SEG/COM will be ON after 100ms 
+(tAF). 
+ Figure 8-16 : The Power ON sequence 
+ 
+ 
+Power OFF sequence : 
+1. Send command AEh for display OFF. 
+2. Power OFF V CC.(1), (2), (3) 
+3. Power OFF V DD after t OFF. (5) (Typical t OFF=100ms)  
+Figure 8-17 : The Power OFF sequence 
+ 
+ 
+Note: 
+(1) Since an ESD protection circuit is connected between V DD and V CC, V CC becomes lower than V DD whenever V DD is 
+ON and V CC is OFF as shown in the dotted line of V CC in Figure 8-16  and Figure 8-17. 
+(2)
+ VCC should be kept float (i.e. disable) when it is OFF.  
+(3) Power Pins (V DD , V CC) can never be pulled to ground under any circumstance.  
+(4) The register values are reset after t 1. 
+(5) VDD should not be Power OFF before V CC Power OFF. OFF ON V DD     RES# ON V CC      Send AFh command for Display ON 
+VDD  
+RES# 
+OFF    t1     
+SEG/COM  tAF 
+ON
+ 
+OFFVCC GND t2  
+OFF V DD 
+VDD  VCC Send command AEh for display OFF  OFF V CC 
+OFF OFF 
+tOFF 
+
+=== PAGE 28 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 28/59 Rev 1.1 SSD1306  
+  
+9 COMMAND TABLE  
+Table 9-1: Command Table 
+(D/C#=0, R/W#(WR#) = 0, E(RD#=1) unless specific setting is stated) 
+1. Fundamental Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description  
+0 81 1 0 0 0 0 0 0 1 
+0 A[7:0] A 7 A 6 A 5 A 4 A 3 A 2 A 1A0
+          Set Contrast Control Double byte command to select 1 out of 256 
+contrast steps. Contrast increases as the value 
+increases.  
+(RESET = 7Fh ) 
+ 
+0 A4/A5 1 0 1 0 0 1 0 X 0Entire Display ON  A4h, X 0=0b: Resume to RAM content display 
+(RESET) 
+               Output follows RAM content   
+A5h, X 0=1b: Entire display ON 
+                Output ignores RAM content 
+0 A6/A7 1 0 1 0 0 1 1 X 0
+  
+        Set Normal/Inverse 
+Display A6h, X[0]=0b: Normal display (RESET) 
+               0 in RAM: OFF in display panel 
+               1 in RAM: ON in display panel  
+A7h, X[0]=1b: Inverse display 
+                0 in RAM: ON in display panel 
+               1 in RAM: OFF in display panel 
+0 AE 1 0 1 0 1 1 1 X 0
+ AF         
+          Set Display ON/OFF
+ AEh, X[0]=0b:Display OFF (sleep mode) 
+(RESET) AFh  X[0]=1b:Display ON in normal mode 
+ 
+       
+ 
+ 
+  
+ 
+ 
+2. Scrolling Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description 
+0 26/27 0 0 1 0 0 1  1 X 0 
+0 A[7:0] 0 0 0 0 0 0 0 0 
+0 B[2:0] * * * * * B 2 B 1 B 0
+0 C[2:0] * * * * * C 2 C 1 C 0
+0 D[2:0] * * * * * D 2 D 1 D 0
+0 E[7:0] 0 0 0 0 0 0 0 0 
+0 F[7:0] 1 1 1 1 1 1 1 1 Continuous 
+Horizontal Scroll 
+Setup 26h, X[0]=0, Right Horizontal Scroll    
+27h, X[0]=1, Left Horizontal Scroll   
+(Horizontal scroll by 1 column) 
+A[7:0] : Dummy byte  (Set as 00h) 
+B[2:0] : Define start page address 
+000b – PAGE0 011b – PAGE3 110b – PAGE6
+001b – PAGE1 100b – PAGE4 111b – PAGE7
+010b – PAGE2 101b – PAGE5  
+C[2:0] : Set time interval be tween each scroll step in  
+terms of  frame frequency 
+000b – 5 frames 100b – 3 frames 
+001b – 64 frames 101b – 4 frames 
+010b – 128 frames 110b – 25 frame 
+011b – 256 frames 111b – 2 frame 
+D[2:0] : Define end page address 
+000b – PAGE0 011b – PAGE3 110b – PAGE6
+001b – PAGE1 100b – PAGE4 111b – PAGE7
+010b – PAGE2 101b – PAGE5  
+             The value of D[2:0] must be larger or equal  
+to B[2:0] 
+E[7:0] : Dummy byte (Set as 00h) 
+ F[7:0] : Dummy byte (Set as FFh) 
+ 
+
+=== PAGE 29 ===
+ 
+ 
+SSD1306 Rev 1.1 P 29/59 Apr 2008  Solomon Systech
+ 2. Scrolling Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description 
+0 29/2A 0 0 1 0 1 0 X 1 X 0
+0 A[2:0] 0 0 0 0 0 0 0 0 
+0 B[2:0] * * * * * B 2 B 1 B 0
+0 C[2:0] * * * * * C 2 C 1 C 0
+0 D[2:0] * * * * * D 2 D 1 D 0
+0 E[5:0] * * E 5 E 4 E 3 E 2 E 1 E 0Continuous 
+Vertical and 
+Horizontal Scroll 
+Setup 29h, X 1X0=01b : Vertical and Right Horizontal Scroll
+2Ah, X 1X0=10b : Vertical and Left Horizontal Scroll
+ (Horizontal scroll by 1 column) 
+A[7:0] : Dummy byte 
+ 
+B[2:0] : Define start page address 
+000b – PAGE0 011b – PAGE3 110b – PAGE6
+001b – PAGE1 100b – PAGE4 111b – PAGE7
+010b – PAGE2 101b – PAGE5  
+ 
+ 
+ 
+C[2:0] : Set time interval be tween each scroll step in  
+terms of  frame frequency 
+000b – 5 frames 100b – 3 frames 
+001b – 64 frames 101b – 4 frames 
+010b – 128 frames 110b – 25 frame 
+011b – 256 frames 111b – 2 frame 
+ 
+ 
+D[2:0] : Define end page address 
+000b – PAGE0 011b – PAGE3 110b – PAGE6
+001b – PAGE1 100b – PAGE4 111b – PAGE7
+010b – PAGE2 101b – PAGE5  
+             The value of D[2:0] must be larger or equal  
+              to B[2:0] 
+ 
+E[5:0] : Vertical scrolling offset 
+              e.g. E[5:0]= 01h  refer to offset =1 row 
+                     E[5:0] =3Fh refer to offset =63 rows 
+Note 
+(1)  No continuous vertical scrolling is available. 
+ 
+0 2E 0 0 1 0 1 1 1 0 
+          Deactivate scroll Stop scrolling that is configured by command 
+26h/27h/29h/2Ah. 
+ 
+ 
+Note 
+(1)  After sending 2Eh command to deactivate the scrolling 
+action, the ram data needs to be rewritten. 
+ 
+0 2F 0 0 1 0 1 1 1 1 
+          Activate scroll Start scrolling that is configured by the scrolling setup 
+commands :26h/27h/29h/2Ah with the following valid 
+sequences: 
+ 
+ 
+ 
+Valid command sequence 1: 26h ;2Fh. 
+Valid command sequence 2: 27h ;2Fh. 
+Valid command  sequence 3: 29h ;2Fh. 
+Valid command  sequence 4: 2Ah ;2Fh. 
+ 
+For example,  if “26h; 2Ah; 2Fh.” commands are 
+issued, the setting in the last scrolling setup command, 
+i.e. 2Ah in this case, will be executed. In other words, 
+setting in the last scrolling setup command overwrites 
+the setting in the previous scrolling setup commands.
+ 
+
+=== PAGE 30 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 30/59 Rev 1.1 SSD1306  
+ 2. Scrolling Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description 
+0 A3 1 0 1 0 0 0 1 1 
+0 A[5:0] * * A 5 A 4 A 3 A 2 A 1 A 0
+0 B[6:0] * B 6 B 5 B 4 B 3 B 2 B 1 B 0Set Vertical Scroll 
+Area A[5:0] : Set No. of rows in top fixed area. The No. of 
+rows in top fixed area is  referenced to the 
+top of the GDDRAM (i.e. row 0). [RESET = 
+0] 
+ 
+B[6:0] : Set No. of rows in scroll area. This is the 
+number of rows to be used for vertical 
+scrolling. The scroll area starts in the first row below the top fixed area. 
+[RESET = 64]
+Note 
+(1) A[5:0]+B[6:0] <= MUX ratio 
+(2)  B[6:0] <= MUX ratio 
+(3a) Vertical scrolling offset (E[5:0] in 29h/2Ah) < 
+B[6:0] 
+(3b) Set Display Start Line (X 5X4X3X2X1X0 of 
+40h~7Fh) < B[6:0] 
+(4) The last row of the scroll area shifts to the first row 
+of the scroll area. 
+(5) For 64d MUX  display 
+   A[5:0] = 0, B[6:0]=64 : whole area scrolls 
+   A[5:0]= 0, B[6:0] < 64 : top area scrolls 
+   A[5:0]  + B[6:0] < 64 : central area scrolls 
+   A[5:0]  + B[6:0] = 64 : bottom area scrolls 
+  
+ 
+  3. Addressing Setting Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description 
+0 00~0F 0 0 0 0 X 3 X 2 X 1 X 0
+          Set Lower Column Start Address for 
+Page Addressing 
+Mode Set the lower nibble of the column start address register for Page Addressing Mode using X[3:0] 
+as data bits. The initial display line register is 
+reset to 0000b after RESET. 
+ 
+Note 
+(1) This command is only for page addressing mode  
+ 
+0 10~1F 0 0 0 1 X 3 X 2 X 1 X 0
+          Set Higher Column Start Address for 
+Page Addressing 
+Mode Set the higher nibble of the column start address 
+register for Page Addressing Mode using X[3:0] 
+as data bits. The initial display line register is 
+reset to 0000b after RESET. 
+ 
+Note 
+(1) This command is only for page addressing mode  
+ 
+0 20 0 0 1 0 0 0 0 0 
+0 A[1:0] * * * * * * A 1 A 0
+          Set Memory 
+Addressing Mode A[1:0] = 00b, Horizontal Addressing Mode A[1:0] = 01b, Vertical Addressing Mode 
+A[1:0] = 10b, Page Addressing Mode (RESET)
+A[1:0] = 11b, Invalid  
+ 
+0 21 0 0 1 0 0 0 0 1 
+0 A[6:0] * A 6 A 5 A 4 A 3 A 2 A 1 A 0
+0 B[6:0] * B 6 B 5 B 4 B 3 B 2 B 1 B 0
+          Set Column Address Setup co lumn start and end address 
+A[6:0] : Column start address, range : 0-127d, 
+(RESET=0d) 
+ 
+B[6:0]: Column end address, range : 0-127d,   
+(RESET =127d) 
+Note 
+(1) This command is only for horizontal or vertical 
+addressing mode.    
+ 
+
+=== PAGE 31 ===
+ 
+ 
+SSD1306 Rev 1.1 P 31/59 Apr 2008  Solomon Systech
+   3. Addressing Setting Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description 
+0 22 0 0 1 0 0 0 1 0 
+0 A[2:0] * * * * * A 2 A 1 A 0
+0 B[2:0] * * * * * B 2 B 1 B 0
+          Set Page Address Setup page start and end address 
+A[2:0] : Page start Address, range : 0-7d,  
+(RESET = 0d) 
+B[2:0] : Page end Address, range : 0-7d,  
+(RESET = 7d) 
+Note 
+(1) This command is only for horizontal or vertical 
+addressing mode.    
+ 
+0 B0~B7 1 0 1 1 0 X 2 X 1 X 0
+  
+        Set Page Start 
+Address for Page 
+Addressing Mode Set GDDRAM Page Start Address 
+(PAGE0~PAGE7) for Page Addressing Mode 
+using X[2:0]. 
+ 
+Note 
+(1) This command is only for page addressing mode  
+ 
+ 
+  
+ 
+ 
+4. Hardware Configuration (Panel resolut ion & layout related) Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description  
+0 40~7F 0 1 X 5 X 4 X 3 X 2 X 1 X 0
+          Set Display Start LineSet display RAM display start line register from 
+0-63 using X 5X3X2X1X0. 
+Display start line register is reset to 000000b 
+during RESET. 
+ 
+0 A0/A1 1 0 1 0 0 0 0 X 0 
+          Set Segment Re-map A0h, X[0]=0b: column address 0 is mapped to 
+SEG0 (RESET) 
+A1h, X[0]=1b: column address 127 is mapped to 
+           SEG0 
+ 
+0 A8 1 0 1 0 1 0 0 0 
+0 A[5:0] * * A 5 A 4 A 3 A 2 A 1 A 0Set Multiplex Ratio Set MUX ratio to N+1 MUX 
+N=A[5:0] : from 16MUX to 64MUX, RESET= 
+111111b (i.e. 63d, 64MUX) 
+A[5:0] from 0 to 14 are invalid entry.  
+0 C0/C8 1 1 0 0 X 3 0 0 0 
+          Set COM Output 
+Scan Direction C0h, X[3]=0b: normal mode (RESET) Scan from 
+COM0 to COM[N –1] 
+C8h, X[3]=1b: remapped mode. Scan from 
+COM[N-1] to COM0 
+Where N is the Multiplex ratio. 
+ 
+0 D3 1 1 0 1 0 0 1 1 
+0 A[5:0] * * A 5 A 4 A 3 A 2 A 1 A 0
+          Set Display Offset Set vertical shift by COM from 0d~63d 
+The value is reset to 00h after RESET. 
+0 DA 1 1 0 1 1 0 1 0 
+0 A[5:4] 0 0 A 5 A 4 0 0 1 0 
+          Set COM Pins 
+Hardware 
+Configuration A[4]=0b, Sequential COM pin configuration 
+A[4]=1b(RESET), Alternative COM pin 
+configuration  
+ 
+A[5]=0b(RESET), Disable COM Left/Right 
+remap 
+A[5]=1b, Enable COM Left/Right remap 
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 32 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 32/59 Rev 1.1 SSD1306  
+  
+5. Timing & Driving Sche me Setting Command Table 
+D/C#Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description  
+0 D5 1 1 0 1 0 1 0 1 
+0 A[7:0] A 7 A 6 A 5 A 4 A 3 A 2 A 1 A 0
+          Set Display Clock 
+Divide 
+Ratio/Oscillator 
+Frequency A[3:0] : Define the divide ratio (D) of the 
+display clocks (DCLK):  
+Divide ratio= A[3:0] + 1, RESET is 
+0000b (divide ratio = 1) 
+ 
+A[7:4] : Set the Oscillator Frequency, F OSC. 
+Oscillator Frequency increases with 
+the value of A[7:4] and vice versa.  
+RESET is 1000b 
+Range:0000b~1111b   
+Frequency increases as setting value 
+increases.  
+0 D9 1 1 0 1 1 0 0 1 
+0 A[7:0] A 7 A 6 A 5 A 4 A 3 A 2 A 1 A 0Set Pre-charge Period A[3:0] : Phase 1 period of up to 15 DCLK 
+clocks 0 is invalid entry   
+(RESET=2h) 
+ 
+A[7:4] : Phase 2 period of up to 15 DCLK 
+clocks 0 is invalid entry   (RESET=2h ) 
+0 DB 1 1 0 1 1 0 1 1 
+0 A[6:4] 0 A 6 A 5 A 4 0 0 0 0 Set V COMH  Deselect 
+Level 
+  A[6:4] Hex 
+code V COMH  deselect level  
+000b 00h ~ 0.65 x V CC 
+010b 20h ~ 0.77 x V CC (RESET) 
+011b 30h ~ 0.83 x V CC 
+0 E3 1 1 1 0 0 0 1 1 
+          NOP Command for no operation 
+ 
+ 
+ 
+Note 
+(1) “*” stands for “Don’t care”. 
+
+=== PAGE 33 ===
+ 
+ 
+SSD1306 Rev 1.1 P 33/59 Apr 2008  Solomon Systech
+ Table 9-2 : Read Command Table 
+Bit Pattern Command Description 
+ D7D6D5D4D3D2D1D0 
+ 
+ Status Register Read  
+ D[7]  : Reserved 
+D[6] : “1” for display OFF / “0” for display ON
+D[5]  : Reserved 
+D[4]   : Reserved 
+D[3]   : Reserved 
+D[2]   : Reserved 
+D[1]   : Reserved 
+D[0]   : Reserved 
+ 
+Note 
+(1) Patterns other than those given in the Command Table are prohibited to enter the chip as a command; as unexpected 
+results can occur. 
+ 
+ 
+9.1 Data Read / Write 
+To read data from the GDDRAM, select HIGH for both the R/W# (WR#) pin and the D/C# pin for 6800-
+series parallel mode and select LOW for the E (RD#) pin and HIGH for the D/C# pin for 8080-series parallel 
+mode. No data read is provi ded in serial mode operation. 
+In normal data read mode the GDDRAM column address poi nter will be increased automatically by one after 
+each data read.  
+Also, a dummy read is required before the first data read.  
+To write data to the GDDRAM, select LOW for the R/ W# (WR#) pin and HIGH for the D/C# pin for both 
+6800-series parallel mode and 8080-series pa rallel mode. The serial interface mode is always in write mode. 
+The GDDRAM column address pointer will be increased  automatically by one after each data write. 
+ 
+Table 9-3 : Address increment table (Automatic) 
+D/C# R/W# (WR#) Comment Address Increment 
+0 0 Write Command No 
+0 1 Read Status No 
+1 0 Write Data Yes 
+1 1 Read Data Yes  
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 34 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 34/59 Rev 1.1 SSD1306  
+ 10 COMMAND DESCRIPTIONS  
+10.1 Fundamental Command 
+10.1.1  Set Lower Column Start Address for Page Addressing Mode (00h~0Fh) 
+This command specifies the lower nibble of the 8-bit column start address for the display data RAM under 
+Page Addressing Mode. The column address will be incr emented by each data access. Please refer to Section 
+Table 9-1  and Section 10.1.3 for details. 
+10.1.2  Set Higher Column Start Address for Page Addressing Mode (10h~1Fh) 
+This command specifies the higher nibble of the 8-b it column start address for the display data RAM under 
+Page Addressing Mode. The column address will be incr emented by each data access. Please refer to Section 
+Table 9-1 and Section 10.1.3  for details. 
+10.1.3  Set Memory Addressing Mode (20h) 
+There are 3 different memory addressing mode in  SSD1306: page addressing mode, horizontal addressing 
+mode and vertical addressing mode. This command sets th e way of memory addressing into one of the above 
+three modes. In there, “COL” means the graphic display data RAM column. 
+ 
+Page addressing mode (A[1:0]=10xb)  
+In page addressing mode, after the display RAM is r ead/written, the column address pointer is increased 
+automatically by 1.  If the column address pointer re aches column end address, the column address pointer is 
+reset to column start address and page address pointer is  not changed. Users have to set the new page and 
+column addresses in order to access the next page RAM content. The sequence of movement of the PAGE 
+and column address point for page addressing mode is shown in Figure 10-1. 
+Figure 10-1 : Address Pointer Move ment of Page addressing mode 
+ COL0 COL 1 ….. COL 126 COL 127 
+P A G E 0       
+P A G E 1       
+: : : : : : 
+P A G E 6       
+P A G E 7       
+ 
+In normal display data RAM read or write and page  addressing mode, the following steps are required to 
+define the starting RAM access pointer location: 
+• Set the page start address of the target display location by command B0h to B7h. 
+• Set the lower start column address of pointer by command 00h~0Fh.  
+• Set the upper start column address of pointer by command 10h~1Fh. 
+For example, if the page address is set to B2h, lowe r column address is 03h and upper column address is 10h, 
+then that means the starting column is SEG3 of P AGE2. The RAM access pointer is located as shown in 
+Figure 10-2 .  The input data byte will be written into RAM position of column 3. 
+Figure 10-2 : Example of GDDRAM a ccess pointer setting in Page Add ressing Mode (No row and column-
+remapping) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ LSB D0  
+MSB D7  Each lattice represents 
+one bit of image data 
+....................PAGE2 
+(Starting page) COM16
+COM17
+: 
+: 
+: 
+: 
+: 
+COM23SEG0       SEG3 (Starting column)                                                                                SEG127 
+RAM access pointe r
+
+=== PAGE 35 ===
+ 
+ 
+SSD1306 Rev 1.1 P 35/59 Apr 2008  Solomon Systech
+ Horizontal addressing mode (A[1:0]=00b)  
+In horizontal addressing mode, after the display RAM is  read/written, the column address pointer is increased 
+automatically by 1.  If the column address pointer re aches column end address, the column address pointer is 
+reset to column start address and page address pointer is increased by 1.  The sequence of movement of the 
+page and column address point for hori zontal addressing mode is shown in Figure 10-3. When both column 
+and page address pointers reach the end address, the pointers are reset to column start address and page start 
+address (Dotted line in Figure 10-3.) 
+ 
+  Figure 10-3 : Address Pointer Mov ement of Horizontal addressing mode 
+ COL0 COL 1 ….. COL 126 COL 127 
+P A G E 0       
+P A G E 1       
+: : : : : : 
+P A G E 6       
+P A G E 7       
+ 
+ 
+Vertical addressing mode: (A[1:0]=01b)  
+In vertical addressing mode, after the display RAM is read/written, the page address pointer is increased 
+automatically by 1.  If the page address pointer reaches th e page end address, the page address pointer is reset 
+to page start address and column address pointer is in creased by 1. The sequence of movement of the page 
+and column address point for vertical addressing mode is shown in Figure 10-4. When both column and page 
+address pointers reach the end address, the pointers are reset to column start address and page start address (Dotted line in 
+Figure 10-4.) 
+ 
+Figure 10-4 : Address Pointer Movemen t of Vertical addressing mode 
+ COL0 COL 1 ….. COL 126 COL 127 
+PAGE0   …..   
+PAGE1   …..   
+:   :   
+PAGE6   …..   
+PAGE7   …..   
+   
+In normal display data RAM read or write and horizon tal / vertical addressing mode, the following steps are 
+required to define the RAM access pointer location: 
+• Set the column start and end address of the target display location by command 21h. 
+• Set the page start and end address of th e target display location by command 22h. 
+Example is shown in 
+Figure 10-5. 
+ 
+10.1.4  Set Column Address (21h) 
+This triple byte command specifies column start address and end address of the display data RAM. This 
+command also sets the column address pointer to column start address.  This pointer is used to define the 
+current read/write column address in graphic display data RAM.  If horizontal address increment mode is 
+enabled by command 20h, after finishing read/write one column data, it is incremented automatically to the 
+next column address.  Whenever the column address pointer finishes accessing the end column address, it is 
+reset back to start column address and the row address is incremented to the next row.   
+ 
+ 
+ 
+
+=== PAGE 36 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 36/59 Rev 1.1 SSD1306  
+ 10.1.5  Set Page Address (22h) 
+This triple byte command specifies page start addr ess and end address of the display data RAM. This 
+command also sets the page address pointer to page start a ddress.  This pointer is used to define the current 
+read/write page address in graphic display data RAM.  If vertical address increment mode is enabled by 
+command 20h, after finishing read/write one page data , it is incremented automatically to the next page 
+address.  Whenever the page address pointer finishes acc essing the end page address, it is reset back to start 
+page address. 
+ 
+The figure below shows the way of co lumn and page address pointer moveme nt through the example: column 
+start address is set to 2 and column end address is set to 125, page start address is set to 1 and page end address is set to 6;  Horizontal address increment mode  is enabled by command 20h.  In this case, the graphic 
+display data RAM column accessible range is from column  2 to column 125 and from page 1 to page 6 only.  
+In addition, the column address pointer is set to 2 a nd page address pointer is set  to 1.  After finishing 
+read/write one pixel of data, the column address is increased automatically by 1 to access the next RAM 
+location for next read/write operation ( solid line in 
+Figure 10-5 ).  Whenever the column address pointer 
+finishes accessing the end column 125, it is reset back  to column 2 and page address is automatically 
+increased by 1 ( solid line in Figure 10-5 ).  While the end page 6 and end column 125 RAM location is 
+accessed, the page address is reset back to 1 an d the column address is reset back to 2 ( dotted line in Figure 
+10-5).  .   
+Figure 10-5 : Example of Column and Row Address Pointer Movement 
+ Col 0 Col 1 Col 2 ….. ……. Col 125 Col 126 Col 127 
+P A G E 0          
+P A G E 1          
+:     :      
+P A G E 6          
+P A G E 7     :      
+ 
+10.1.6  Set Display Start Line (40h~7Fh) 
+This command sets the Display Start Line register to determine starting address of display RAM, by selecting 
+a value from 0 to 63. With value equal to 0, RAM ro w 0 is mapped to COM0. With value equal to 1, RAM 
+row 1 is mapped to COM0 and so on.    
+ 
+Refer to Table 10-1 for more illustrations. 
+ 
+10.1.7  Set Contrast Control for BANK0 (81h) 
+This command sets the Contrast Setting of the display. The chip has 256 contrast steps from 00h to FFh. The 
+segment output current increases as the contrast step value increases. 
+ 
+ 
+10.1.8   Set Segment Re-map (A0h/A1h) 
+This command changes the mapping between the display data column address and the segment driver. It 
+allows flexibility in OLED module design. Please refer to Table 9-1. 
+ This command only affects subsequent data input.  Da ta already stored in GDDRAM will have no changes. 
+  
+
+=== PAGE 37 ===
+ 
+ 
+SSD1306 Rev 1.1 P 37/59 Apr 2008  Solomon Systech
+ 10.1.9   Entire Display ON   (A4h/A5h) 
+A4h command enable display output s according to the GDDRAM contents. 
+If A5h command is issued, then by using A4h command,  the display will resume to the GDDRAM contents. 
+In other words, A4h command resumes the display from entire display “ON” stage.  
+A5h command forces the entire display to be “ON”, rega rdless of the contents of the display data RAM. 
+ 
+10.1.10   Set Normal/Inverse Display (A6h/A7h) 
+This command sets the display to be either normal or inve rse. In normal display a RAM data of 1 indicates an 
+“ON” pixel while in inverse display a RA M data of 0 indicates an “ON” pixel. 
+ 
+10.1.11   Set Multiplex Ratio (A8h) 
+This command switches the default 63 multiplex mode  to any multiplex ratio, ranging from 16 to 63. The 
+output pads COM0~COM63 will be switc hed to the corresponding COM signal.   
+ 
+10.1.12  Set Display ON/OFF (AEh/AFh) 
+These single byte commands are used to turn  the OLED panel display ON or OFF.   
+When the display is ON, the selected circuits by Se t Master Configuration command will be turned ON.   
+When the display is OFF, those circuits will be tu rned OFF and the segment and common output are in V SS 
+state and high impedance state, respectively. These commands set the display to one of the two states: 
+o AEh : Display OFF 
+o AFh : Display ON 
+ 
+ Figure 10-6 :Transitio n between different modes 
+ 
+ 
+ 
+ 
+10.1.13  Set Page Start Address for Page  Addressing Mode (B0h~B7h) 
+This command positions the page start address fro m 0 to 7 in GDDRAM under Page Addressing Mode. 
+Please refer to Table 9-1  and Section 10.1.3  for details. 
+ 
+10.1.14   Set COM Output Scan Direction (C0h/C8h) 
+This command sets the scan direction of the COM output , allowing layout flexibility in the OLED module 
+design. Additionally, the display will show once this command is issued. For example, if this command is 
+sent during normal display then the graphic display w ill be vertically flipped immediately. Please refer to 
+Table 10-3 for details. 
+ 
+10.1.15   Set Display Offset (D3h) 
+This is a double byte command. The second command specifies the mapping of the display start line to one of 
+COM0~COM63 (assuming that COM0 is the display start line th en the display start line register is equal to 0).  
+ For example, to move the COM16 to wards the COM0 direction by 16 lines the 6-bit data in the second byte 
+should be given as 010000b. To move in the opposite dir ection by 16 lines the 6-bit data should be given by 
+64 – 16, so the second byte would be 100000b. The following two tables (
+Table 10-1, Table 10-2) show the 
+example of setting the command C0h/C8h and D3h. 
+ 
+ Normal mode Sleep mode AFh 
+AEh
+
+=== PAGE 38 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 38/59 Rev 1.1 SSD1306  
+ Table 10-1 : Example of Set Display Offset  and Display Start Line with no Remap 
+ 
+ 
+ 
+ 
+ 
+  Set MUX  ratio(A8h)
+COM Normal / Remapped (C0h / C8h )
+Display offset (D3h)
+Display start line (40h - 7Fh)
+COM0 Row0 RAM0 Row8 RAM8 Row0 RAM8 Row0 RAM0 Row8 RAM8 Row0 RAM8
+COM1 Row1 RAM1 Row9 RAM9 Row1 RAM9 Row1 RAM1 Row9 RAM9 Row1 RAM9
+COM2 Row2 RAM2 Row10 RAM10 Row2 RAM10 Row2 RAM2 Row10 RAM10 Row2 RAM10
+COM3 Row3 RAM3 Row11 RAM11 Row3 RAM11 Row3 RAM3 Row11 RAM11 Row3 RAM11COM4 Row4 RAM4 Row12 RAM12 Row4 RAM12 Row4 RAM4 Row12 RAM12 Row4 RAM12
+COM5 Row5 RAM5 Row13 RAM13 Row5 RAM13 Row5 RAM5 Row13 RAM13 Row5 RAM13
+COM6 Row6 RAM6 Row14 RAM14 Row6 RAM14 Row6 RAM6 Row14 RAM14 Row6 RAM14
+COM7 Row7 RAM7 Row15 RAM15 Row7 RAM15 Row7 RAM7 Row15 RAM15 Row7 RAM15
+COM8 Row8 RAM8 Row16 RAM16 Row8 RAM16 Row8 RAM8 Row16 RAM16 Row8 RAM16COM9 Row9 RAM9 Row17 RAM17 Row9 RAM17 Row9 RAM9 Row17 RAM17 Row9 RAM17
+COM10 Row10 RAM10 Row18 RAM18 Row10 RAM18 Row10 RAM10 Row18 RAM18 Row10 RAM18
+COM11 Row11 RAM11 Row19 RAM19 Row11 RAM19 Row11 RAM11 Row19 RAM19 Row11 RAM19
+COM12 Row12 RAM12 Row20 RAM20 Row12 RAM20 Row12 RAM12 Row20 RAM20 Row12 RAM20COM13 Row13 RAM13 Row21 RAM21 Row13 RAM21 Row13 RAM13 Row21 RAM21 Row13 RAM21COM14 Row14 RAM14 Row22 RAM22 Row14 RAM22 Row14 RAM14 Row22 RAM22 Row14 RAM22COM15 Row15 RAM15 Row23 RAM23 Row15 RAM23 Row15 RAM15 Row23 RAM23 Row15 RAM23
+COM16 Row16 RAM16 Row24 RAM24 Row16 RAM24 Row16 RAM16 Row24 RAM24 Row16 RAM24
+COM17 Row17 RAM17 Row25 RAM25 Row17 RAM25 Row17 RAM17 Row25 RAM25 Row17 RAM25
+COM18 Row18 RAM18 Row26 RAM26 Row18 RAM26 Row18 RAM18 Row26 RAM26 Row18 RAM26COM19 Row19 RAM19 Row27 RAM27 Row19 RAM27 Row19 RAM19 Row27 RAM27 Row19 RAM27
+COM20 Row20 RAM20 Row28 RAM28 Row20 RAM28 Row20 RAM20 Row28 RAM28 Row20 RAM28
+COM21 Row21 RAM21 Row29 RAM29 Row21 RAM29 Row21 RAM21 Row29 RAM29 Row21 RAM29
+COM22 Row22 RAM22 Row30 RAM30 Row22 RAM30 Row22 RAM22 Row30 RAM30 Row22 RAM30COM23 Row23 RAM23 Row31 RAM31 Row23 RAM31 Row23 RAM23 Row31 RAM31 Row23 RAM31COM24 Row24 RAM24 Row32 RAM32 Row24 RAM32 Row24 RAM24 Row32 RAM32 Row24 RAM32
+COM25 Row25 RAM25 Row33 RAM33 Row25 RAM33 Row25 RAM25 Row33 RAM33 Row25 RAM33
+COM26 Row26 RAM26 Row34 RAM34 Row26 RAM34 Row26 RAM26 Row34 RAM34 Row26 RAM34COM27 Row27 RAM27 Row35 RAM35 Row27 RAM35 Row27 RAM27 Row35 RAM35 Row27 RAM35COM28 Row28 RAM28 Row36 RAM36 Row28 RAM36 Row28 RAM28 Row36 RAM36 Row28 RAM36
+COM29 Row29 RAM29 Row37 RAM37 Row29 RAM37 Row29 RAM29 Row37 RAM37 Row29 RAM37
+COM30 Row30 RAM30 Row38 RAM38 Row30 RAM38 Row30 RAM30 Row38 RAM38 Row30 RAM38COM31 Row31 RAM31 Row39 RAM39 Row31 RAM39 Row31 RAM31 Row39 RAM39 Row31 RAM39COM32 Row32 RAM32 Row40 RAM40 Row32 RAM40 Row32 RAM32 Row40 RAM40 Row32 RAM40COM33 Row33 RAM33 Row41 RAM41 Row33 RAM41 Row33 RAM33 Row41 RAM41 Row33 RAM41
+COM34 Row34 RAM34 Row42 RAM42 Row34 RAM42 Row34 RAM34 Row42 RAM42 Row34 RAM42
+COM35 Row35 RAM35 Row43 RAM43 Row35 RAM43 Row35 RAM35 Row43 RAM43 Row35 RAM43COM36 Row36 RAM36 Row44 RAM44 Row36 RAM44 Row36 RAM36 Row44 RAM44 Row36 RAM44COM37 Row37 RAM37 Row45 RAM45 Row37 RAM45 Row37 RAM37 Row45 RAM45 Row37 RAM45
+COM38 Row38 RAM38 Row46 RAM46 Row38 RAM46 Row38 RAM38 Row46 RAM46 Row38 RAM46
+COM39 Row39 RAM39 Row47 RAM47 Row39 RAM47 Row39 RAM39 Row47 RAM47 Row39 RAM47COM40 Row40 RAM40 Row48 RAM48 Row40 RAM48 Row40 RAM40 Row48 RAM48 Row40 RAM48COM41 Row41 RAM41 Row49 RAM49 Row41 RAM49 Row41 RAM41 Row49 RAM49 Row41 RAM49COM42 Row42 RAM42 Row50 RAM50 Row42 RAM50 Row42 RAM42 Row50 RAM50 Row42 RAM50
+COM43 Row43 RAM43 Row51 RAM51 Row43 RAM51 Row43 RAM43 Row51 RAM51 Row43 RAM51
+COM44 Row44 RAM44 Row52 RAM52 Row44 RAM52 Row44 RAM44 Row52 RAM52 Row44 RAM52COM45 Row45 RAM45 Row53 RAM53 Row45 RAM53 Row45 RAM45 Row53 RAM53 Row45 RAM53COM46 Row46 RAM46 Row54 RAM54 Row46 RAM54 Row46 RAM46 Row54 RAM54 Row46 RAM54
+COM47 Row47 RAM47 Row55 RAM55 Row47 RAM55 Row47 RAM47 Row55 RAM55 Row47 RAM55
+COM48 Row48 RAM48 Row56 RAM56 Row48 RAM56 Row48 RAM48 - - Row48 RAM56
+COM49 Row49 RAM49 Row57 RAM57 Row49 RAM57 Row49 RAM49 - - Row49 RAM57COM50 Row50 RAM50 Row58 RAM58 Row50 RAM58 Row50 RAM50 - - Row50 RAM58COM51 Row51 RAM51 Row59 RAM59 Row51 RAM59 Row51 RAM51 - - Row51 RAM59
+COM52 Row52 RAM52 Row60 RAM60 Row52 RAM60 Row52 RAM52 - - Row52 RAM60
+COM53 Row53 RAM53 Row61 RAM61 Row53 RAM61 Row53 RAM53 - - Row53 RAM61COM54 Row54 RAM54 Row62 RAM62 Row54 RAM62 Row54 RAM54 - - Row54 RAM62COM55 Row55 RAM55 Row63 RAM63 Row55 RAM63 Row55 RAM55 - - Row55 RAM63
+COM56 Row56 RAM56 Row0 RAM0 Row56 RAM0 - - Row0 RAM0 - -
+COM57 Row57 RAM57 Row1 RAM1 Row57 RAM1 - - Row1 RAM1 - -COM58 Row58 RAM58 Row2 RAM2 Row58 RAM2 - - Row2 RAM2 - -COM59 Row59 RAM59 Row3 RAM3 Row59 RAM3 - - Row3 RAM3 - -COM60 Row60 RAM60 Row4 RAM4 Row60 RAM4 - - Row4 RAM4 - -
+COM61 Row61 RAM61 Row5 RAM5 Row61 RAM5 - - Row5 RAM5 - -
+COM62 Row62 RAM62 Row6 RAM6 Row62 RAM6 - - Row6 RAM6 - -COM63 Row63 RAM63 Row7 RAM7 Row63 RAM7 - - Row7 RAM7 - -
+Display 
+ex amples(e) (f) (a) (b) (c) (d)080
+00856 56 56
+Normal Normal Normal64
+Normal
+08Output
+Hardware 
+pin name 00Normal64 64
+Normal
+80
+(a) (b) (d) (c)
+(e) (f) 
+(RAM )
+
+=== PAGE 39 ===
+ 
+ 
+SSD1306 Rev 1.1 P 39/59 Apr 2008  Solomon Systech
+ Table 10-2 :Example of Set Display Offset and Display Start Line with Remap 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+(a) (b) (d) (c)
+(e) (f) (g)
+ (RAM ) Set MUX ratio(A8h )
+COM Normal / Remapped (C0h / C8h )
+Display offset (D3h )
+Display start line (40h - 7Fh )
+COM0 Row6 3 RAM63 Row 7 RAM7 Row6 3 RAM7 Row4 7 RAM47 - - Row47 RAM5 5 --
+COM1 Row6 2 RAM62 Row 6 RAM6 Row6 2 RAM6 Row4 6 RAM46 - - Row46 RAM5 4 --
+COM2 Row61 RAM61 Row 5 RAM5 Row61 RAM 5 Row4 5 RAM4 5 -- R o w 4 5 RAM5 3 --
+COM3 Row6 0 RAM60 Row 4 RAM4 Row6 0 RAM4 Row4 4 RAM44 - - Row44 RAM5 2 --
+COM4 Row5 9 RAM59 Row 3 RAM3 Row5 9 RAM3 Row4 3 RAM43 - - Row43 RAM51 - -
+COM5 Row5 8 RAM58 Row 2 RAM2 Row5 8 RAM2 Row4 2 RAM42 - - Row42 RAM5 0 --
+COM6 Row5 7 RAM57 Row1 RAM1 Row5 7 RAM1 Row41 RAM41 - - Row41 RAM4 9 --
+COM7 Row5 6 RAM56 Row 0 RAM0 Row5 6 RAM0 Row4 0 RAM40 - - Row40 RAM4 8 --
+COM8 Row5 5 RAM5 5 Row6 3 RAM6 3 Row5 5 RAM6 3 Row3 9 RAM39 Row4 7 RAM4 7 Row39 RAM4 7 Row47 RAM6 3
+COM9 Row5 4 RAM54 Row6 2 RAM6 2 Row5 4 RAM6 2 Row3 8 RAM38 Row4 6 RAM4 6 Row38 RAM4 6 Row46 RAM6 2
+COM10 Row5 3 RAM53 Row61 RAM61 Row5 3 RAM61 Row3 7 RAM37 Row4 5 RAM4 5 Row37 RAM4 5 Row4 5 RAM61
+COM11 Row5 2 RAM52 Row6 0 RAM6 0 Row5 2 RAM6 0 Row3 6 RAM36 Row4 4 RAM4 4 Row36 RAM4 4 Row44 RAM6 0
+COM12 Row51 RAM51 Row5 9 RAM5 9 Row51 RAM5 9 Row3 5 RAM3 5 Row4 3 RAM4 3 Row3 5 RAM4 3 Row43 RAM5 9
+COM13 Row5 0 RAM50 Row5 8 RAM5 8 Row5 0 RAM5 8 Row3 4 RAM34 Row4 2 RAM4 2 Row34 RAM4 2 Row42 RAM5 8
+COM14 Row4 9 RAM49 Row5 7 RAM5 7 Row4 9 RAM5 7 Row3 3 RAM33 Row41 RAM41 Row33 RAM41 Row41 RAM5 7
+COM15 Row4 8 RAM48 Row5 6 RAM5 6 Row4 8 RAM5 6 Row3 2 RAM32 Row4 0 RAM4 0 Row32 RAM4 0 Row40 RAM5 6
+COM16 Row4 7 RAM47 Row5 5 RAM5 5 Row4 7 RAM5 5 Row31 RAM31 Row3 9 RAM3 9 Row31 RAM3 9 Row39 RAM5 5
+COM17 Row4 6 RAM46 Row5 4 RAM5 4 Row4 6 RAM5 4 Row3 0 RAM30 Row3 8 RAM3 8 Row30 RAM3 8 Row38 RAM5 4
+COM18 Row4 5 RAM4 5 Row5 3 RAM5 3 Row4 5 RAM5 3 Row2 9 RAM29 Row3 7 RAM3 7 Row29 RAM3 7 Row37 RAM5 3
+COM19 Row4 4 RAM44 Row5 2 RAM5 2 Row4 4 RAM5 2 Row2 8 RAM28 Row3 6 RAM3 6 Row28 RAM3 6 Row36 RAM5 2
+COM20 Row4 3 RAM43 Row51 RAM51 Row4 3 RAM51 Row2 7 RAM27 Row3 5 RAM3 5 Row27 RAM3 5 Row3 5 RAM51
+COM21 Row4 2 RAM42 Row5 0 RAM5 0 Row4 2 RAM5 0 Row2 6 RAM26 Row3 4 RAM3 4 Row26 RAM3 4 Row34 RAM5 0
+COM22 Row41 RAM41 Row4 9 RAM4 9 Row41 RAM4 9 Row2 5 RAM2 5 Row3 3 RAM3 3 Row2 5 RAM3 3 Row33 RAM4 9
+COM23 Row4 0 RAM40 Row4 8 RAM4 8 Row4 0 RAM4 8 Row2 4 RAM24 Row3 2 RAM3 2 Row24 RAM3 2 Row32 RAM4 8
+COM24 Row3 9 RAM39 Row4 7 RAM4 7 Row3 9 RAM4 7 Row2 3 RAM23 Row31 RAM31 Row23 RAM31 Row31 RAM4 7
+COM25 Row3 8 RAM38 Row4 6 RAM4 6 Row3 8 RAM4 6 Row2 2 RAM22 Row3 0 RAM3 0 Row22 RAM3 0 Row30 RAM4 6
+COM26 Row3 7 RAM37 Row4 5 RAM4 5 Row3 7 RAM4 5 Row21 RAM21 Row2 9 RAM2 9 Row21 RAM2 9 Row29 RAM4 5
+COM27 Row3 6 RAM36 Row4 4 RAM4 4 Row3 6 RAM4 4 Row2 0 RAM20 Row2 8 RAM2 8 Row20 RAM2 8 Row28 RAM4 4
+COM28 Row3 5 RAM3 5 Row4 3 RAM4 3 Row3 5 RAM4 3 Row1 9 RAM19 Row2 7 RAM2 7 Row19 RAM2 7 Row27 RAM4 3
+COM29 Row3 4 RAM34 Row4 2 RAM4 2 Row3 4 RAM4 2 Row1 8 RAM18 Row2 6 RAM2 6 Row18 RAM2 6 Row26 RAM4 2
+COM30 Row3 3 RAM33 Row41 RAM41 Row3 3 RAM41 Row1 7 RAM17 Row2 5 RAM2 5 Row17 RAM2 5 Row2 5 RAM41
+COM31 Row3 2 RAM32 Row4 0 RAM4 0 Row3 2 RAM4 0 Row1 6 RAM16 Row2 4 RAM2 4 Row16 RAM2 4 Row24 RAM4 0
+COM32 Row31 RAM31 Row3 9 RAM3 9 Row31 RAM3 9 Row1 5 RAM1 5 Row2 3 RAM2 3 Row1 5 RAM2 3 Row23 RAM3 9
+COM33 Row3 0 RAM30 Row3 8 RAM3 8 Row3 0 RAM3 8 Row1 4 RAM14 Row2 2 RAM2 2 Row14 RAM2 2 Row22 RAM3 8
+COM34 Row2 9 RAM29 Row3 7 RAM3 7 Row2 9 RAM3 7 Row1 3 RAM13 Row21 RAM21 Row13 RAM21 Row21 RAM3 7
+COM35 Row2 8 RAM28 Row3 6 RAM3 6 Row2 8 RAM3 6 Row1 2 RAM12 Row2 0 RAM2 0 Row12 RAM2 0 Row20 RAM3 6
+COM36 Row2 7 RAM27 Row3 5 RAM3 5 Row2 7 RAM3 5 Row11 RAM11 Row1 9 RAM1 9 Row11 RAM1 9 Row19 RAM3 5
+COM37 Row2 6 RAM26 Row3 4 RAM3 4 Row2 6 RAM3 4 Row1 0 RAM10 Row1 8 RAM1 8 Row10 RAM1 8 Row18 RAM3 4
+COM38 Row2 5 RAM2 5 Row3 3 RAM3 3 Row2 5 RAM3 3 Row9 RAM9 Row1 7 RAM1 7 Row9 RAM1 7 Row17 RAM3 3
+COM39 Row2 4 RAM24 Row3 2 RAM3 2 Row2 4 RAM3 2 Row8 RAM8 Row1 6 RAM1 6 Row8 RAM1 6 Row16 RAM3 2
+COM40 Row2 3 RAM23 Row31 RAM31 Row2 3 RAM31 Row 7 RAM7 Row1 5 RAM1 5 Row7 RAM1 5 Row1 5 RAM31
+COM41 Row2 2 RAM22 Row3 0 RAM3 0 Row2 2 RAM3 0 Row6 RAM6 Row1 4 RAM1 4 Row6 RAM1 4 Row14 RAM3 0
+COM42 Row21 RAM21 Row2 9 RAM2 9 Row21 RAM2 9 Row5 RAM5 Row1 3 RAM1 3 Row5 RAM1 3 Row13 RAM2 9
+COM43 Row2 0 RAM20 Row2 8 RAM2 8 Row2 0 RAM2 8 Row4 RAM4 Row1 2 RAM1 2 Row4 RAM1 2 Row12 RAM2 8
+COM44 Row1 9 RAM19 Row2 7 RAM2 7 Row1 9 RAM2 7 Row3 RAM3 Row11 RAM11 Row3 RAM11 Row11 RAM2 7
+COM45 Row1 8 RAM18 Row2 6 RAM2 6 Row1 8 RAM2 6 Row2 RAM2 Row1 0 RAM1 0 Row2 RAM1 0 Row10 RAM2 6
+COM46 Row1 7 RAM17 Row2 5 RAM2 5 Row1 7 RAM2 5 Row1 RAM1 Row 9 RAM9 Row1 RAM 9 Row9 RAM2 5
+COM47 Row1 6 RAM16 Row2 4 RAM2 4 Row1 6 RAM2 4 Row0 RAM0 Row8 RAM8 Row0 RAM 8 Row8 RAM2 4
+COM48 Row1 5 RAM1 5 Row2 3 RAM2 3 Row1 5 RAM2 3 -- R o w 7 RAM7 -- R o w 7 RAM2 3
+COM49 Row1 4 RAM14 Row2 2 RAM2 2 Row1 4 RAM2 2 -- R o w 6 RAM6 -- R o w 6 RAM2 2
+COM50 Row1 3 RAM13 Row21 RAM21 Row1 3 RAM21 - - Row 5 RAM5 -- R o w 5 RAM21
+COM51 Row1 2 RAM12 Row2 0 RAM2 0 Row1 2 RAM2 0 -- R o w 4 RAM4 -- R o w 4 RAM2 0
+COM52 Row11 RAM11 Row1 9 RAM1 9 Row11 RAM1 9 -- R o w 3 RAM3 -- R o w 3 RAM1 9
+COM53 Row1 0 RAM10 Row1 8 RAM1 8 Row1 0 RAM1 8 -- R o w 2 RAM2 -- R o w 2 RAM1 8
+COM54 Row9 RAM9 Row1 7 RAM1 7 Row9 RAM1 7 - - Row1 RAM1 - - Row1 RAM1 7
+COM55 Row8 RAM8 Row1 6 RAM1 6 Row8 RAM1 6 -- R o w 0 RAM0 -- R o w 0 RAM1 6
+COM56 Row7 RAM7 Row1 5 RAM1 5 Row7 RAM1 5 --------
+COM57 Row6 RAM6 Row1 4 RAM1 4 Row6 RAM1 4 --------
+COM58 Row5 RAM5 Row1 3 RAM1 3 Row5 RAM1 3 --------
+COM59 Row4 RAM4 Row1 2 RAM1 2 Row4 RAM1 2 --------
+COM60 Row3 RAM3 Row11 RAM11 Row 3 R A M 1 1 --------
+COM61 Row 2 RAM2 Row1 0 RAM1 0 Row2 RAM1 0 --------
+COM62 Row1 RAM1 Row 9 RAM9 Row1 RAM 9 --------
+COM63 Row0 RAM0 Row8 RAM8 Row0 RAM8 --------
+Display 
+examples48
+Remap
+8
+1680
+0 848 48
+Remap Remap48
+Remap
+0
+00
+0 0 8Hardware 
+pin nameOutput
+64 64 64
+Remap Remap Remap
+08
+(e) (f) (g) (a) (b) (c) (d)
+
+=== PAGE 40 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 40/59 Rev 1.1 SSD1306  
+  
+10.1.16  Set Display Clock Divide Ratio/  Oscillator Frequency (D5h) 
+This command consists of two functions: 
+ 
+• Display Clock Divide Ratio (D)(A[3:0]) Set the divide ratio to generate DCLK (Display Cl ock) from CLK.  The divide ratio is from 1 to 16, 
+with reset value = 1.  Please refer to section 
+8.3 for the details relationship of DCLK and CLK. 
+ 
+• Oscillator Frequency (A[7:4]) 
+Program the oscillator frequency Fosc that is the sour ce of CLK if CLS pin is pulled high.  The 4-bit 
+value results in 16 different frequency settings av ailable as shown below.  The default setting is 
+1000b. 
+10.1.17  Set Pre-charge Period (D9h) 
+This command is used to set the duration of the pre-ch arge period. The interval is counted in number of 
+DCLK, where RESET equals 2 DCLKs.  
+ 
+10.1.18  Set COM Pins Hardware Configuration (DAh) 
+This command sets the COM signals pin configuration to match the OLED panel hardware layout. The table 
+below shows the COM pin configuration under different conditions (for MUX ratio =64):  
+Table 10-3 : COM Pins Hardware Configuration 
+Conditions COM pins Configurations 
+1 Sequential COM pin configuration (DAh A[4] =0) 
+COM output Scan direction: from COM0 to COM63 (C0h)
+Disable COM Left/Right remap (DAh A[5] =0) 
+ 
+2 Sequential COM pin configuration (DAh A[4] =0) 
+COM output Scan direction: from COM0 to COM63 (C0h)Enable COM Left/Right remap (DAh A[5] =1) 
+         
+ 
+128 x 64 ROW32ROW63 
+ROW0 ROW31
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0 
+COM63 COM32         
+ 
+128x 64 
+ROW0 ROW31 ROW32ROW63
+Pad 1,2,3,…->126 Gold Bumps face up SSD1306Z COM0 
+COM31 COM32
+COM63
+
+=== PAGE 41 ===
+ 
+ 
+SSD1306 Rev 1.1 P 41/59 Apr 2008  Solomon Systech
+ Conditions COM pins Configurations 
+3 Sequential COM pin configuration (DAh A[4] =0) 
+COM output Scan direction: from COM63 to COM0 (C8h)
+Disable COM Left/Right remap (DAh A[5] =0) 
+ 
+4 Sequential COM pin configuration (DAh A[4] =0) 
+COM output Scan direction: from COM63 to COM0 (C8h)Enable COM Left/Right remap (DAh A[5] =1) 
+ 
+5 Alternative COM pin configuration (DAh A[4] =1) 
+COM output Scan direction: from COM0 to COM63 (C0h)Disable COM Left/Right remap (DAh A[5] =0) 
+ 
+         
+ 
+128 x 64 
+ROW0 ROW62 
+ROW1 ROW63
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0
+COM31 COM32
+COM63 ROW61
+COM62ROW2 
+COM1        
+ 
+128 x 64 ROW31ROW0 
+ROW63ROW32
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0 
+COM31 COM63 COM32         
+ 
+128 x 64 
+ROW63ROW32 ROW31ROW0 
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0 
+COM31 COM32
+COM63
+
+=== PAGE 42 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 42/59 Rev 1.1 SSD1306  
+ Conditions COM pins Configurations 
+6 Alternative COM pin configuration (DAh A[4] =1) 
+COM output Scan direction: from COM0 to COM63 (C0h)
+Enable COM Left/Right remap (DAh A[5] =1) 
+ 
+7 Alternative COM pin configuration (DAh A[4] =1) 
+COM output Scan direction: from COM63 to COM0(C8h) 
+Disable COM Left/Right remap (DAh A[5] =0) 
+ 
+8 Alternative COM pin configuration (DAh A[4] =1) 
+COM output Scan direction: from COM63 to COM0(C8h) Enable COM Left/Right remap (DAh A[5] =1) 
+ 
+ 
+  
+ 
+ 
+         
+ 
+128 x 64 
+ROW61ROW0 
+ROW63ROW1 
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0 COM32
+COM63 ROW2 
+COM33ROW62
+COM31 COM30        
+ 
+128 x 64 
+ROW63ROW1 
+ROW62ROW0 
+Pad 1,2,3,…->126 Gold Bumps face up SSD1306Z COM0
+COM31 COM32
+COM63 ROW2 
+COM62ROW61
+COM1        
+ 
+128 x 64 
+ROW2 ROW63 
+ROW0ROW62
+Pad 1,2,3,…->126 
+Gold Bumps face up SSD1306Z COM0 COM32
+COM63 ROW61
+COM33ROW1 
+COM31 COM30
+
+=== PAGE 43 ===
+ 
+ 
+SSD1306 Rev 1.1 P 43/59 Apr 2008  Solomon Systech
+ 10.1.19   Set VCOMH   Deselect Level (DBh) 
+This command adjusts the V COMH  regulator output.  
+  
+  
+10.1.20  NOP (E3h) 
+No Operation Command 
+ 
+ 
+10.1.21   Status register Read 
+This command is issued by setting D/C# ON LOW during a data read (See Figure 13-1 to  Figure 13-2  for 
+parallel interface waveform). It allows the MCU to monitor the internal status of the chip. No status read is 
+provided for serial mode. 
+ 
+
+=== PAGE 44 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 44/59 Rev 1.1 SSD1306  
+ 10.2 Graphic Acceleration Command 
+10.2.1  Horizontal Scroll Setup (26h/27h) 
+ 
+This command consists of  consecutive bytes to set up the horizontal scroll parameters and determines the 
+scrolling start page, end page and scrolling speed.  
+Before issuing this command the hori zontal scroll must be deactivated (2Eh). Otherwise, RAM content may 
+be corrupted.  
+ 
+The SSD1306 horizontal scroll is designed for 128 columns scrolling. The following two figures (
+Figure 10-7, 
+Figure 10-8, Figure 10-9 ) show the examples of using the horizontal scroll:  
+ 
+Figure 10-7 : Horizontal scroll ex ample: Scroll RIGHT by 1 column 
+Original Setting 
+SEG0 
+SEG1 SEG2 SEG3 
+SEG4 
+SEG5 
+… 
+… 
+… 
+SEG122 SEG123 SEG124 
+SEG125 
+SEG126 
+SEG127 
+After one scroll 
+step 
+SEG127 
+SEG0 SEG1 SEG2 
+SEG3 
+SEG4 
+… 
+… 
+… SEG121 SEG122 SEG123 
+SEG124 
+SEG125 
+SEG126  
+ 
+Figure 10-8 : Horizontal scroll ex ample: Scroll LEFT by 1 column 
+Original 
+Setting 
+SEG0 
+SEG1 
+SEG2 
+SEG3 SEG4 
+SEG5 
+… … … 
+SEG122 SEG123 
+SEG124 
+SEG125 
+SEG126 
+SEG127 
+After one 
+scroll step 
+SEG1 
+SEG2 
+SEG3 
+SEG4 SEG5 
+SEG6 
+… … … 
+SEG123 SEG124 
+SEG125 
+SEG126 
+SEG127 
+SEG0 
+ 
+Figure 10-9 : Horizontal scrolling setup example 
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 45 ===
+ 
+ 
+SSD1306 Rev 1.1 P 45/59 Apr 2008  Solomon Systech
+ 10.2.2  Continuous Vertical and Horizo ntal Scroll Setup (29h/2Ah) 
+ 
+This command consists of 6 consecutive bytes to set up the continuous vertical scroll parameters and 
+determines the scrolling start page, end page, scrolling speed and vertical scrolling offset. 
+ 
+The bytes B[2:0], C[2:0] and D[2:0] of command 29h/2Ah are for the setting of the continuous horizontal 
+scrolling.  The byte E[5:0] is for the setting of the cont inuous vertical scrolling offset. All these bytes together 
+are for the setting of continuous diagonal (horizontal + ve rtical) scrolling. If the vertical scrolling offset byte 
+E[5:0] is set to zero, then only horizontal scrolling is  performed (like command 26/27h).  
+  
+ 
+Before issuing this command the scroll must be d eactivated (2Eh). Otherwise, RAM content may be 
+corrupted. The following figure ( Figure 10-10 ) show the example of us ing the continuous vertical and 
+horizontal scroll:  
+ 
+ 
+ 
+ 
+ 
+Figure 10-10 : Continuous Vertical a nd Horizontal scrolling setup example 
+ 
+ 
+ 
+ 
+
+=== PAGE 46 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 46/59 Rev 1.1 SSD1306  
+  
+10.2.3  Deactivate Scroll (2Eh) 
+This command stops the motion of scrolling.  After sending 2Eh command to deactivate the scrolling action, 
+the ram data needs to be rewritten.  
+ 
+10.2.4  Activate Scroll (2Fh) 
+This command starts the motion of scrolling and should only be issued after the scroll setup parameters have 
+been defined by the scrolling setup commands :26h/2 7h/29h/2Ah . The setting in the last scrolling setup 
+command overwrites the setting in the previous scrolling setup commands. 
+  
+ The following actions are prohibite d after the scrolling is activated 
+1. RAM access (Data write or read) 
+2. Changing the horizontal scroll setup parameters  
+ 
+  
+ 
+ 
+ 
+10.2.5  Set Vertical Scroll Area(A3h) 
+This command consists of 3 consecutive bytes to set up the vertical scroll area. For the continuous vertical 
+scroll function (command 29/2Ah), the number of rows that in vertical scrolling can be  set smaller or equal to 
+the MUX ratio.   
+  
+
+=== PAGE 47 ===
+ 
+ 
+SSD1306 Rev 1.1 P 47/59 Apr 2008  Solomon Systech
+ 11 MAXIMUM RATINGS 
+Table 11-1 : Maximum Ratings (Voltage Referenced to VSS) 
+Symbol Parameter Value Unit 
+VDD  -0.3 to +4 V 
+VCC Supply Voltage 0 to 16 V 
+VSEG SEG output voltage 0 to V CC V 
+VCOM COM output voltage 0 to 0.9*V CC V 
+Vin Input voltage V SS-0.3 to V DD+0.3 V 
+TA Operating Temperature -40 to +85 ºC 
+Tstg Storage Temperature Range -65 to +150 ºC 
+ 
+ 
+Maximum ratings are those values beyond whic h damages to the device may occur. Functio nal operation should be restricted to the  
+limits in the Electrical Characteristics tables or Pin Description section 
+ 
+This device may be light sensitive. Caution should be taken to avoid exposure of this device to any light source during normal 
+operation. This device is not radiation protected. 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+
+=== PAGE 48 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 48/59 Rev 1.1 SSD1306  
+ 12 DC CHARACTERISTICS 
+ 
+ Condition (Unless otherwise specified): 
+Voltage referenced to VSS 
+VDD = 1.65 to 3.3V  
+TA = 25 °C  
+ 
+Table 12-1 : DC Characteristics 
+Symbol Parameter Test Condition Min Typ Max Unit
+VCC Operating Voltage - 7 - 15 V 
+VDD Logic Supply Voltage - 1.65 - 3.3 V 
+ 
+VOH High Logic Output Level I OUT = 100uA, 3.3MHz 0.9 x V DD  - - V 
+VOL Low Logic Output Level I OUT = 100uA, 3.3MHz - - 0.1 x V DDV 
+VIH High Logic Input Level - 0.8 x V DD- - V 
+VIL Low Logic Input Level - - - 0.2 x V DDV 
+ICC, SLEEP 
+ ICC,  Sleep mode Current VDD = 1.65V~3.3V, VCC= 7V~15V 
+Display OFF, No panel attached - - 10 uA 
+IDD, SLEEP 
+ IDD,  Sleep mode Current VDD = 1.65V~3.3V, VCC= 7V~15V 
+Display OFF, No panel attached - - 10 uA 
+ICC VCC Supply Current 
+VDD = 2.8V, V CC = 12V,        
+IREF = 12.5uA 
+No loading, Display ON, All 
+ON - 430 780 uA 
+IDD 
+ VDD Supply Current 
+VDD = 2.8V, V CC = 12V,        
+IREF = 12.5uA 
+No loading, Display ON, All 
+ON Contrast  = FFh 
+ 
+- 50 150  
+uA 
+ 
+Contrast=FFh - 100 - 
+Contrast=AFh - 69 - ISEG Segment Output Current  
+ 
+VDD=2.8V, V CC=12V, 
+IREF=12.5uA, Display ON. Contrast=3Fh - 25 - uA 
+Dev Segment output current uniformity Dev = (I
+SEG – I MID)/IMID 
+IMID = (I MAX + I MIN)/2 
+ISEG[0:131] = Segment current at 
+contrast = FFh -3 - +3 % 
+Adj. Dev Adjacent pin output current 
+uniformity (contrast = FF) Adj Dev = (I[n]-I[n+1]) / (I[n]+I[n+1]) -2 - +2 % 
+ 
+ 
+  
+ 
+  
+ 
+  
+ 
+  
+ 
+  
+
+=== PAGE 49 ===
+ 
+ 
+SSD1306 Rev 1.1 P 49/59 Apr 2008  Solomon Systech
+ 13 AC CHARACTERISTICS 
+ 
+Conditions: 
+Voltage referenced to VSS 
+VDD=1.65 to3.3V  
+TA = 25°C 
+ 
+Table 13-1 : AC Characteristics 
+Symbol Parameter Test Condition Min Typ Max Unit
+FOSC (1) Oscillation Frequency of Display 
+Timing Generator  VDD = 2.8V 
+ 333 370 407 kHz
+FFRM Frame Frequency for 64 MUX 
+Mode 128x64 Graphic Display Mode, Display ON, Intern al Oscillator 
+Enabled - FOSC x 1/(DxKx64) 
+(2) - Hz 
+RES#  Reset low pulse width  3 - - us 
+  
+ 
+Note 
+(1) FOSC stands for the frequency value of the internal oscillator and the value is measured when command D5h A[7:4] is 
+in default value.  
+ 
+(2) D: divide ratio (default value = 1) 
+     K: number of display clocks (default value = 54) 
+   Please refer to Table 9-1 (Set Display Clock Divide Ratio/Oscillator Frequency, D5h) for detailed description 
+ 
+ 
+  
+          
+            
+ 
+     
+
+=== PAGE 50 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 50/59 Rev 1.1 SSD1306  
+  
+Table 13-2 : 6800-Series  MCU Parallel Interface Timing Characteristics 
+(VDD - V SS = 1.65V to 3.3V, T A = 25°C)  
+Symbol Parameter Min Typ Max Unit 
+tcycle Clock Cycle Time 300 - - ns 
+tAS Address Setup Time 0 - - ns 
+tAH Address Hold Time 0 - - ns 
+tDSW Write Data Setup Time 40 - - ns 
+tDHW Write Data Hold Time 7 - - ns 
+tDHR Read Data Hold Time 20 - - ns 
+tOH Output Disable Time - - 70 ns 
+tACC Access Time - - 140 ns 
+PW CSL Chip Select Low Pulse Width (read) 
+Chip Select Low Pulse Width (write) 120 60 - - ns 
+PW CSH Chip Select High Pulse Width (read) 
+Chip Select High Pulse Width (write) 60 60 - - ns 
+tR Rise Time - - 40 ns 
+tF Fall Time - - 40 ns 
+ 
+ 
+Figure 13-1 : 6800-seri es MCU parallel interf ace characteristics 
+ 
+      D[7:0](WRITE)
+       D[7:0](READ)E
+CS#R/W#
+PW CSL
+tR
+tF tDHW
+tOHtACC tDHR
+Valid DatatDSW
+Valid DatatcyclePW CSHtAHtASD/C#
+ 
+ 
+  
+ 
+
+=== PAGE 51 ===
+ 
+ 
+SSD1306 Rev 1.1 P 51/59 Apr 2008  Solomon Systech
+ Table 13-3 : 8080-Series  MCU Parallel Interface Timing Characteristics 
+(VDD - V SS = 1.65V to 3.3V, T A = 25°C) 
+Symbol Parameter Min Typ Max Unit
+tcycle Clock Cycle Time 300 - - ns 
+tAS Address Setup Time 10 - - ns 
+tAH Address Hold Time 0 - - ns 
+tDSW Write Data Setup Time 40 - - ns 
+tDHW Write Data Hold Time 7 - - ns 
+tDHR Read Data Hold Time 20 - - ns 
+tOH Output Disable Time - - 70 ns 
+tACC Access Time - - 140 ns 
+tPWLR Read Low Time 120 - - ns 
+tPWLW  Write Low Time 60 - - ns 
+tPWHR Read High Time 60 - - ns 
+tPWHW  Write High Time 60 - - ns 
+tR Rise Time - - 40 ns 
+tF Fall Time - - 40 ns 
+tCS Chip select setup time 0 - - ns 
+tCSH Chip select hold time to read signal 0 - - ns 
+tCSF Chip select hold time 20 - - ns 
+ 
+Figure 13-2 : 8080-series paralle l interface characteristics  
+ 
+Write Cycle 
+ 
+WR#
+D[7:0]tASD/C#CS#
+tCS
+tAH
+tPWLWtcycle
+tDSWtDHWtPWHWtCSF
+tFtR
+ 
+ 
+ 
+Read cycle 
+RD#
+D[7:0]tASD/C#CS#
+tCS
+tAH
+tPWLRtcycle
+tPWHRtCSH
+tACCtDHR
+tOHtFtR
+ 
+ 
+  
+
+=== PAGE 52 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 52/59 Rev 1.1 SSD1306  
+ Table 13-4 : 4-wire Serial Int erface Timing Characteristics 
+ 
+(VDD - V SS = 1.65V to 3.3V, T A = 25°C) 
+Symbol Parameter Min Typ Max Unit 
+tcycle Clock Cycle Time 100 - - ns 
+tAS Address Setup Time 15 - - ns 
+tAH Address Hold Time 15 - - ns 
+tCSS Chip Select Setup Time 20 - - ns 
+tCSH Chip Select Hold Time 10 - - ns 
+tDSW Write Data Setup Time 15 - - ns 
+tDHW Write Data Hold Time 15 - - ns 
+tCLKL Clock Low Time 20 - - ns 
+tCLKH Clock High Time 20 - - ns 
+tR Rise Time - - 40 ns 
+tF Fall Time - - 40 ns 
+ 
+ 
+Figure 13-3 : 4-wire Serial interface characteristics 
+ 
+ 
+ 
+        tAH tASD/C#  
+Valid DatatDHWt CLKL
+tDSWt CLKH tcyclet CSS tCSH
+t F tR
+SDIN(D  1 ) CS# 
+SCLK(D  0 ) 
+D7 SDIN(D1)  CS# 
+SCLK(D  0 ) 
+D6 D5 D4 D3 D2 D1 D0
+
+=== PAGE 53 ===
+ 
+ 
+SSD1306 Rev 1.1 P 53/59 Apr 2008  Solomon Systech
+  
+Table 13-5 : 3-wire Serial Int erface Timing Characteristics 
+ 
+(VDD - V SS = 1.65V to 3.3V, T A = 25°C) 
+Symbol Parameter Min Typ Max Unit 
+tcycle Clock Cycle Time 100 - - ns 
+tCSS Chip Select Setup Time 20 - - ns 
+tCSH Chip Select Hold Time 10 - - ns 
+tDSW Write Data Setup Time 15 - - ns 
+tDHW Write Data Hold Time 15 - - ns 
+tCLKL Clock Low Time 20 - - ns 
+tCLKH Clock High Time 20 - - ns 
+tR Rise Time - - 40 ns 
+tF Fall Time - - 40 ns 
+ 
+ 
+ 
+Figure 13-4 : 3-wire Serial interface characteristics 
+ 
+ 
+ 
+  
+ 
+  
+   SDIN  CS# 
+SCLK 
+D7 D6 D5 D4 D3 D2 D1 D0 D/C#  Valid DatatDSHt CLKL 
+t DSW tCLKHtCYCLEt CSS tCSH
+t F tR
+SDIN  CS# 
+SCLK  
+
+=== PAGE 54 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 54/59 Rev 1.1 SSD1306  
+  
+Conditions: 
+VDD - V SS = VDD - V SS = 1.65V to 3.3V  
+TA = 25 °C 
+ 
+ Table 13-6 :I2C Interface Timing  Characteristics 
+  
+Symbol Parameter Min Typ Max Unit 
+tcycle Clock Cycle Time 2.5 - - us 
+tHSTART  Start condition Hold Time 0.6 - - us 
+Data Hold Time (for “SDA OUT” pin) 0 - - ns tHD 
+Data Hold Time (for “SDA IN” pin) 300 - - ns 
+tSD Data Setup Time  100 - - ns 
+tSSTART  Start condition Setup Time (Only relevant for a repeated 
+Start condition) 0.6 - - us 
+tSSTOP  Stop condition Setup Time  0.6 - - us 
+tR Rise Time for data and clock pin - - 300 ns 
+tF Fall Time for data and clock pin - - 300 ns 
+tIDLE Idle Time before a new transmission can start  1.3 - - us 
+ 
+ 
+ Figure 13-5 : I2C interface Timing characteristics 
+ 
+ 
+ 
+    
+ 
+ 
+ 
+ 
+  
+          
+   // //  
+SDA 
+SCL tHSTART  
+tCYCLEtHD 
+tR tF 
+tSDtSSTART tSSTOP  tIDLE 
+
+=== PAGE 55 ===
+ 
+ 
+SSD1306 Rev 1.1 P 55/59 Apr 2008  Solomon Systech
+ The configuration for 8080-parallel interface mode is shown in the following diagram: 
+(VDD=2.8V, V CC =12V, I REF=12.5uA) 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   
+ 
+ 
+ 
+ 
+   
+ 
+ 
+Pin connected to MCU interface: D[ 7:0], E, R/W#, D/C#, CS#, RES# 
+Pin internally connected to V SS: BS0, CL 
+Pin internally connected to V DD: CLS 
+C2P, C2N, C1P, C1N, V BREF, FB should be left open. 
+ C1: 1.0uF 
+(1) 
+C2: 2.2uF (1) 
+C3: 2.2uF (1) 
+ 
+ 
+  
+ 
+Voltage at I REF = V CC – 2.5V. For V CC = 12V, I REF = 12.5uA: 
+R1 = (Voltage at I REF - V SS) / I REF 
+        = (12-2.5) / 12.5u 
+        =760K Ω   
+ 
+ 
+Note 
+(1) The capacitor value is recommended value. Select appropriate value agains t module application. 14 Application Example 
+ 
+Figure 14-1 : Application Example of SSD1306Z 
+  
+DISPLAY PANEL   
+128 x 64  COM62 
+COM60 . 
+. 
+COM2 
+COM0 
+ 
+ 
+ 
+ 
+SEG0 
+. 
+. 
+. 
+. 
+. 
+. . 
+. 
+. 
+. 
+. 
+. 
+SEG127 
+ 
+ 
+ 
+ 
+COM1 
+COM3 
+. 
+. COM61 
+COM63 
+SSD1306Z 
+                                                                                                                                               
+ 
+ 
+ BGGND            V CC   V COMH   IREF   D[7:0]   E (RD#)  R/W#(W/R#)  D/C#   RES#   CS#    BS1   BS2      V DD     V BAT  VBREF      FR            V SS                 C1N   C1P   C2N  C2P
+R1 
+ D[7:0]   E (RD#)  R/W# (W/R#)   D/C#    RES#    CS#                          V DD                                           V SS C1
+C2 
+ VSS 
+[GND]  C3 
+VCC 
+
+=== PAGE 56 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 56/59 Rev 1.1 SSD1306  
+ 15 PACKAGE INFORMATION 
+15.1 SSD1306TR1 Detail Dimension 
+Figure 15-1 SSD1306TR1 Detail Dimension 
+ 
+    
+         
+                    
+ 
+ SSD1306T
+
+=== PAGE 57 ===
+ 
+ 
+SSD1306 Rev 1.1 P 57/59 Apr 2008  Solomon Systech
+  
+    
+         
+                                        
+    
+
+=== PAGE 58 ===
+ 
+ 
+Solomon Systech  Apr 2008 P 58/59 Rev 1.1 SSD1306  
+ 15.2 SSD1306Z Die Tray Information 
+Figure 15-2 : SSD1306Z die tray information 
+ 
+       
+  
+ 
+ 
+  
+          
+
+
+=== PAGE 59 ===
+ 
+ 
+SSD1306 Rev 1.1 P 59/59 Apr 2008  Solomon Systech
+  
+    
+         
+                      
+ 
+ 
+Solomon Systech reserves the right to ma ke changes without notice to any products herein. Solomon Systech makes no warranty, 
+representation or guarantee regarding the su itability of its products for any particul ar purpose, nor does Solomon Systech assu me any 
+liability arising out of the application or use of any product or  circuit, and specifically disclaims any, and all, liability, including without 
+limitation consequential or incidental dama ges. “Typical” parameters can and do vary in different applications. All operating p arameters, 
+including “Typical” must be validated for each customer applicati on by the customer’s technical experts. Solomon Systech does n ot con-
+vey any license under its patent rights nor the rights of others. Solomon Systech produc ts are not designed, intended, or autho rized for use 
+as components in systems intended for surgical implant into th e body, or other applications in tended to support or sustain life , or for any 
+other application in which the failure of the Solomon Systech product could create a situation where personal injury or death m ay occur. 
+Should Buyer purchase or use Solomon Systech products for any such  unintended or unauthorized app lication, Buyer shall indemnif y and 
+hold Solomon Systech and its offices, employees, subsidiaries, a ffiliates, and distributors harmless against all claims, costs,  damages, and 
+expenses, and reasonable attorney fees arising out of, directly or indirectly, any claim of pers onal injury or death associated  with such 
+unintended or unauthorized use, even if such claim alleges that  Solomon Systech was negligent regarding the design or manufactu re of the 
+part. 
+ 
+ 
+All Solomon Systech Products complied with six (6) hazardous subs tances limitation requirement per European Union (EU) “Restric tion of 
+Hazardous Substance (RoHS) Directive (2002/95/EC)” and China standard “ 电子信息产品污染控制标识要求  (SJ/T11364-2006)” with 
+control Marking Symbol         .  Hazardous Substances test report is available upon requested. 
+ 
+ http://www.solomon-systech.com 
+
+
+=== PAGE 60 ===
+SOLOMON SYSTECH  
+SEMICONDUCTOR APPLICATION NOTE 
+ 
+ 
+ 
+ 
+This document contains information on a new product. Specifications and information herein are subject to 
+change without notice. 
+ http://www.solomon-systech.com 
+SSD1306 App Note Rev 0.4 P 1/6 Jan 2009  Copyright  2008 Solomon Systech Limited  
+ 
+ 
+  
+   
+ 
+ 
+               
+Application Note 
+ 
+128 x 64 Dot Matrix  
+OLED/PLED Segment/Common Driver with Controller  
+ 
+ 
+ 
+ 
+     
+ 
+     SSD1306  
+
+=== PAGE 61 ===
+ 
+ 
+Solomon Systech  Jan 2009 P 2/6 Rev 0.4 SSD1306 App note
+ TABLE OF CONTENTS 
+1 INTRODUCTION 3 
+2 CHARGE PUMP REGULATOR 3  
+2.1 Command Table for Charge Bump Setting 3  
+3 SOFTWARE CONFIGURATION 5  
+ 
+TABLE OF FIGURES 
+ 
+Figure 1 : Application Example of SSD1306Z with charge bump...........................................................4  
+Figure 2 : Software Initialization Flow Chart .................................................................................. .........5  
+ 
+
+=== PAGE 62 ===
+ 
+ 
+SSD1306 App Note Rev 0.4 P 3/6 Jan 2009  Solomon Systech
+  1 Introduction  
+ 
+This application note of SSD1306 is written to explain the charge pump regulator function of 
+SSD1306.  SSD1306 is a single-chip CMOS OLED/PLED driver with controller for organic / polymer 
+light emitting diode dot-matrix graphic display system.  It consists of 128 segments and 64 commons. This IC is designed for Common Cathode type OLED panel.    For the detailed characteristics of the driver IC, please refer to SSD1306 datasheet.  
+ 
+2 Charge Pump Regulator 
+ 
+The internal regulator circuit in SSD1306 accompanying only 2 external capacitors can generate a 
+7.5V voltage supply, V CC, from a low voltage supply input, V BAT. The V CC is the voltage supply to the 
+OLED driver block. This is a switching capacitor regulator circuit, designed for handheld applications.  This regulator can be turned on/off by software command setting.   
+• Power supply 
+o V
+DD = 1.65V to 3.3V,<V BAT for IC logic 
+o V BAT = 3.3V to 4.2V   for charge pump regulator circuit 
+  
+ 
+• Pins description for related pins of the charge pump regulator 
+o V BAT – Power supply for charge pump regulator circuit.  
+Status V BAT V DD V CC 
+Enable 
+charge pump Connect to external 
+VBAT source Connect to external 
+VDD source A capacitor should be connected 
+between this pin and V SS  
+Disable charge pump Connect with V
+DD  
+pin Connect to external 
+VDD source Connect to external V CC source 
+ 
+o C1P/C1N – Pin for charge pump capacitor; Connect to each other with a capacitor 
+o C2P/C2N – Pin for charge pump capacitor; Connect to each other with a capacitor 
+ 
+ 
+2.1 Command Table for Charge Bump Setting 
+ 
+1. Charge Pump Command Table 
+D/C# Hex D7 D6 D5 D4 D3 D2 D1 D0 Command Description  
+0 8D 1 0 0 0 1 1 0 1 
+0 A[7:0] * * 0 1 0 A 2 0 0 
+          Charge 
+Pump Setting A[2] = 0b, Disable charge 
+pump(RESET) A[2] = 1b, Enable charge pump during display on  
+Note 
+(1)  The Charge Pump must be 
+enabled by the following command: 8Dh ; Charge Pump Setting 14h ; Enable Charge Pump AFh; Display ON 
+ 
+ 
+
+=== PAGE 63 ===
+ 
+ 
+Solomon Systech  Jan 2009 P 4/6 Rev 0.4 SSD1306 App note
+ The configuration for 8080-parallel interface mode is shown in the following diagram: 
+(VDD= 1.65V ~ 3.3V, < V BAT     , V BAT=3.3V~4.2V, I REF=12.5uA) 
+   
+ 
+ 
+ 
+     
+ 
+     
+ 
+     
+ 
+ 
+ 
+ 
+ 
+ 
+ 
+   
+ 
+ 
+Pin connected to MCU interface: D[7:0], E, R/W#, D/C#, CS#, RES# 
+Pin internally connected to V SS: BS0, CL 
+Pin internally connected to V DD: CLS 
+VBREF, FR should be left open. 
+ 
+C1, C4, C6, C7: 1.0uF (1) 
+C2, C3: 2.2uF (1) 
+ 
+ 
+Voltage at I REF = V CC – 2.5V. For V CC = 7.5V, I REF = 12.5uA: 
+R1 = (Voltage at I REF - V SS) / I REF 
+        = (7.5-2.5) / 12.5u 
+        =400K Ω 
+ 
+ 
+Note 
+(1) The capacitor value is recommended value. Select appropriate value against module application. Figure 1 : Application Example of SSD1306Z with charge bump 
+ 
+  
+DISPLAY PANEL   
+104 x 16  COM14 
+COM12 
+. 
+. COM2 COM0  
+ 
+  SEG0 . 
+. 
+. . . . 
+. 
+. . . . 
+. 
+SEG103    
+ 
+COM1 COM3 . . 
+COM13 
+COM15 
+SSD1306Z 
+                                                                                                                                               
+ 
+ 
+ BGGND               V CC   V COMH IREF D[7:0]  E (RD#)  R/W# (W/R# )  D/C#  RES#  CS#  BS1  BS2    V DD  VBAT VBREF  FR           V SS C1N   C1P   C2N  C2P
+R1 
+ D[7:0]   E (RD#)  R/W# (W/R#)   D/C#    RES#    CS#                V DD     V BAT                             V SS C1 
+ 
+ 
+C4 C2 
+ VSS 
+[GND]  C3 
+C6        C7 
+
+=== PAGE 64 ===
+ 
+ 
+SSD1306 App Note Rev 0.4 P 5/6 Jan 2009  Solomon Systech
+  3 Software Configuration 
+SSD1306 has internal command registers that are used to configure the operations of the driver IC.  
+After reset, the registers should be set with appropriate values in order to function well.  The registers 
+can be accessed by MPU interface in either 6800, 8080, SPI type with D/C# pin pull low or using I2C 
+interface.  Below is an example of initialization flow of SSD1306.  The values of registers depend on different condition and application.   
+Figure 2 : Software Initialization Flow Chart 
+ 
+ 
+     
+ 
+     
+ 
+     
+ 
+     
+ 
+     
+ 
+     
+ 
+     
+ 
+     
+ 
+ 
+Enable charge 
+pump regulator
+8Dh, 14h Set MUX 
+Ratio 
+A8h, 3Fh 
+Set Display 
+Offset 
+D3h, 00h 
+Set Display 
+Start Line 
+40h 
+Set Segment  
+re-map 
+A0h/A1h 
+Set COM Output 
+Scan Direction 
+C0h/C8h Set Contrast 
+Control 
+81h, 7Fh 
+Disable Entire 
+Display On 
+A4h 
+Set Normal 
+Display 
+A6h 
+Set Osc 
+Frequency 
+ D5h, 80h 
+Set COM Pins 
+hardware 
+configuration 
+DAh, 02 Display On 
+ AFh 
+
+=== PAGE 65 ===
+ 
+ 
+Solomon Systech  Jan 2009 P 6/6 Rev 0.4 SSD1306 App note
+  
+   
+ 
+     
+ 
+     
+ 
+     
+ 
+      
+ 
+   
+ 
+ 
+ 
+  
+All Solomon Systech Products complied with six (6) hazardous substances limitation requirement per European Union (EU) 
+“Restriction of Hazardous Substance (RoHS) Directive (2002/95/EC)” and China standard “ 电子信息产品污染控制标识要求  
+(SJ/T11364-2006)” with control Marking Symbol         .  Hazardous Substances test report is available upon requested. 
+ 
+ 
+http://www.solomon-systech.com  
+ 
+ Solomon Systech reserves the right to make changes without notice to any products herein. Solomon Systech makes no warranty, 
+representation or guarantee regarding the suitability of its products for any particular purpose, nor does Solomon Systech assu me 
+any liability arising out of the application or use of any product or circuit, and specifically disclaims any, and all, liabili ty, including 
+without limitation consequential or incidental damages. “Typical” parameters can and do vary in different applications. All ope rating 
+parameters, including “Typical” must be validated for each customer application by the customer’s technical experts. Solomon 
+Systech does not convey any license under its patent rights nor the rights of others. Solomon Systech products are not designed , 
+intended, or authorized for use as components in systems intended for surgical implant into the body, or other applications int ended 
+to support or sustain life, or for any other application in which the failure of the Solomon Systech product could create a sit uation 
+where personal injury or death may occur. Should Buyer purchase or use Solomon Systech products for any such unintended or unauthorized application, Buyer shall indemnify and hold Solomon Systech and its offices, employees, subsidiaries, affiliates, and 
+distributors harmless against all claims, costs, damages, and expenses, and reasonable attorney fees arising out of, directly o r 
+indirectly, any claim of personal injury or death associated with such unintended or unauthorized use, even if such claim alleg es that 
+Solomon S
+ystech was ne gligent re gardin g the desi gn or manufacture of the part.
