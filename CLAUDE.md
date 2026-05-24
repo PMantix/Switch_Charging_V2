@@ -19,3 +19,23 @@ Do NOT delegate for:
 - Single Python script edits with a known target
 - Reading one known config or memory file
 - Quick git ops, status checks, single-file diffs
+
+## Subagent audit rules
+
+When spawning agents for verification, auditing, or datasheet
+cross-referencing, ALWAYS include this in the prompt:
+
+> CRITICAL: If you cannot read a datasheet or source document (PDF
+> parse error, corrupted file, blocked URL), report the failure
+> explicitly. Do NOT substitute values from training data or general
+> knowledge. An unverified spec presented as verified is worse than a
+> gap. Report what you could not read so we can verify manually.
+
+When compiling subagent results, flag any agent that:
+- Reported a file read failure but still provided specs for that file
+- Used phrases like "based on my knowledge" or "from training data"
+- Gave confident numbers without citing a page/table reference
+
+Also include `pcb/PCB_V3_CHANGELIST.md` as required reading for any
+agent auditing V3 hardware — it contains empirical V2 failure lessons
+that datasheets alone cannot capture.

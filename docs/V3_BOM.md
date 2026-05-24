@@ -13,7 +13,7 @@ as of 2026-05-23. Max continuous current: **3 A** (hard limit).
 | ADC (2× ADS131M04) | 2 | ~$5.66 |
 | MOSFETs (AO3400A, V2 carry-over) | 4 | ~$0.12 |
 | Gate drivers (UCC5304, hand-solder) | 4 | existing stock |
-| Isolated supplies (B0512S-1WR3) | 2 | existing stock |
+| Isolated supplies (B0512S-1WR3) | 3 | existing stock (need 1 more for PS3) |
 | Shunt resistors | 4 | ~$0.19 |
 | Protection (polyfuse, TVS, MOSFET) | 3 | existing stock |
 | Voltage dividers + clamps | ~16 | ~$0.40 |
@@ -22,8 +22,8 @@ as of 2026-05-23. Max continuous current: **3 A** (hard limit).
 | microSD socket | 1 | ~$0.07 |
 | OLED display module | 1 | ~$3 |
 | Buttons + debounce | 3 + passives | ~$0.10 |
-| LEDs + resistors | 9 | ~$0.50 |
-| **Total (new parts only)** | **~85** | **~$18** |
+| LEDs + resistors + level shift | 10 | ~$0.51 |
+| **Total (new parts only)** | **~86** | **~$18** |
 
 Cost excludes parts already in stock from V2 (UCC5304, B0512S-1WR3,
 protection components, Pico 2 if already purchased).
@@ -89,12 +89,12 @@ Stock: 77,240 units (extended part).
 
 ### Voltage dividers (bus voltage channels)
 
-Divider ratio: 91 kΩ / (91 kΩ + 9.1 kΩ) = 10.01:1. Calibrated in
-firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
+Divider ratio: (91 kΩ + 9.1 kΩ) / 9.1 kΩ = 11.0:1 (Vin:Vout).
+Calibrated in firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
 
 | Ref | Part | Package | Qty | LCSC # | Unit price | Notes |
 |---|---|---|---|---|---|---|
-| R_DIV_H1–H4 | 91 kΩ 1% 0603 | 0603 | 4 | [C23265](https://www.lcsc.com/product-detail/C23265.html) | ~$0.001 | UNI-ROYAL. High-side of 10:1 divider. Basic part. 29,100 stock. |
+| R_DIV_H1–H4 | 91 kΩ 1% 0603 | 0603 | 4 | [C23265](https://www.lcsc.com/product-detail/C23265.html) | ~$0.001 | UNI-ROYAL. High-side of 11:1 divider. Basic part. 29,100 stock. |
 | R_DIV_L1–L4 | 9.1 kΩ 1% 0603 | 0603 | 4 | [C114639](https://www.lcsc.com/product-detail/C114639.html) | ~$0.002 | YAGEO. Low-side of divider. 37,900 stock. |
 | C_AA1–AA4 | 100 nF X7R 0603 | 0603 | 4 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | ~$0.003 | Anti-alias across R_DIV_L. Basic part. |
 
@@ -111,9 +111,9 @@ firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz.
 | L_AVDD | TAI-TECH HCB1608KF-601T20 | 0603 | 1 | [C304319](https://www.lcsc.com/product-detail/C304319.html) | Ferrite bead 600 Ω @ 100 MHz, DCR=100 mΩ, 2 A. 28,400 stock. |
 | C_AVDD1 | 10 µF X7R 10 V | 0805 | 1 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Murata. +3V3_A bulk decoupling. 153,220 stock. |
 | C_AVDD2 | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | +3V3_A close to AVDD pin. Basic part. |
-| C_DVDD | 1 µF X5R 50 V | 0603 | 1 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | Samsung. DVDD to DGND (external digital/IO supply, 2.7–3.6 V). Datasheet requires 1 µF. 3,740,750 stock. |
-| C_CAP | 220 nF X7R 25 V | 0603 | 1 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | Samsung. CAP to DGND (internal 1.8 V LDO output from DVDD). Datasheet required. 1,237,500 stock. |
-| C_VREF | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | REFP to REFN (internal reference). |
+| C_DVDD | 1 µF X5R 50 V | 0603 | 2 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | Samsung. DVDD to DGND per device. Datasheet requires 1 µF. 3,740,750 stock. |
+| C_CAP | 220 nF X7R 25 V | 0603 | 2 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | Samsung. CAP to DGND per device (internal 1.8 V LDO output). Datasheet required. 1,237,500 stock. |
+| C_VREF | 100 nF X7R 50 V | 0603 | 2 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | REFP to REFN per device (internal reference decoupling). |
 
 ---
 
@@ -146,8 +146,10 @@ which was unreliable at the UCC5304 UVLO threshold).
 
 Decoupling per converter (×3) — upgraded from V2 per SW1 failure
 (2026-05-19: B0512S died from gate charge transient stress without
-adequate decoupling). Values match YLPTEC datasheet Table 1
-(Cin=4.7 µF for 5 V input, Cout=2.2 µF for 12 V output):
+adequate decoupling). Values match both Mornsun and YLPTEC datasheet
+Table 1 (Cin=4.7 µF for 5 V input, Cout=2.2 µF for 12 V output).
+Efficiency: Mornsun 83% typ, YLPTEC 89% typ — use Mornsun (conservative)
+for 5V rail budget calculations.
 
 | Ref | Part | Package | Qty total | LCSC # | Notes |
 |---|---|---|---|---|---|
@@ -165,7 +167,7 @@ per driver. Add a bleeder resistor on each converter output:
 
 | Ref | Part | Package | Qty total | LCSC # | Notes |
 |---|---|---|---|---|---|
-| R_BLEED_PS1–3 | 1.5 kΩ 1% 0603 | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | VDD to VSS per converter. I_bleed = 12 V / 1.5 kΩ = 8 mA. P = 96 mW (0603 rated 100 mW, use 0805 if margin needed). Total load with driver: ~10 mA. |
+| R_BLEED_PS1–3 | 1.5 kΩ 1% 0805 | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | UNI-ROYAL. VDD to VSS per converter. I_bleed = 12 V / 1.5 kΩ = 8 mA. P = 96 mW (0805 rated 125 mW, 23% margin). Total load with driver: ~10 mA. |
 
 **Pin mapping warning:** GDHUIZHT-brand B0512S modules have pins 1↔2
 and 3↔4 swapped vs Mornsun datasheet. Add silkscreen note on PCB.
@@ -265,7 +267,8 @@ insufficient under measured load.
 | D_LED_REC | Lite-On LTST-C193TGKT-5A (green) | 0603 | 1 | [C12065](https://www.lcsc.com/product-detail/C12065.html) | GP22, recording active. |
 | D_LED_AUTO | NATIONSTAR NCD0603Y5 (yellow) | 0603 | 1 | [C7429912](https://www.lcsc.com/product-detail/C7429912.html) | GP0, auto-follow engaged. 595 nm peak, 40–180 mcd, Vf=1.5–2.6 V. 26,360 stock. |
 | R_LED_REC, R_LED_AUTO | 1 kΩ 1% 0603 | 0603 | 2 | [C22548](https://www.lcsc.com/product-detail/C22548.html) | YAGEO. Current limit. |
-| NEOPIXEL | WS2812B-MINI-X2 | 3535 | 1 | [C4154873](https://www.lcsc.com/product-detail/C4154873.html) | GP1, RGB mode status. 37,690 stock. |
+| NEOPIXEL | WS2812B-MINI-X2 | 3535 | 1 | [C4154873](https://www.lcsc.com/product-detail/C4154873.html) | GP1 data. VDD via D_NEO from `+5V` (~4.3 V effective). 37,690 stock. |
+| D_NEO | 1N4148W (ST/Semtech) | SOD-123 | 1 | [C81598](https://www.lcsc.com/product-detail/C81598.html) | Series diode in NeoPixel VDD. Drops +5V to ~4.3 V → VIH = 0.65×4.3 = 2.80 V, giving 500 mV margin for 3.3 V GPIO. 1,974,100 stock. ~$0.01. |
 
 ---
 
@@ -300,12 +303,14 @@ insufficient under measured load.
 | 9.1 kΩ 1% | 0603 | 4 | [C114639](https://www.lcsc.com/product-detail/C114639.html) | Voltage divider low-side (YAGEO, 37.9K stock) |
 | 10 kΩ 5% | 0603 | 8 | [C99198](https://www.lcsc.com/product-detail/C99198.html) | Gate pulldowns (4), button pullups (3), R_RP (1) (YAGEO, 2.5M stock) |
 | 91 kΩ 1% | 0603 | 4 | [C23265](https://www.lcsc.com/product-detail/C23265.html) | Voltage divider high-side (UNI-ROYAL, 29.1K stock, basic) |
-| 100 nF X7R 50 V | 0603 | ~20 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | Decoupling, anti-alias, debounce (YAGEO, 6.6M stock, basic) |
-| 10 µF X7R 10 V | 0805 | ~6 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Bulk decoupling — 3V3, 5V, SD rails (Murata, 153K stock) |
-| 10 µF X5R 50 V | 1206 | 1 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | Bulk decoupling — +HV rail (YAGEO, 251K stock) |
+| 100 nF X7R 50 V | 0603 | 26 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI(4) + VDD_HF(4) + AVDD2(1) + VREF(2) + AA(4) + BTN(3) + PS_IN2(3) + PS_OUT2(3) + BULK2(1) + 5V2(1) (YAGEO, 6.6M stock, basic) |
+| 10 µF X7R 10 V | 0805 | 3 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Bulk decoupling — C_AVDD1(1) + C_5V1(1) + C_SD1(1) (Murata, 153K stock) |
+| 10 µF X5R 50 V | 1206 | 5 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | C_VDD_U1–4_1(4) + C_BULK1(1) — +HV and UCC5304 VDD bulk (YAGEO, 251K stock) |
 | 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input bulk ×3 converters (Samsung, 2.5M stock, basic). Datasheet recommended Cin. |
 | 2.2 µF X7R 25 V | 0805 | 3 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | B0512S output bulk ×3 converters (Samsung, 872K stock). Datasheet recommended Cout for 12 V output. |
-| 1.5 kΩ 1% | 0603 | 3 | [C22843](https://www.lcsc.com/product-detail/C22843.html) | B0512S bleeder resistors, minimum load (UNI-ROYAL, 650,600 stock) |
+| 1 µF X5R 50 V | 0603 | 2 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | ADS131M04 DVDD decoupling ×2 devices (Samsung, 3.7M stock) |
+| 220 nF X7R 25 V | 0603 | 2 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | ADS131M04 CAP pin ×2 devices (Samsung, 1.2M stock) |
+| 1.5 kΩ 1% | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | B0512S bleeder resistors, minimum load (UNI-ROYAL) |
 
 ---
 
@@ -323,6 +328,7 @@ insufficient under measured load.
 - [ ] Green LEDs × 6 — [C12065](https://www.lcsc.com/product-detail/C12065.html) (83K stock)
 - [ ] Yellow LED × 1 — [C7429912](https://www.lcsc.com/product-detail/C7429912.html) (26K stock)
 - [ ] WS2812B-MINI-X2 × 1 — [C4154873](https://www.lcsc.com/product-detail/C4154873.html) (37K stock)
+- [ ] 1N4148W × 1 — [C81598](https://www.lcsc.com/product-detail/C81598.html) (1.97M stock, NeoPixel VDD level shift)
 - [ ] Ferrite bead × 1 — [C304319](https://www.lcsc.com/product-detail/C304319.html) (28K stock)
 - [ ] Screw terminals 2P × 2 — [C395868](https://www.lcsc.com/product-detail/C395868.html) (37K stock)
 - [ ] JST-XH 4-pin × 1 — [C144395](https://www.lcsc.com/product-detail/C144395.html) (262K stock)
@@ -331,7 +337,7 @@ insufficient under measured load.
 ### Hand-solder after JLCPCB
 
 - [ ] UCC5304DWVR × 4 (existing stock)
-- [ ] B0512S-1WR3 × 2 (existing stock)
+- [ ] B0512S-1WR3 × 3 (2 existing stock + 1 new for PS3)
 
 ### Separate purchase
 
@@ -352,8 +358,8 @@ insufficient under measured load.
    DRDY2). RP2350 has plenty.
 
 3. **Voltage divider → 91 kΩ / 9.1 kΩ** (was 90 kΩ / 10 kΩ). Both
-   values in stock; ratio is 10.01:1, calibrated in firmware. 10 kΩ 1%
-   was out of stock across all brands at LCSC.
+   values in stock; Vin:Vout ratio = 11.0:1, calibrated in firmware.
+   10 kΩ 1% was out of stock across all brands at LCSC.
 
 4. **Cycler input → Kelvin clip pads** (was 2-pos screw terminal).
    4 exposed copper pads on PCB edge (+A, +V, −A, −V) for alligator

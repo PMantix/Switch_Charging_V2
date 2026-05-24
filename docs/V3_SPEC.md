@@ -94,7 +94,7 @@ Pulse charge sequence: [0, 3] (alternates P1+N1 and P2+N2).
 | `+HV` | Cycler through clip pads + protection | 2.65–10 V | FET drain rails (P1/P2) |
 | `CYCLER_IN-` | Cycler negative through clip pads | ~0 V | Tied to `GND` at pad only |
 | `GND` | Star ground | 0 V | System reference |
-| `+5V` | Pico 2 VBUS pin (or optional buck from `+HV`) | 5 V | LS driver VDD, B0512S input |
+| `+5V` | Pico 2 VBUS pin (or optional buck from `+HV`) | 5 V | LS driver VDD, B0512S input, WS2812B VDD (via D_NEO diode drop to ~4.3 V) |
 | `+3V3` | Pico 2 3V3(OUT) pin | 3.3 V | UCC5304 VCCI, ADS131M04 DVDD, OLED, I²C pullups, LEDs |
 | `+3V3_A` | Filtered from `+3V3` (ferrite bead + 10 µF) | 3.3 V | ADS131M04 AVDD (analog supply, isolated from digital noise) |
 | `VCC2_P1` | B0512S #1 Vout+ (floating) | ~12 V above CELL_A_POS | U1 VDD |
@@ -243,7 +243,7 @@ At gain=16, input range ±75 mV:
 
 ### Bus voltage channel — analog front-end
 
-Each bus voltage channel uses a 10:1 resistive divider + anti-alias
+Each bus voltage channel uses an 11:1 resistive divider + anti-alias
 filter + input clamp:
 
 ```
@@ -258,14 +258,14 @@ filter + input clamp:
     AGND
 ```
 
-- Divider ratio: 91k / (91k + 9.1k) = 10.01:1 (calibrated in firmware)
-- Gain=1: input range ±1.2 V → 0.99 V max is within range
+- Divider ratio: (91k + 9.1k) / 9.1k = 11.0:1 Vin:Vout (calibrated in firmware)
+- Gain=1: input range ±1.2 V → 10 V / 11.0 = 0.91 V max is within range
 - Anti-alias: 100 nF across R_DIV_L → f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz
   (sufficient for DC bus voltage)
 - Input protection: Nexperia BAV99,215 dual diode, clamp to AVDD/AGND
 
 Voltage resolution: 1.2 V / 2²³ = 143 nV → 1.43 µV/bit at divider →
-**14.3 µV/bit at bus** (after ~10× scaling).
+**15.7 µV/bit at bus** (after 11.0× scaling).
 
 ### ADS131M04 support components (per device, ×2)
 
@@ -322,7 +322,7 @@ drivers, matching the validated breadboard architecture.
 ### Per-driver support components
 
 - `C_VCCI_U1..4`: 100 nF 0603 (VCCI to GND)
-- `C_VDD_U1..4_1`: 10 µF 0805 (VDD to VSS, bulk)
+- `C_VDD_U1..4_1`: 10 µF 1206 X5R 50 V (VDD to VSS, bulk — 12 V across VDD-VSS requires 50 V rating)
 - `C_VDD_U1..4_2`: 100 nF 0603 (VDD to VSS, close to pin 8)
 - `R_G_U1..4`: **10 Ω** 0603 (OUT to FET gate)
 
@@ -416,10 +416,10 @@ Gate drive indicator LEDs (no extra GPIO — driven from GATE_*_IN nets):
 
 | Ref | Anode | Cathode → 1 kΩ → | Purpose |
 |---|---|---|---|
-| D_LED_P1 | `+3V3` | `GATE_P1_IN` | P1 FET commanded |
-| D_LED_P2 | `+3V3` | `GATE_P2_IN` | P2 FET commanded |
-| D_LED_N1 | `+3V3` | `GATE_N1_IN` | N1 FET commanded |
-| D_LED_N2 | `+3V3` | `GATE_N2_IN` | N2 FET commanded |
+| D_LED_P1 | `+3V3` | `GATE_P1_IN` | P1 FET idle (LED on when gate LOW) |
+| D_LED_P2 | `+3V3` | `GATE_P2_IN` | P2 FET idle (LED on when gate LOW) |
+| D_LED_N1 | `+3V3` | `GATE_N1_IN` | N1 FET idle (LED on when gate LOW) |
+| D_LED_N2 | `+3V3` | `GATE_N2_IN` | N2 FET idle (LED on when gate LOW) |
 | D_LED_PWR | `+3V3` | `GND` | Board power on |
 
 ---
@@ -502,10 +502,10 @@ offset  bytes  field
 Followed by a continuous stream of 38-byte binary frames (§14).
 
 Write strategy:
-- 2048-sample ring buffer (78 KB) in RAM
+- 2048-sample ring buffer (64 KB) in RAM (32 bytes/entry, see §15)
 - Core 0 drains buffer → 512-byte aligned SD writes
 - At 4 kSPS × 38 bytes = 152 KB/s sustained write
-- 32 GB card ≈ 56 hours of continuous recording
+- 32 GB card ≈ 58 hours of continuous recording
 
 ---
 
@@ -560,7 +560,7 @@ import struct
 SHUNT_OHM = 0.01
 ADS_LSB_75MV = 75e-3 / (2**23)       # gain=16, ±75 mV range
 ADS_LSB_1V2 = 1.2 / (2**23)          # gain=1, ±1.2 V range
-BUS_DIVIDER = (91.0 + 9.1) / 9.1      # 91k/9.1k divider → 10.01:1
+BUS_DIVIDER = (91.0 + 9.1) / 9.1      # 91k/9.1k divider → 11.0:1
 
 def decode_frame(buf):
     sync, typ, length = struct.unpack_from('<HBB', buf, 0)
@@ -671,13 +671,35 @@ CAL <ch> <gain> <offset>  Per-channel calibration trim
 | Ref | GPIO / Net | Color | Purpose |
 |---|---|---|---|
 | D_LED_PWR | `+3V3` → 1 kΩ → GND | Green | Board power on |
-| D_LED_P1 | `+3V3` → 1 kΩ → `GATE_P1_IN` | Green | P1 FET commanded |
-| D_LED_P2 | `+3V3` → 1 kΩ → `GATE_P2_IN` | Green | P2 FET commanded |
-| D_LED_N1 | `+3V3` → 1 kΩ → `GATE_N1_IN` | Green | N1 FET commanded |
-| D_LED_N2 | `+3V3` → 1 kΩ → `GATE_N2_IN` | Green | N2 FET commanded |
+| D_LED_P1 | `+3V3` → 1 kΩ → `GATE_P1_IN` | Green | P1 FET idle (on when gate LOW) |
+| D_LED_P2 | `+3V3` → 1 kΩ → `GATE_P2_IN` | Green | P2 FET idle (on when gate LOW) |
+| D_LED_N1 | `+3V3` → 1 kΩ → `GATE_N1_IN` | Green | N1 FET idle (on when gate LOW) |
+| D_LED_N2 | `+3V3` → 1 kΩ → `GATE_N2_IN` | Green | N2 FET idle (on when gate LOW) |
 | D_LED_REC | GP22 → 1 kΩ → GND | Green | SD recording active |
 | D_LED_AUTO | GP0 → 1 kΩ → GND | Yellow | Auto-follow engaged |
-| NeoPixel | GP1 (WS2812 data) | RGB | Mode status color |
+| NeoPixel | GP1 (WS2812 data), VDD = `+5V` via D_NEO | RGB | Mode status color (level-shifted, see below) |
+
+### NeoPixel level shift — series diode on VDD
+
+The WS2812B-MINI-X2 requires VIH = 0.65 x VDD. At VDD = 5.0 V, VIH =
+3.25 V — only 50 mV above the RP2350 3.3 V GPIO output, which is
+unreliable across temperature and voltage tolerance.
+
+**Fix:** A 1N4148W silicon diode (D_NEO, SOD-123) in series with the
+NeoPixel VDD line drops the effective supply to ~4.3 V (Vf ~0.65 V at
+typical LED current). This lowers VIH to 0.65 x 4.3 = 2.80 V, giving
+**500 mV of margin** over the 3.3 V GPIO.
+
+```
++5V ──[D_NEO 1N4148W]──┬── NEOPIXEL VDD (~4.3 V)
+                        │
+GP1 ────────────────────┤── NEOPIXEL DIN
+                        │
+GND ────────────────────┴── NEOPIXEL GND
+```
+
+At minimum USB voltage (4.5 V): VDD = 4.5 - 0.65 = 3.85 V (above
+3.7 V min). VIH = 0.65 x 3.85 = 2.50 V — still 800 mV margin.
 
 NeoPixel color map:
 - Blue = IDLE
@@ -715,13 +737,14 @@ NeoPixel color map:
 
 ## 18. Estimated component count
 
-~90 parts (vs ~70 in V2). Net additions:
+~91 parts (vs ~70 in V2). Net additions:
 - +2 ADS131M04 + 12 support passives (replaces 4× INA226 + 8 passives → net +6)
 - +1 microSD socket + 2 passives
 - +1 OLED header (replaces TM1637 header)
 - +3 tact switches + 9 passives (replaces rotary encoder header)
 - +4 voltage dividers (8 resistors + 4 caps + 4 diodes)
 - +2 indicator LEDs + 2 resistors
+- +1 NeoPixel VDD level-shift diode (D_NEO, 1N4148W)
 - +1 ferrite bead
 - −4 INA226 chips, −2 I²C pullup resistors, −1 ALERT pullup
 - −1 screw terminal (cycler input replaced by PCB clip pads)
@@ -734,13 +757,13 @@ NeoPixel color map:
 - [ ] SPI1 clock ≤ 25 MHz (ADS131M04 max SCLK)
 - [ ] Both ADS131M04 CS/DRDY lines routed to correct GPIO (GP13/14 and GP26/21)
 - [ ] Shunt voltage at 3 A (30 mV) within gain=16 input range (±75 mV)
-- [ ] Bus voltage at 10 V through 10.01:1 divider (0.99 V) within gain=1 range (±1.2 V)
+- [ ] Bus voltage at 10 V through 11.0:1 divider (0.91 V) within gain=1 range (±1.2 V)
 - [ ] MOSFET SOA check: 3 A continuous at ambient + enclosure temp (AO3400A SOT-23, R_DS(on) max 26.5 mΩ, θ_JA 125 °C/W → ΔT ≈ 30 °C)
 - [ ] UCC5304 UVLO: VDD rising threshold 5.0–5.9 V — 5 V supply fails on typical/worst-case units. V3 uses 12 V from PS3 (resolved).
 - [ ] B0512S-1WR3 output floats above CELL_x_POS — verify isolation rating
 - [ ] SPI0 (SD) and SPI1 (ADS) on separate peripherals — no bus contention
 - [ ] I²C0 (OLED) does not share bus with any high-speed device
-- [ ] Total 3.3 V rail current: RP2350 (~50 mA) + 2× ADS131M04 (~16 mA) + OLED (~20 mA) + LEDs (~10 mA) + drivers VCCI (~4 mA) = ~100 mA — within Pico 2 3V3 regulator (300 mA)
+- [ ] Total 3.3 V rail current: RP2350 (~50 mA) + 2× ADS131M04 (~32 mA) + OLED (~20 mA) + LEDs (~10 mA) + drivers VCCI (~4 mA) = ~116 mA — within Pico 2 3V3 regulator (300 mA)
 - [ ] 5 V rail: 3× B0512S input current (~8 mA each quiescent + ~10 mA output load / 89% efficiency ≈ ~20 mA each = ~60 mA total) + misc (~80 mA) = ~140 mA typical — within USB 500 mA. Bleeder resistors add ~24 mA input draw total across 3 converters.
 - [ ] Optional 5 V buck: footprint present, DNP, solder jumper SJ_5V defaults to VBUS
 - [ ] Kelvin sense routing: shunt voltage traces go directly to ADS131M04 inputs, not through power traces
@@ -751,3 +774,4 @@ NeoPixel color map:
 - [ ] ADS131M04 CAP pin: 220 nF to DGND per device (internal LDO output, datasheet required)
 - [ ] ADS131M04 DVDD decoupling: 1 µF minimum per datasheet (not 100 nF)
 - [ ] Gate drive LEDs on input nets (system-GND referenced), not floating output nets
+- [ ] NeoPixel VDD level shift: D_NEO (1N4148W) in series with +5V → VDD drops to ~4.3 V, VIH = 2.80 V, margin ≥500 mV over 3.3 V GPIO. At min USB (4.5 V), VDD = 3.85 V (above 3.7 V min).
