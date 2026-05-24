@@ -110,10 +110,9 @@ Calibrated in firmware. Anti-alias f_c = 1/(2π × 9.1 kΩ × 100 nF) ≈ 175 Hz
 |---|---|---|---|---|---|
 | L_AVDD | TAI-TECH HCB1608KF-601T20 | 0603 | 1 | [C304319](https://www.lcsc.com/product-detail/C304319.html) | Ferrite bead 600 Ω @ 100 MHz, DCR=100 mΩ, 2 A. 28,400 stock. |
 | C_AVDD1 | 10 µF X7R 10 V | 0805 | 1 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Murata. +3V3_A bulk decoupling. 153,220 stock. |
-| C_AVDD2 | 100 nF X7R 50 V | 0603 | 1 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | +3V3_A close to AVDD pin. Basic part. |
+| C_AVDD2 | 100 nF X7R 50 V | 0603 | 2 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | +3V3_A close to AVDD pin, per device. Basic part. |
 | C_DVDD | 1 µF X5R 50 V | 0603 | 2 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | Samsung. DVDD to DGND per device. Datasheet requires 1 µF. 3,740,750 stock. |
 | C_CAP | 220 nF X7R 25 V | 0603 | 2 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | Samsung. CAP to DGND per device (internal 1.8 V LDO output). Datasheet required. 1,237,500 stock. |
-| C_VREF | 100 nF X7R 50 V | 0603 | 2 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | REFP to REFN per device (internal reference decoupling). |
 
 ---
 
@@ -159,7 +158,12 @@ for 5V rail budget calculations.
 | C_PS*_OUT2 | 100 nF X7R 50 V | 0603 | 3 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | Output HF, close to Vout pins. |
 
 Max capacitive load for B0512S 12 V output: **560 µF**. Total per
-converter (2.2 µF + 0.1 µF) = 2.3 µF — well under limit.
+converter including UCC5304 VDD decoupling: PS1/PS2 ≈ 12.4 µF each
+(2.2 + 0.1 + 10 + 0.1), PS3 ≈ 22.5 µF (2.2 + 0.1 + 2×10 + 2×0.1)
+— well under limit. PS3's total (22.5 µF) satisfies the
+`PCB_V3_CHANGELIST.md` item #2 recommendation for additional bulk
+capacitance, via the UCC5304 VDD bulk caps rather than a separate
+electrolytic.
 
 **Minimum load warning:** B0512S-1WR3 requires ≥9 mA output (10% of
 84 mA rated) for proper regulation. UCC5304 VDD draw is only ~1–2.5 mA
@@ -167,7 +171,7 @@ per driver. Add a bleeder resistor on each converter output:
 
 | Ref | Part | Package | Qty total | LCSC # | Notes |
 |---|---|---|---|---|---|
-| R_BLEED_PS1–3 | 1.5 kΩ 1% 0805 | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | UNI-ROYAL. VDD to VSS per converter. I_bleed = 12 V / 1.5 kΩ = 8 mA. P = 96 mW (0805 rated 125 mW, 23% margin). Total load with driver: ~10 mA. |
+| R_BLEED_PS1–3 | 1.2 kΩ 1% 0805 | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | UNI-ROYAL. VDD to VSS per converter. I_bleed = 12 V / 1.2 kΩ = 10 mA. P = 120 mW (0805 rated 125 mW, 4% margin). Total load with driver: ~12 mA. |
 
 **Pin mapping warning:** GDHUIZHT-brand B0512S modules have pins 1↔2
 and 3↔4 swapped vs Mornsun datasheet. Add silkscreen note on PCB.
@@ -268,7 +272,7 @@ insufficient under measured load.
 | D_LED_AUTO | NATIONSTAR NCD0603Y5 (yellow) | 0603 | 1 | [C7429912](https://www.lcsc.com/product-detail/C7429912.html) | GP0, auto-follow engaged. 595 nm peak, 40–180 mcd, Vf=1.5–2.6 V. 26,360 stock. |
 | R_LED_REC, R_LED_AUTO | 1 kΩ 1% 0603 | 0603 | 2 | [C22548](https://www.lcsc.com/product-detail/C22548.html) | YAGEO. Current limit. |
 | NEOPIXEL | WS2812B-MINI-X2 | 3535 | 1 | [C4154873](https://www.lcsc.com/product-detail/C4154873.html) | GP1 data. VDD via D_NEO from `+5V` (~4.3 V effective). 37,690 stock. |
-| D_NEO | 1N4148W (ST/Semtech) | SOD-123 | 1 | [C81598](https://www.lcsc.com/product-detail/C81598.html) | Series diode in NeoPixel VDD. Drops +5V to ~4.3 V → VIH = 0.65×4.3 = 2.80 V, giving 500 mV margin for 3.3 V GPIO. 1,974,100 stock. ~$0.01. |
+| D_NEO | 1N4148W (ST/Semtech) | SOD-123 | 1 | [C81598](https://www.lcsc.com/product-detail/C81598.html) | Series diode in NeoPixel VDD. Datasheet Vf: 0.715 V max @ 1 mA, 0.855 V max @ 10 mA. At 5 V / 10 mA: VDD ≈ 4.15 V, VIH = 2.70 V, margin = 600 mV. Limit NeoPixel brightness to keep total current ≤10 mA (at min USB 4.5 V, VDD = 3.65 V — below 3.7 V min at higher currents). 1,974,100 stock. ~$0.01. |
 
 ---
 
@@ -303,14 +307,14 @@ insufficient under measured load.
 | 9.1 kΩ 1% | 0603 | 4 | [C114639](https://www.lcsc.com/product-detail/C114639.html) | Voltage divider low-side (YAGEO, 37.9K stock) |
 | 10 kΩ 5% | 0603 | 8 | [C99198](https://www.lcsc.com/product-detail/C99198.html) | Gate pulldowns (4), button pullups (3), R_RP (1) (YAGEO, 2.5M stock) |
 | 91 kΩ 1% | 0603 | 4 | [C23265](https://www.lcsc.com/product-detail/C23265.html) | Voltage divider high-side (UNI-ROYAL, 29.1K stock, basic) |
-| 100 nF X7R 50 V | 0603 | 26 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI(4) + VDD_HF(4) + AVDD2(1) + VREF(2) + AA(4) + BTN(3) + PS_IN2(3) + PS_OUT2(3) + BULK2(1) + 5V2(1) (YAGEO, 6.6M stock, basic) |
+| 100 nF X7R 50 V | 0603 | 26 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI(4) + VDD_HF(4) + AVDD2(2) + AA(4) + BTN(3) + PS_IN2(3) + PS_OUT2(3) + BULK2(1) + 5V2(1) + SD2(1) (YAGEO, 6.6M stock, basic) |
 | 10 µF X7R 10 V | 0805 | 3 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Bulk decoupling — C_AVDD1(1) + C_5V1(1) + C_SD1(1) (Murata, 153K stock) |
 | 10 µF X5R 50 V | 1206 | 5 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | C_VDD_U1–4_1(4) + C_BULK1(1) — +HV and UCC5304 VDD bulk (YAGEO, 251K stock) |
 | 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input bulk ×3 converters (Samsung, 2.5M stock, basic). Datasheet recommended Cin. |
 | 2.2 µF X7R 25 V | 0805 | 3 | [C19110](https://www.lcsc.com/product-detail/C19110.html) | B0512S output bulk ×3 converters (Samsung, 872K stock). Datasheet recommended Cout for 12 V output. |
 | 1 µF X5R 50 V | 0603 | 2 | [C15849](https://www.lcsc.com/product-detail/C15849.html) | ADS131M04 DVDD decoupling ×2 devices (Samsung, 3.7M stock) |
 | 220 nF X7R 25 V | 0603 | 2 | [C21120](https://www.lcsc.com/product-detail/C21120.html) | ADS131M04 CAP pin ×2 devices (Samsung, 1.2M stock) |
-| 1.5 kΩ 1% | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | B0512S bleeder resistors, minimum load (UNI-ROYAL) |
+| 1.2 kΩ 1% | 0805 | 3 | [C17379](https://www.lcsc.com/product-detail/C17379.html) | B0512S bleeder resistors, minimum load (UNI-ROYAL, 18.9K stock) |
 
 ---
 

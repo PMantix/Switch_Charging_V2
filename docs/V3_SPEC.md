@@ -264,19 +264,18 @@ filter + input clamp:
   (sufficient for DC bus voltage)
 - Input protection: Nexperia BAV99,215 dual diode, clamp to AVDD/AGND
 
-Voltage resolution: 1.2 V / 2²³ = 143 nV → 1.43 µV/bit at divider →
-**15.7 µV/bit at bus** (after 11.0× scaling).
+Voltage resolution: 1.2 V / 2²³ = 143 nV = 0.143 µV/bit at divider →
+**1.57 µV/bit at bus** (after 11.0× scaling).
 
 ### ADS131M04 support components (per device, ×2)
 
 | Ref | Part | Value | Connection |
 |---|---|---|---|
 | C_AVDD1 | 10 µF MLCC | 0805 X7R 10 V | `+3V3_A` to `AGND` |
-| C_AVDD2 | 100 nF MLCC | 0603 X7R 50 V | `+3V3_A` to `AGND` (close to pin) |
+| C_AVDD2 | 100 nF MLCC | 0603 X7R 50 V | `+3V3_A` to `AGND` (close to AVDD pin, per device) |
 | C_DVDD | 1 µF MLCC | 0603 X5R 50 V | DVDD to DGND (external digital/IO supply, datasheet requires 1 µF) |
 | C_CAP | 220 nF MLCC | 0603 X7R 25 V | CAP to DGND (internal 1.8 V LDO output, datasheet required) |
 | L_AVDD | Ferrite bead | TAI-TECH HCB1608KF-601T20, 600 Ω @ 100 MHz, 0603 | `+3V3` → `+3V3_A` (shared, single ferrite for both devices) |
-| C_VREF | 100 nF MLCC | 0603 X7R 50 V | REFP to REFN (internal reference decoupling) |
 
 Pin connections (both devices share SPI1 bus):
 
@@ -349,14 +348,14 @@ Decoupling per converter (all three), per YLPTEC datasheet Table 1:
 - Input: 4.7 µF 0805 + 100 nF 0603, close to Vin pins
 - Output: 2.2 µF 0805 + 100 nF 0603, close to Vout pins
 - Additional 100 nF 0603 at each UCC5304 pin 8 (VDD), close to the driver
-- Max capacitive load for 12 V output: 560 µF (total decoupling is ~2.3 µF — safe)
+- Max capacitive load for 12 V output: 560 µF (total decoupling incl. UCC5304 VDD caps: PS1/PS2 ≈ 12.4 µF, PS3 ≈ 22.5 µF — safe)
 
 **Minimum load:** B0512S requires ≥9 mA output (10% of 84 mA). UCC5304
 IVDD is only ~1–2.5 mA per driver (quiescent 1.0 mA, operating 2.5 mA
 @ 500 kHz with COUT=100 pF). AO3400A Qg = 7 nC adds negligible
 average current at our switching frequencies (≤2 kHz). Each converter
-needs a 1.5 kΩ bleeder resistor (VDD to VSS) to bring total load to
-~10 mA. P_bleeder = 96 mW per resistor.
+needs a 1.2 kΩ bleeder resistor (VDD to VSS) to bring total load to
+~12 mA. P_bleeder = 120 mW per resistor (0805, 125 mW rated).
 
 **B0512S pin mapping note:** Verify pinout matches your actual parts.
 GDHUIZHT-brand modules have pins 1↔2 and 3↔4 swapped vs Mornsun
@@ -502,7 +501,7 @@ offset  bytes  field
 Followed by a continuous stream of 38-byte binary frames (§14).
 
 Write strategy:
-- 2048-sample ring buffer (64 KB) in RAM (32 bytes/entry, see §15)
+- 2048-sample ring buffer (~66 KB) in RAM (33 bytes/entry, see §15)
 - Core 0 drains buffer → 512-byte aligned SD writes
 - At 4 kSPS × 38 bytes = 152 KB/s sustained write
 - 32 GB card ≈ 58 hours of continuous recording
@@ -533,7 +532,7 @@ In frequency adjust mode:
 offset  bytes  field
   0      2     sync         0xAA 0x55
   2      1     type         'D' (0x44)
-  3      1     length       34 (payload bytes after length, before xor)
+  3      1     length       33 (payload bytes after length, before xor)
   4      4     ticks_us     uint32 (RP2350 timer at DRDY, µs)
   8      4     seq_no       uint32 (monotonic, wraps at 2³²)
  12      3     ch0_raw      int24 (P1 shunt, signed, big-endian)
@@ -607,8 +606,8 @@ def decode_frame(buf):
 ### Ring buffer (core 1 → core 0)
 
 Lock-free single-producer single-consumer ring:
-- Entry size: 32 bytes (timestamp + seq + 8 × int24 + flags)
-- Buffer depth: 2048 entries = 64 KB
+- Entry size: 33 bytes (timestamp + seq + 8 × int24 + flags = 4+4+24+1)
+- Buffer depth: 2048 entries ≈ 66 KB
 - At 4 kSPS: ~0.5 s of buffering (handles SD write latency spikes)
 - Core 1 writes head pointer, core 0 reads tail pointer
 - Memory barrier via `__dmb()` on ARM M33
@@ -686,20 +685,29 @@ The WS2812B-MINI-X2 requires VIH = 0.65 x VDD. At VDD = 5.0 V, VIH =
 unreliable across temperature and voltage tolerance.
 
 **Fix:** A 1N4148W silicon diode (D_NEO, SOD-123) in series with the
-NeoPixel VDD line drops the effective supply to ~4.3 V (Vf ~0.65 V at
-typical LED current). This lowers VIH to 0.65 x 4.3 = 2.80 V, giving
-**500 mV of margin** over the 3.3 V GPIO.
+NeoPixel VDD line drops the effective supply voltage. Datasheet Vf
+(Semtech, max values): 0.715 V @ 1 mA, 0.855 V @ 10 mA, 1.0 V @ 50 mA.
+
+At nominal 5 V USB, 10 mA NeoPixel current (moderate brightness):
+- VDD = 5.0 - 0.855 = **4.15 V** (within 3.7–5.3 V)
+- VIH = 0.65 × 4.15 = 2.70 V → **600 mV margin** over 3.3 V GPIO
 
 ```
-+5V ──[D_NEO 1N4148W]──┬── NEOPIXEL VDD (~4.3 V)
++5V ──[D_NEO 1N4148W]──┬── NEOPIXEL VDD (~4.15 V @ 10 mA)
                         │
 GP1 ────────────────────┤── NEOPIXEL DIN
                         │
 GND ────────────────────┴── NEOPIXEL GND
 ```
 
-At minimum USB voltage (4.5 V): VDD = 4.5 - 0.65 = 3.85 V (above
-3.7 V min). VIH = 0.65 x 3.85 = 2.50 V — still 800 mV margin.
+At minimum USB voltage (4.5 V), VDD depends on NeoPixel current:
+- 1 mA (dim): VDD = 4.5 - 0.715 = 3.79 V (above 3.7 V min, VIH margin = 840 mV)
+- 10 mA: VDD = 4.5 - 0.855 = 3.65 V (**below 3.7 V min**)
+
+**Firmware constraint:** limit NeoPixel brightness so total current
+stays ≤5 mA. As a single-pixel status indicator, this is adequate —
+full white is not needed. At 5 mA, Vf ≈ 0.8 V (interpolated), giving
+VDD = 4.5 - 0.8 = 3.7 V (at minimum).
 
 NeoPixel color map:
 - Blue = IDLE
@@ -763,15 +771,16 @@ NeoPixel color map:
 - [ ] B0512S-1WR3 output floats above CELL_x_POS — verify isolation rating
 - [ ] SPI0 (SD) and SPI1 (ADS) on separate peripherals — no bus contention
 - [ ] I²C0 (OLED) does not share bus with any high-speed device
-- [ ] Total 3.3 V rail current: RP2350 (~50 mA) + 2× ADS131M04 (~32 mA) + OLED (~20 mA) + LEDs (~10 mA) + drivers VCCI (~4 mA) = ~116 mA — within Pico 2 3V3 regulator (300 mA)
-- [ ] 5 V rail: 3× B0512S input current (~8 mA each quiescent + ~10 mA output load / 89% efficiency ≈ ~20 mA each = ~60 mA total) + misc (~80 mA) = ~140 mA typical — within USB 500 mA. Bleeder resistors add ~24 mA input draw total across 3 converters.
+- [ ] Total 3.3 V rail current: RP2350 (~50 mA) + 2× ADS131M04 (~9 mA, datasheet IAVDD+IDVDD max 4.5 mA/device) + OLED (~20 mA) + LEDs (~10 mA) + drivers VCCI (~6 mA, 4×1.5 mA typ) = ~95 mA — within Pico 2 3V3 regulator (300 mA)
+- [ ] 5 V rail: 3× B0512S input current (each ~12 mA output load at 12 V, Mornsun 83% efficiency: I_in ≈ 12×0.012/(5×0.83) ≈ 35 mA per converter = ~105 mA total) + misc (~80 mA) = ~185 mA typical — within USB 500 mA.
 - [ ] Optional 5 V buck: footprint present, DNP, solder jumper SJ_5V defaults to VBUS
 - [ ] Kelvin sense routing: shunt voltage traces go directly to ADS131M04 inputs, not through power traces
 - [ ] Star ground: AGND and DGND tied at one point under ADS131M04 devices
 - [ ] Kelvin clip pads: 22×8 mm per pad, ENIG finish, board edge, current/sense paths separated, ≥1 mm traces on current pads
-- [ ] B0512S minimum load: each converter needs ≥9 mA. UCC5304 draws ~1–2.5 mA → 1.5 kΩ bleeder required per converter
+- [ ] B0512S minimum load: each converter needs ≥9 mA. UCC5304 draws ~1–2.5 mA → 1.2 kΩ bleeder required per converter (10 mA + driver ≈ 12 mA, 33% margin)
 - [ ] UCC5304 VDD bulk caps: all four see ~12 V across VDD-VSS — use 50 V rated (1206), not 10 V
 - [ ] ADS131M04 CAP pin: 220 nF to DGND per device (internal LDO output, datasheet required)
 - [ ] ADS131M04 DVDD decoupling: 1 µF minimum per datasheet (not 100 nF)
+- [ ] ADS131M04 has no REFP/REFN pins — internal 1.2 V reference requires no external decoupling (do NOT carry over C_VREF from M08)
 - [ ] Gate drive LEDs on input nets (system-GND referenced), not floating output nets
-- [ ] NeoPixel VDD level shift: D_NEO (1N4148W) in series with +5V → VDD drops to ~4.3 V, VIH = 2.80 V, margin ≥500 mV over 3.3 V GPIO. At min USB (4.5 V), VDD = 3.85 V (above 3.7 V min).
+- [ ] NeoPixel VDD level shift: D_NEO (1N4148W) in series with +5V → VDD ≈ 4.15 V @ 10 mA (Vf max 0.855 V per datasheet), VIH = 2.70 V, margin ≥600 mV. At min USB (4.5 V), limit NeoPixel brightness to ≤5 mA to keep VDD ≥3.7 V.

@@ -58,9 +58,12 @@ This matches the breadboard architecture that was validated working.
 failed after continuous switching over a weekend (2026-05-19, SW1 board).
 5V input present, 0V output — DC-DC died from gate charge transient stress
 without adequate decoupling. V3 MUST include:
-- PS3 input: 10µF + 100nF ceramic close to Vin pins
-- PS3 output: 22-47µF bulk + 10µF + 100nF ceramic close to Vout pins
+- PS3 input: 4.7µF + 100nF ceramic close to Vin pins (per Mornsun datasheet Table 1)
+- PS3 output: 2.2µF + 100nF ceramic close to Vout pins (per datasheet Table 1)
 - Additional 100nF ceramic at each UCC5304 pin 8 (VDD)
+- **Resolved (2026-05-23):** The UCC5304 VDD bulk caps (2×10µF on PS3)
+  provide ~22.5µF total on the PS3 output, satisfying the original intent
+  for bulk capacitance. No separate electrolytic needed.
 
 Same decoupling standard should apply to PS1/PS2 (high-side supplies).
 
