@@ -17,13 +17,14 @@ as of 2026-05-23. Max continuous current: **3 A** (hard limit).
 | Shunt resistors | 4 | ~$0.19 |
 | Protection (polyfuse, TVS, MOSFET) | 3 | existing stock |
 | Voltage dividers + clamps | ~16 | ~$0.40 |
-| Passives (caps, resistors, ferrite) | ~35 | ~$2.00 |
+| Current-sense amps (INA180A1) | 2 | ~$0.40 |
+| Passives (caps, resistors, ferrite) | ~37 | ~$2.00 |
 | Connectors (terminals, headers) | 5 | ~$1.30 |
 | microSD socket | 1 | ~$0.07 |
 | OLED display module | 1 | ~$3 |
 | Buttons + debounce | 3 + passives | ~$0.10 |
 | LEDs + resistors + level shift | 10 | ~$0.51 |
-| **Total (new parts only)** | **~86** | **~$18** |
+| **Total (new parts only)** | **~90** | **~$18.40** |
 
 Cost excludes parts already in stock from V2 (UCC5304, B0512S-1WR3,
 protection components, Pico 2 if already purchased).
@@ -85,7 +86,26 @@ Stock: 77,240 units (extended part).
 
 ---
 
-## 5. ADS131M04 analog front-end
+## 5. High-side current-sense amplifiers
+
+The ADS131M04 analog input absolute maximum is AVDD + 0.3 V = 3.6 V.
+High-side shunt nodes (`+HV`, `+HV_P1/P2`) run at 2.65–10 V and cannot
+connect directly. Two INA180A1 current-sense amplifiers convert each
+high-side shunt voltage to a ground-referenced signal.
+
+| Ref | Part | Package | Qty | LCSC # | Unit price | Notes |
+|---|---|---|---|---|---|---|
+| U_CSA_P1, U_CSA_P2 | INA180A1IDBVR (TI) | SOT-23-5 | 2 | [C122228](https://www.lcsc.com/product-detail/C122228.html) | ~$0.20 | Gain = 20 V/V fixed. CM range −0.2 V to +26 V. Supply 2.7–5.5 V. Unidirectional output. 80,505 stock. |
+
+Decoupling (per device):
+
+| Ref | Part | Package | Qty total | LCSC # | Notes |
+|---|---|---|---|---|---|
+| C_CSA_P1, C_CSA_P2 | 100 nF X7R 50 V | 0603 | 2 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VS to GND, close to IC. |
+
+---
+
+## 6. ADS131M04 analog front-end
 
 ### Voltage dividers (bus voltage channels)
 
@@ -307,7 +327,7 @@ insufficient under measured load.
 | 9.1 kΩ 1% | 0603 | 4 | [C114639](https://www.lcsc.com/product-detail/C114639.html) | Voltage divider low-side (YAGEO, 37.9K stock) |
 | 10 kΩ 5% | 0603 | 8 | [C99198](https://www.lcsc.com/product-detail/C99198.html) | Gate pulldowns (4), button pullups (3), R_RP (1) (YAGEO, 2.5M stock) |
 | 91 kΩ 1% | 0603 | 4 | [C23265](https://www.lcsc.com/product-detail/C23265.html) | Voltage divider high-side (UNI-ROYAL, 29.1K stock, basic) |
-| 100 nF X7R 50 V | 0603 | 26 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI(4) + VDD_HF(4) + AVDD2(2) + AA(4) + BTN(3) + PS_IN2(3) + PS_OUT2(3) + BULK2(1) + 5V2(1) + SD2(1) (YAGEO, 6.6M stock, basic) |
+| 100 nF X7R 50 V | 0603 | 28 | [C14663](https://www.lcsc.com/product-detail/C14663.html) | VCCI(4) + VDD_HF(4) + AVDD2(2) + AA(4) + BTN(3) + PS_IN2(3) + PS_OUT2(3) + BULK2(1) + 5V2(1) + SD2(1) + CSA(2) (YAGEO, 6.6M stock, basic) |
 | 10 µF X7R 10 V | 0805 | 3 | [C86038](https://www.lcsc.com/product-detail/C86038.html) | Bulk decoupling — C_AVDD1(1) + C_5V1(1) + C_SD1(1) (Murata, 153K stock) |
 | 10 µF X5R 50 V | 1206 | 5 | [C100122](https://www.lcsc.com/product-detail/C100122.html) | C_VDD_U1–4_1(4) + C_BULK1(1) — +HV and UCC5304 VDD bulk (YAGEO, 251K stock) |
 | 4.7 µF X5R 25 V | 0805 | 3 | [C1779](https://www.lcsc.com/product-detail/C1779.html) | B0512S input bulk ×3 converters (Samsung, 2.5M stock, basic). Datasheet recommended Cin. |
@@ -322,6 +342,7 @@ insufficient under measured load.
 
 ### JLCPCB-assembled (SMD)
 
+- [ ] INA180A1IDBVR × 2 — [C122228](https://www.lcsc.com/product-detail/C122228.html) (80K stock, high-side CSA)
 - [ ] ADS131M04IRUKR × 2 — [C5121509](https://www.lcsc.com/product-detail/C5121509.html) (3,520 stock, extended)
 - [ ] AO3400A × 4 — JLCPCB basic (same as V2)
 - [ ] RLP25FEGR010 × 4 — [C393070](https://www.lcsc.com/product-detail/C393070.html) (77K stock)

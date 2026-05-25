@@ -1,0 +1,211 @@
+(footprint "B0512S_1WR3_SIP4"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "Mornsun B_S-1WR3 series SIP-4 package, 4 TH pins at 2.54mm pitch in a line. Body approximately 11.5x6.5mm. Verify against your specific module before fab.")
+	(tags "Mornsun B0512S isolated DC-DC SIP-4")
+	(property "Reference" "PS**"
+		(at 0 -5.5 0)
+		(layer "F.SilkS")
+		(uuid "ba28fac2-b189-42f4-a20f-f3fe30ef568f")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "B0512S-1WR3"
+		(at 0 5.5 0)
+		(layer "F.Fab")
+		(uuid "7b89e1fd-d18f-4625-9de2-4009c120c329")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "b9251290-4142-4daa-83ad-eaa1df752ace")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "76e1bc39-30ca-4b25-b1c5-348a87a3ca62")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr through_hole)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -5.75 -3.25)
+		(end 5.75 -3.25)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "1655f560-5ba4-4d5d-850a-abbb1898ae4c")
+	)
+	(fp_line
+		(start -5.75 3.25)
+		(end -5.75 -3.25)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "5231aba0-b6f6-4f77-ad0c-aca6e6576673")
+	)
+	(fp_line
+		(start 5.75 -3.25)
+		(end 5.75 3.25)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "ac3ac045-83bf-4dd7-800c-e6e75bbe12eb")
+	)
+	(fp_line
+		(start 5.75 3.25)
+		(end -5.75 3.25)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "27d0e479-f484-4fd8-b685-49f872e9741a")
+	)
+	(fp_circle
+		(center -5.5 -1.5)
+		(end -5.2 -1.5)
+		(stroke
+			(width 0.15)
+			(type solid)
+		)
+		(fill yes)
+		(layer "F.SilkS")
+		(uuid "563cea77-4f85-4fa8-875b-feef6a466618")
+	)
+	(fp_rect
+		(start -6.25 -3.75)
+		(end 6.25 3.75)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(fill no)
+		(layer "F.CrtYd")
+		(uuid "e0f9eff6-cd14-4c12-924e-124c5fce3e6d")
+	)
+	(fp_line
+		(start -5.75 -3.25)
+		(end 5.75 -3.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "cd14b6f0-b245-4b20-ac3f-b47789543fe6")
+	)
+	(fp_line
+		(start -5.75 3.25)
+		(end -5.75 -3.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "6a5a8b67-faca-46fd-b747-9456620df880")
+	)
+	(fp_line
+		(start 5.75 -3.25)
+		(end 5.75 3.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "790aba27-a38c-4252-a75b-3e2429c8659b")
+	)
+	(fp_line
+		(start 5.75 3.25)
+		(end -5.75 3.25)
+		(stroke
+			(width 0.1)
+			(type solid)
+		)
+		(layer "F.Fab")
+		(uuid "3903deff-ccbf-418e-a5f1-fa11fd967def")
+	)
+	(fp_text user "5V"
+		(at -2.54 -4 0)
+		(layer "F.SilkS")
+		(uuid "4ed517f2-e0a9-4c8e-8fec-aeec2733ff33")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.12)
+			)
+		)
+	)
+	(fp_text user "12V"
+		(at 2.54 -4 0)
+		(layer "F.SilkS")
+		(uuid "ac352503-1d14-44f0-a99f-07c43545a58f")
+		(effects
+			(font
+				(size 0.8 0.8)
+				(thickness 0.12)
+			)
+		)
+	)
+	(pad "1" thru_hole rect
+		(at -3.81 0)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "506b4f96-e1df-4c1f-9624-d76bef2b3d52")
+	)
+	(pad "2" thru_hole circle
+		(at -1.27 0)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "74a14f61-74a6-4625-81bc-72bc713384d9")
+	)
+	(pad "3" thru_hole circle
+		(at 1.27 0)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "0282d8b4-9278-4a96-8163-7d5a008d9060")
+	)
+	(pad "4" thru_hole circle
+		(at 3.81 0)
+		(size 1.7 1.7)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "4432f78e-f9d5-41d8-9e6a-3e441fcd5b4f")
+	)
+	(embedded_fonts no)
+)
