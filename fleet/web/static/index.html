@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Fleet Dashboard - Switch Charging V2</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header>
+        <h1>Switch Charging Fleet</h1>
+        <div class="cycler-status">
+            WS: <span id="ws-status" style="color: var(--yellow)">connecting...</span>
+            &nbsp;|&nbsp; Pis: <span id="pi-count">0</span>
+        </div>
+    </header>
+
+    <div class="batch-bar">
+        <label>Batch:</label>
+        <select id="batch-field">
+            <option value="mode">Mode</option>
+            <option value="frequency">Frequency</option>
+            <option value="sequence">Sequence</option>
+            <option value="af-enabled">Auto-Follow</option>
+            <option value="af-target">AF Target</option>
+            <option value="af-cc">AF CC Setpoint</option>
+        </select>
+        <span id="batch-value-container">
+            <select id="batch-value">
+                <option value="charge">charge</option>
+                <option value="discharge">discharge</option>
+                <option value="pulse_charge">pulse_charge</option>
+                <option value="idle">idle</option>
+            </select>
+        </span>
+        <button class="btn btn-primary" onclick="batchSend()">Apply to All</button>
+    </div>
+
+    <div class="fleet-table-wrap">
+        <table class="fleet-table" id="fleet-table">
+            <thead>
+                <tr>
+                    <th class="col-pi">Pi</th>
+                    <th class="col-status">Status</th>
+                    <th class="col-mode">Mode</th>
+                    <th class="col-freq">Freq (Hz)</th>
+                    <th class="col-seq">Sequence</th>
+                    <th class="col-af-en">AF</th>
+                    <th class="col-af-tgt">AF Target</th>
+                    <th class="col-af-cc">CC Set (A)</th>
+                    <th class="col-af-ie">I Enter (A)</th>
+                    <th class="col-af-ix">I Exit (A)</th>
+                    <th class="col-af-act">AF Active</th>
+                    <th class="col-avg">Avg I / V</th>
+                    <th class="col-age">Age</th>
+                </tr>
+            </thead>
+            <tbody id="fleet-body">
+            </tbody>
+        </table>
+    </div>
+
+    <p class="empty-msg" id="empty-msg">No Pis discovered yet. Waiting for AP scan...</p>
+
+    <!-- Edit modal -->
+    <div class="modal-backdrop" id="edit-modal">
+        <div class="modal">
+            <h2 id="edit-title">Edit</h2>
+            <div id="edit-body"></div>
+            <div class="modal-actions">
+                <button class="btn" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-primary" id="edit-submit">Apply</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast notifications -->
+    <div class="toast-container" id="toasts"></div>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

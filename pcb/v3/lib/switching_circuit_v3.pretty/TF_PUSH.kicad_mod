@@ -1,0 +1,217 @@
+(footprint "TF_PUSH"
+	(version 20260206)
+	(generator "pcbnew")
+	(generator_version "10.0")
+	(layer "F.Cu")
+	(descr "SHOU HAN TF PUSH microSD card socket, push-push, SMD, LCSC C393941")
+	(tags "microSD TF card socket push-push C393941")
+	(property "Reference" "J**"
+		(at 0 -6.5 0)
+		(layer "F.SilkS")
+		(uuid "72986d77-387c-4bd7-8b2c-46fbe13b737e")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Value" "TF_PUSH"
+		(at 0 6.5 0)
+		(layer "F.Fab")
+		(uuid "dfc42f1a-4445-46a6-9f8c-266e06568647")
+		(effects
+			(font
+				(size 1 1)
+				(thickness 0.15)
+			)
+		)
+	)
+	(property "Datasheet" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "cdf449be-b219-46d5-a103-95740cd5fbc8")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(property "Description" ""
+		(at 0 0 0)
+		(layer "F.Fab")
+		(hide yes)
+		(uuid "6c4f315a-53ac-4734-8c16-a25480945ae7")
+		(effects
+			(font
+				(size 1.27 1.27)
+			)
+		)
+	)
+	(attr smd)
+	(duplicate_pad_numbers_are_jumpers no)
+	(fp_line
+		(start -6.05 -4.625)
+		(end 6.05 -4.625)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "16df26ea-1099-4375-83d9-4890631b7f48")
+	)
+	(fp_line
+		(start -6.05 4.625)
+		(end -6.05 -4.625)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "cc629aad-c471-4fc9-abe2-994cd545ec32")
+	)
+	(fp_line
+		(start 6.05 -4.625)
+		(end 6.05 4.625)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "0c931df9-28a3-4e7c-a3af-32b7834bd4b7")
+	)
+	(fp_line
+		(start 6.05 4.625)
+		(end -6.05 4.625)
+		(stroke
+			(width 0.12)
+			(type solid)
+		)
+		(layer "F.SilkS")
+		(uuid "84a374e5-6624-4db9-8470-ce69209e67a8")
+	)
+	(fp_line
+		(start -6.55 -5.825)
+		(end 6.55 -5.825)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "fc1ca8e4-b29c-42f9-b444-c8d151377cb9")
+	)
+	(fp_line
+		(start -6.55 5.125)
+		(end -6.55 -5.825)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "6edb57ee-ec3b-4b43-b632-eb74ac8d7f2d")
+	)
+	(fp_line
+		(start 6.55 -5.825)
+		(end 6.55 5.125)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "40a36db6-c922-463b-9234-2887704b956b")
+	)
+	(fp_line
+		(start 6.55 5.125)
+		(end -6.55 5.125)
+		(stroke
+			(width 0.05)
+			(type solid)
+		)
+		(layer "F.CrtYd")
+		(uuid "82817104-5ec4-4158-9436-e0adfb847a29")
+	)
+	(pad "1" smd rect
+		(at 3.35 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "c797c3d9-1907-4d9f-9d24-9d6e40f6017d")
+	)
+	(pad "2" smd rect
+		(at 2.25 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "952675a0-9776-46c2-86b6-2035f9f52bff")
+	)
+	(pad "3" smd rect
+		(at 1.15 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "cd2f14d2-0ffc-425d-8978-9fe41b1bf49e")
+	)
+	(pad "4" smd rect
+		(at 0.05 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "8acfa24e-4321-48d8-a31c-b27031d70660")
+	)
+	(pad "5" smd rect
+		(at -1.05 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "bf243c9b-f318-4e58-b692-88ab543ae3c0")
+	)
+	(pad "6" smd rect
+		(at -2.15 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "ebdcf50f-3d09-4244-ac97-77debb50228a")
+	)
+	(pad "7" smd rect
+		(at -3.25 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "1e715de8-6818-41ed-bd3c-2747643a3e9c")
+	)
+	(pad "8" smd rect
+		(at -4.35 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "d913c63e-1886-4547-a78c-57edfca13988")
+	)
+	(pad "CD" smd rect
+		(at -5.45 -4.525)
+		(size 0.7 1.6)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "16fd7535-f762-4f18-9df3-c1b965572ea0")
+	)
+	(pad "SH" smd rect
+		(at -3.4 4.275)
+		(size 1.2 0.7)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "4a754da7-edf1-43a6-abdb-93428b48dfd7")
+	)
+	(pad "SH" thru_hole circle
+		(at -2.475 4.275)
+		(size 1.5 1.5)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "a98bd7ef-9ce6-429a-8538-9046123d5113")
+	)
+	(pad "SH" thru_hole circle
+		(at 2.475 4.275)
+		(size 1.5 1.5)
+		(drill 1)
+		(layers "*.Cu" "*.Mask")
+		(remove_unused_layers no)
+		(uuid "93c60978-aec6-4fe3-8aed-2fe7a5e3793d")
+	)
+	(pad "SH" smd rect
+		(at 3.4 4.275)
+		(size 1.2 0.7)
+		(layers "F.Cu" "F.Mask" "F.Paste")
+		(uuid "4574d945-090c-43ce-9c31-3068edd3d7c4")
+	)
+	(embedded_fonts no)
+)

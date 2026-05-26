@@ -1,0 +1,258 @@
+INA180, INA2180, INA4180 (INAx180)
+Low- and High-Side Voltage Output, Current-Sense Amplifiers
+Texas Instruments - SBOS741H - APRIL 2017 - REVISED JULY 2022
+
+Text extracted from TI datasheet PDF: https://www.ti.com/lit/ds/symlink/ina180.pdf
+
+================================================================================
+SECTION 1: FEATURES
+================================================================================
+
+- Common-mode range (VCM): -0.2 V to +26 V
+- High bandwidth: 350 kHz (A1 devices)
+- Offset voltage:
+  - +/-150 uV (maximum) at VCM = 0 V
+  - +/-500 uV (maximum) at VCM = 12 V
+- Output slew rate: 2 V/us
+- Accuracy:
+  - +/-1% gain error (maximum)
+  - 1-uV/C offset drift (maximum)
+- Gain options:
+  - 20 V/V (A1 devices)
+  - 50 V/V (A2 devices)
+  - 100 V/V (A3 devices)
+  - 200 V/V (A4 devices)
+- Quiescent current: 260 uA maximum (INA180)
+
+================================================================================
+SECTION 3: DESCRIPTION
+================================================================================
+
+The INA180, INA2180, and INA4180 (INAx180) current sense amplifiers are designed
+for cost-optimized applications. These devices are part of a family of current-sense
+amplifiers (also called current-shunt monitors) that sense voltage drops across
+current-sense resistors at common-mode voltages from -0.2 V to +26 V, independent
+of the supply voltage. The INAx180 integrate a matched resistor gain network in
+four, fixed-gain device options: 20 V/V, 50 V/V, 100 V/V, or 200 V/V. This matched
+gain resistor network minimizes gain error and reduces the temperature drift.
+
+All these devices operate from a single 2.7-V to 5.5-V power supply. The single-
+channel INA180 draws a maximum supply current of 260 uA; whereas, the dual-channel
+INA2180 draws a maximum supply current of 500 uA, and the quad channel draws a
+maximum supply current of 900 uA.
+
+The INA180 is available in a 5-pin, SOT-23 package with two different pin
+configurations. The INA2180 is available in 8-pin, VSSOP and WSON packages. The
+INA4180 is available in a 14-pin, TSSOP package. All device options are specified
+over the extended operating temperature range of -40C to +125C.
+
+Packaging Information:
+  INA180   - SOT-23 (5)  - 2.90 mm x 1.60 mm
+  INA2180  - VSSOP (8)   - 3.00 mm x 3.00 mm
+  INA2180  - WSON (8)    - 2.00 mm x 2.00 mm
+  INA4180  - TSSOP (14)  - 5.00 mm x 4.40 mm
+
+================================================================================
+SECTION 5: DEVICE COMPARISON
+================================================================================
+
+Table 5-1. Device Comparison
+
+  PRODUCT       | # CHANNELS | GAIN (V/V)
+  --------------|------------|----------
+  INA180A1 (1)  |     1      |    20
+  INA180A2 (1)  |     1      |    50
+  INA180A3 (1)  |     1      |   100
+  INA180A4 (1)  |     1      |   200
+  INA180B1 (1)  |     1      |    20
+  INA180B2 (1)  |     1      |    50
+  INA180B3 (1)  |     1      |   100
+  INA180B4 (1)  |     1      |   200
+  INA2180A1     |     2      |    20
+  INA2180A2     |     2      |    50
+  INA2180A3     |     2      |   100
+  INA2180A4     |     2      |   200
+  INA4180A1     |     4      |    20
+  INA4180A2     |     4      |    50
+  INA4180A3     |     4      |   100
+  INA4180A4     |     4      |   200
+
+(1) INA180A devices use pinout A. INA180B devices use pinout B.
+
+================================================================================
+SECTION 6: PIN CONFIGURATION AND FUNCTIONS
+================================================================================
+
+INA180: DBV Package 5-Pin SOT-23 (Pinout A) Top View
+  Pin 1 = OUT    (left top)
+  Pin 2 = GND    (left middle)
+  Pin 3 = IN+    (left bottom)
+  Pin 4 = IN-    (right bottom)
+  Pin 5 = VS     (right top)
+
+INA180: DBV Package 5-Pin SOT-23 (Pinout B) Top View
+  Pin 1 = IN+    (left top)
+  Pin 2 = GND    (left middle)
+  Pin 3 = IN-    (left bottom)
+  Pin 4 = OUT    (right bottom)
+  Pin 5 = VS     (right top)
+
+Table 6-1. Pin Functions: INA180 (Single Channel)
+
+  NAME  | Pinout A | Pinout B | TYPE          | DESCRIPTION
+  ------|----------|----------|---------------|--------------------------------------------
+  GND   |    2     |    2     | Analog        | Ground
+  IN-   |    4     |    3     | Analog input  | Current-sense amplifier negative input.
+        |          |          |               | High-side: connect to load side of Rsense.
+        |          |          |               | Low-side: connect to ground side of Rsense.
+  IN+   |    3     |    1     | Analog input  | Current-sense amplifier positive input.
+        |          |          |               | High-side: connect to bus-voltage side of Rsense.
+        |          |          |               | Low-side: connect to load side of Rsense.
+  OUT   |    1     |    4     | Analog output | Output voltage
+  VS    |    5     |    5     | Analog        | Power supply, 2.7 V to 5.5 V
+
+NOTE: INA180A1 uses Pinout A. INA180B1 uses Pinout B.
+
+================================================================================
+SECTION 7: SPECIFICATIONS
+================================================================================
+
+7.1 Absolute Maximum Ratings
+
+  Parameter                              | MIN        | MAX    | UNIT
+  ---------------------------------------|------------|--------|-----
+  Supply voltage, VS                     |            |   6    |  V
+  Analog inputs, differential            |  -26       |  26    |  V
+  Analog inputs, common-mode             | GND - 0.3  |  26    |  V
+  Output Voltage                         | GND - 0.3  | VS+0.3 |  V
+  Maximum output current, IOUT           |            |   8    | mA
+  Operating free-air temperature, TA     |  -55       | 150    |  C
+  Junction temperature, TJ              |            | 150    |  C
+  Storage temperature, Tstg             |  -65       | 150    |  C
+
+7.3 Recommended Operating Conditions
+
+  Parameter                              | MIN   | NOM  | MAX  | UNIT
+  ---------------------------------------|-------|------|------|-----
+  VCM  Common-mode input voltage         | -0.2  |  12  |  26  |  V
+  VS   Operating supply voltage          |  2.7  |   5  | 5.5  |  V
+  TA   Operating free-air temperature    |  -40  |      | 125  |  C
+
+7.4 Thermal Information
+
+  INA180 DBV (SOT23, 5 PINS):
+  RthetaJA = 197.1 C/W
+  RthetaJC(top) = 95.8 C/W
+  RthetaJB = 53.1 C/W
+
+7.5 Electrical Characteristics (at TA = 25C, VS = 5 V, VIN+ = 12 V)
+
+  PARAMETER                    | CONDITIONS                      | MIN   | TYP   | MAX   | UNIT
+  -----------------------------|--------------------------------|-------|-------|-------|------
+  INPUT
+  CMRR                        | VIN+=0-26V, Vsense=10mV        |  84   | 100   |       |  dB
+  VOS (VIN+=0V)                |                                |       | +/-25 | +/-150| uV
+  VOS (VIN+=12V)               |                                |       | +/-100| +/-500| uV
+  dVOS/dT                      | -40C to +125C                  |       |  0.2  |   1   | uV/C
+  PSRR                        | VS=2.7-5.5V, Vsense=10mV      |       | +/-8  | +/-40 | uV/V
+  IIB (VIN+=0V)                | Vsense=0mV                     |       |  0.1  |       | uA
+  IIB (VIN+=12V)               | Vsense=0mV                     |       |  80   |       | uA
+  IIO                          | Vsense=0mV                     |       | +/-0.05|      | uA
+
+  OUTPUT
+  Gain - A1 devices            |                                |       |  20   |       | V/V
+  Gain - A2 devices            |                                |       |  50   |       | V/V
+  Gain - A3 devices            |                                |       | 100   |       | V/V
+  Gain - A4 devices            |                                |       | 200   |       | V/V
+  EG Gain error                | VOUT=0.5-4.5V, -40 to +125C   | +/-0.1%|      | +/-1% |
+  Gain error vs temperature    | -40C to +125C                  |       |  1.5  |  20   | ppm/C
+  Nonlinearity error           | VOUT=0.5-4.5V                  |       |+/-0.01%|      |
+  Max capacitive load          |                                |       |       |   1   | nF
+
+  VOLTAGE OUTPUT
+  VSP Swing to VS              | RL=10k to GND                  |(VS)-0.02|     |(VS)-0.03| V
+  VSN Swing to GND             | RL=10k to GND                  |GND+0.0005|   |GND+0.005| V
+
+  FREQUENCY RESPONSE
+  BW - A1 devices              | CLOAD=10pF                     |       | 350   |       | kHz
+  BW - A2 devices              | CLOAD=10pF                     |       | 210   |       | kHz
+  BW - A3 devices              | CLOAD=10pF                     |       | 150   |       | kHz
+  BW - A4 devices              | CLOAD=10pF                     |       | 105   |       | kHz
+  SR Slew rate                 |                                |       |   2   |       | V/us
+
+  NOISE, RTI
+  Voltage noise density        |                                |       |  40   |       | nV/rtHz
+
+  POWER SUPPLY
+  IQ INA180                    | Vsense=10mV                    |       | 197   | 260   | uA
+  IQ INA180 (extended temp)    | Vsense=10mV, -40 to +125C     |       |       | 300   | uA
+  IQ INA2180                   | Vsense=10mV                    |       | 355   | 500   | uA
+  IQ INA4180                   | Vsense=10mV                    |       | 690   | 900   | uA
+
+================================================================================
+SECTION 8: DETAILED DESCRIPTION
+================================================================================
+
+8.1 Overview:
+The INA180, INA2180, and INA4180 (INAx180) are 26-V, common-mode, current-sensing
+amplifiers used in both low-side and high-side configurations.
+
+8.3.1 High Bandwidth and Slew Rate:
+Small-signal bandwidths as high as 350 kHz, large-signal slew rates of 2 V/us.
+
+8.3.2 Wide Input Common-Mode Voltage Range:
+-0.2 V to +26 V. Common-mode range is not restricted by the power-supply voltage (VS)
+as long as VS stays within 2.7 V to 5.5 V.
+
+8.3.3 Precise Low-Side Current Sensing:
+Offset voltage within +/-150 uV. Gain error within 1%.
+
+8.3.4 Rail-to-Rail Output Swing:
+Max swing to positive rail: 30 mV. Max swing to GND: 5 mV.
+
+8.4 Device Functional Modes:
+- Normal mode: VS = 2.7-5.5 V, VCM = -0.2 to +26 V
+- Input differential overload: output driven to rail, recovers ~20 us after fault
+- Shutdown mode: no dedicated shutdown pin, use external switch on VS
+
+================================================================================
+SECTION 9: APPLICATION AND IMPLEMENTATION
+================================================================================
+
+9.1.1 Basic Connections:
+- Connect IN+ and IN- as close as possible to shunt resistor (Kelvin connection)
+- Bypass capacitor: 0.1 uF minimum on VS pin
+
+9.1.2 RSENSE and Device Gain Selection:
+- Input resistance (RINT) by gain version:
+    A1 (20 V/V):  25 kohm
+    A2 (50 V/V):  10 kohm
+    A3 (100 V/V):  5 kohm
+    A4 (200 V/V): 2.5 kohm
+
+9.3 Power Supply Recommendations:
+- VS can be 5 V while bus voltage at IN+/IN- can be up to 26 V
+- Output voltage range limited by VS
+- Device withstands full 26 V differential at inputs even without power
+
+9.4 Layout Guidelines:
+- Use Kelvin (4-wire) connection to sense resistor
+- Place bypass cap as close as possible to VS and GND pins
+- Keep input trace lengths matched
+
+================================================================================
+ORDERING INFORMATION
+================================================================================
+
+INA180A1IDBVR - SOT-23, 5-pin, 3000/reel, Part marking: 18ID
+INA180A1IDBVT - SOT-23, 5-pin, 250/reel, Part marking: 18ID
+INA180A2IDBVR - Part marking: 1A8D
+INA180A3IDBVR - Part marking: 1A9D
+INA180A4IDBVR - Part marking: 1AAD
+INA180B1IDBVR - Part marking: 18RD
+INA180B2IDBVR - Part marking: 1ABD
+INA180B3IDBVR - Part marking: 1ACD
+INA180B4IDBVR - Part marking: 1ADD
+
+All INA180 variants: Active production status, RoHS compliant,
+Operating temperature: -40 to +125 C, MSL: Level-1-260C-UNLIM

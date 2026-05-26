@@ -1,0 +1,165 @@
+=== PAGE 1 ===
+  
+      
+ 
+  
+                                                                           Dated: 20/09/2016  Rev: 05  ® SEMTECH ELECTRONICS LTD. 
+ 
+ 1N4148W 
+ 
+Silicon Epitaxial Planar Switching Diode 
+ 
+ 
+Features 
+• SOD-123 package 
+• Fast switching • These diodes are also available in other case 
+style including the DO-35 case with the type 
+designation 1N4148, the MiniMELF case with the type designation LL4148 and the MicroMELF case with the type designation MCL4148. 
+ 
+  
+Absolute Maximum Ratings (T a = 25℃)  
+Parameter Symbol Value Unit 
+Peak Reverse Voltage VRM 100 V 
+Reverse Voltage VR 75 V 
+Average Rectified Forward Current IF(AV) 150 mA 
+Non-repetitive Peak Forward Surge Current at t = 1 s 
+at t = 1 ms at t = 1 μs I
+FSM 0.5 
+1 4 A 
+Power Dissipation Ptot 400 mW 
+Thermal Resistance from Junction to Ambient Air RθJA 312 ℃/W 
+Junction Temperature Tj 150 ℃ 
+Storage Temperature Range Tstg - 65 to + 150 ℃ 
+ 
+ 
+Characteristics at T a = 25℃ 
+Parameter Symbol Min. Max. Unit 
+Reverse Breakdown Voltage 
+at I R = 1 µA V(BR)R 75 - V 
+Forward Voltage 
+at I F = 1 mA 
+at I F = 10 mA 
+at I F = 50 mA 
+at I F = 150 mA VF  
+- - - -  
+0.715 0.855 
+1 
+1.25 V 
+Peak Reverse Current 
+at V R = 75 V 
+at V R = 20 V 
+at V R = 75 V, T J = 150℃ 
+at V R = 25 V, T J = 150℃ IR  
+- - - -  
+1 
+25 50 30  
+µA 
+nA 
+µA µA 
+Total Capacitance  
+at V R = 0 V, f = 1 MHz CT - 2 pF 
+Reverse Recovery Time 
+at I F = 10 mA, I rr = 1 mA, V R = 6 V, R L = 100 Ω trr - 4 ns Anode 2
+Top View 
+Marking Code: " W1" 
+Simplified outline SOD-123 and symbol1 2PINNING
+1PIN
+CathodeDESCRIPTION
+W1
+
+=== PAGE 2 ===
+  
+      
+ 
+  
+                                                                           Dated: 20/09/2016  Rev: 05  ® SEMTECH ELECTRONICS LTD. 
+ 
+ 1N4148W 
+ 
+ 
+                                    
+Reverse capacitance vs. reverse voltage  
+0.9
+Ctot (VR)
+Ctot (0 V)
+0.7
+0 20.81.01.1
+6
+VR (V)48 10Tj=25   C
+f=1MHzForward characteristics
+Tj=100   C
+IF (mA)10
+10
+-110
+0-21
+VF (V)1Tj=25   C10
+2103
+2~~~2nF
+5K
+Rectification Efficiency Measurement Circuit60
+VRF =2V
+Vo
+IR (nA)Leakage current vs. junction temperature  
+VR=20V5
+2
+102
+510
+Tj (   C)100103
+25
+2
+105
+2104
+200
+Reverse capacitance vs. reverse voltage  
+0.9
+Ctot (VR)
+Ctot (0 V)
+0.7
+0 20.81.01.1
+6
+VR (V)48 10Tj=25   C
+f=1MHz       Ambient Temperature: Ta ( C)O0 25 100 1500200400600Power Dissipation: Ptot (mW)Power Dissipation vs Ambient Temperature
+50 75 125500
+300
+100
+
+=== PAGE 3 ===
+  
+      
+ 
+  
+                                                                           Dated: 20/09/2016  Rev: 05  ® SEMTECH ELECTRONICS LTD. 
+ 
+ 1N4148W 
+ 
+ 
+PACKAGE OUTLINE 
+ 
+Plastic surface mounted package; 2 leads                                               SOD-123 
+ 
+ 
+ 
+ 
+                 
+ 
+ 
+ 
+ 
+ 
+    
+ 
+  
+E
+mmUNIT A b c DEHv ∠ALL ROUND∠
+Db c
+A
+A
+HHEp
+p E
+1.15
+1.050.6
+0.50.135
+0.1002.7
+2.61.65
+1.553.85
+3.550.2O5

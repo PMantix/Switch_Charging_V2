@@ -1,0 +1,242 @@
+=== PAGE 1 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page1of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretationSelectionGuide
+Certification PartNo.InputVoltage(VDC) OutputFullLoad
+Efficiency(%)
+Min./Typ.Capacitive
+Load(µF)
+Max.Nominal
+(Range)Voltage
+(VDC)Current(mA)
+Max./Min.
+--B0303S-1WR3
+3.3
+(2.97-3.63)3.3 303/30 75/79 2400
+B0305S-1WR3 5 200/20 78/82 2400
+B0309S-1WR3 9 111/11 81/85 1000
+B0312S-1WR3 12 83/8 78/82 560
+B0315S-1WR3 15 67/7 78/82 560
+B0324S-1WR3 24 42/4 80/84 220
+EN/BSENB0503S-1WR3
+5
+(4.5-5.5)3.3 303/30 70/74 2400
+B0505S-1WR3 5 200/20 78/82 2400
+B0509S-1WR3 9 111/12 79/83 1000
+B0512S-1WR3 12 84/9 79/83 560
+B0515S-1WR3 15 67/7 79/83 560
+B0524S-1WR3 24 42/4 81/85 220
+EN/BSEN/IECB1203S-1WR3
+12
+(10.8-13.2)3.3 303/30 71/75 2400
+B1205S-1WR3 5 200/20 76/80 2400
+B1209S-1WR3 9 111/12 76/80 1000
+B1212S-1WR3 12 83/9 76/80 560
+B1215S-1WR3 15 67/7 77/81 560
+B1224S-1WR3 24 42/5 77/81 220
+B1505S-1WR3
+15
+(13.5-16.5)5 200/20 76/80 2400
+B1509S-1WR3 9 111/12 76/80 1000
+B1512S-1WR3 12 83/9 76/80 560
+B1515S-1WR3 15 67/7 77/81 560
+-- B1524S-1WR3 24 42/5 77/81 220
+EN/BSEN/IECB2403S-1WR3
+24
+(21.6-26.4)3.3 303/30 69/75 2400
+B2405S-1WR3 5 200/20 73/79 2400
+B2409S-1WR3 9 111/12 74/80 1000
+B2412S-1WR3 12 83/9 75/81 560
+B2415S-1WR3 15 67/7 75/81 560
+B2424S-1WR3 24 42/5 75/81 220
+InputSpecifications
+Item OperatingConditions Min. Typ. Max. Unit
+InputCurrent
+(fullload/no-load)3.3Vinput3.3VDCoutput -- 384/10405/--
+mA
+Otheroutput -- 370/18389/--1WisolatedDC-DCconverter
+Fixedinputvoltage,unregulatedsingleoutput
+PatentProtection
+Report
+ReportCBRoHS
+EN62368-1BSEN62368-1IEC62368-1FEATURES
+Continuousshort-circuitprotection
+No-loadinputcurrentaslowas8mA
+Operatingambienttemperaturerange:
+-40℃to+105℃
+Highefficiencyupto85%
+I/Oisolationtestvoltage:1.5kVDC
+Industrystandardpin-out
+B_S-1WR3seriesarespeciallydesignedforapplicationswhereanisolatedvoltageisrequiredinadistributedpowersupplysystem.Theyare
+suitablefor:puredigitalcircuits,lowfrequencyanalogcircuits,relay-drivencircuitsanddataswitchingcircuits.
+
+=== PAGE 2 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page2of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretationInputCurrent
+(fullload/no-load)5Vinput3.3VDCoutput -- 271/8286/--
+mA5VDCoutput -- 244/8257/--
+9VDC/12VDC/15VDCoutput -- 241/12254/--
+24VDCoutput -- 241/18254/--
+12Vinput3.3VDCoutput -- 112/8118/--
+5VDC/9VDC/12VDCoutput -- 105/8110/--
+15VDC/24VDCoutput -- 103/8109/--
+15Vinput5VDC/9VDC/12VDCoutput -- 84/8 88/--
+15VDC/24VDCoutput -- 83/8 87/--
+24Vinput3.3VDCoutput -- 56/8 61/--
+5VDCoutput -- 53/8 58/--
+9VDCoutput -- 53/8 57/--
+12VDC/15VDC/24VDCoutput -- 52/8 56/--
+ReflectedRippleCurrent -- 15 --
+SurgeVoltage(1sec.max.)3.3VDCinput -0.7 -- 5
+VDC5VDCinput -0.7 -- 9
+12VDCinput -0.7 -- 18
+15VDCinput -0.7 -- 21
+24VDCinput -0.7 -- 30
+InputFilter Capacitancefilter
+HotPlug Unavailable
+Note:*RefertoDC-DCConverterApplicationNotesfordetaileddescriptionofreflectedripplecurrenttestmethod.
+OutputSpecifications
+Item OperatingConditions Min. Typ. Max. Unit
+VoltageAccuracy Seeoutputregulationcurves(Fig.1)
+LinearRegulation Inputvoltagechange:±1%3.3VDCoutput -- -- 1.5
+--
+Otheroutput -- -- 1.2
+LoadRegulation3.3VDCinput
+10%-100%load3.3VDCoutput -- 12 18
+%Otheroutput -- 8 15
+5VDCinput
+10%-100%load3.3VDCoutput -- 15 20
+5VDCoutput -- 10 15
+9VDCoutput -- 8 10
+12VDCoutput -- 7 10
+15VDCoutput -- 6 10
+24VDCoutput -- 5 10
+12VDC/15VDC/24VVDCinput
+10%-100%load3.3VDCoutput -- 8 20
+5VDCoutput -- 5 15
+9VDCoutput -- 3 10
+12VDCoutput -- 3 10
+15VDCoutput -- 3 10
+24VDCoutput -- 2 10
+Ripple&Noise* 20MHzbandwidthOtheroutput -- 30 75
+mVp-p
+24VDCoutput -- 50 100
+TemperatureCoefficientFullload -- ±0.02 -- %/℃
+Short-CircuitProtection Continuous,self-recovery
+Note:*The“parallelcable”methodisusedforRippleandNoisetest,pleaserefertoDC-DCConverterApplicationNotesforspecificinformation.
+
+=== PAGE 3 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page3of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretationGeneralSpecifications
+Item OperatingConditions Min. Typ. Max. Unit
+IsolationInput-outputelectricstrengthtestfor1minutewitha
+leakagecurrentof1mAmax.1500 -- --
+VDC5Vinput,input-outputelectricstrengthtestfor1
+secondwithaleakagecurrentof1mAmax.3000 -- --
+InsulationResistance Input-outputresistanceat500VDC 1000 -- -- MΩ
+IsolationCapacitanceInput-outputcapacitanceat100kHz/0.1V -- 20 -- pF
+OperatingTemperature3.3VinputDeratingwhenoperating
+temperature≥100℃,(seeFig.2)-40 -- 105
+℃OtherinputDeratingwhenoperating
+temperature≥85℃,(seeFig.2)
+StorageTemperature -55 -- 125
+CaseTemperatureRiseTa=25℃ -- 25 --
+PinSolderingResistance
+TemperatureSolderingspotis1.5mmawayfromcasefor10seconds-- -- 300
+StorageHumidity Non-condensing5Vinput -- -- 95
+%RH
+Otheroutput 5 -- 95
+Vibration 3.3V/12V/15V/24Vinput 10-150Hz,5G,0.75mm.alongX,YandZ
+SwitchingFrequency3.3Vinput,fullload,nominalinputvoltage -- 220 --
+kHz 5Vinput,fullload,nominalinputvoltage -- 270 --
+12V/15V/24Vinput,fullload,nominalinputvoltage -- 260 --
+MTBF MIL-HDBK-217F@25℃ 3500 -- -- khours
+ElectromagneticCompatibility(EMC)
+EmissionsCE CISPR32/EN55032CLASSB
+RE CISPR32/EN55032CLASSB
+Immunity ESD IEC/EN61000-4-2Air±8kV,Contact±6kVperf.CriteriaB
+Note:RefertoFig.4forrecommendedcircuittest.
+TypicalCharacteristicCurves
+3.3VDCoutput
+3.3/5VDCinputotheroutput
+MechanicalSpecifications
+CaseMaterial Blackplastic;flame-retardantandheat-resistant(UL94V-0)
+Dimensions 11.60x6.00x10.16mm
+Weight 1.3g(Typ.)
+CoolingMethod Freeairconvection
+
+
+=== PAGE 4 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page4of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretation12VDC/15VDC/24VDCinput
+Otheroutput
+Fig.1
+3.3VDCinput
+ 5VDC/12VDC/15VDC/24VDCinput
+Fig.2
+
+
+=== PAGE 5 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page5of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretation
+DesignReference
+1.Typicalapplication
+Inputand/oroutputripplecanbefurtherreduced,byconnectingafiltercapacitorfromtheinputand/oroutputterminalstogroundas
+showninFig.3.
+Choosingsuitablefiltercapacitorvaluesisveryimportantforasmoothoperationofthemodules,particularlytoavoidstart-upproblems
+causedbycapacitorvaluesthataretoohigh.ForrecommendedinputandoutputcapacitorvaluesrefertoTable1.
+Vin
+GND+Vo
+0VDC Cin DC Cout
+Fig.3Table1:Recommendedinputandoutputcapacitorvalues
+Vin Cin Vo Cout
+3.3VDC10µF/25V3.3VDC10µF/16V
+5VDC4.7µF/16V5VDC10µF/16V
+12VDC2.2µF/25V9VDC2.2µF/16V
+15VDC2.2µF/25V12VDC2.2µF/25V
+24VDC1µF/50V15VDC1µF/25V
+-- -- 24VDC1µF/50V
+2.EMCcompliancecircuit
+Fig.4
+Table2:RecommendedEMCfiltervalues
+Inputvoltage 3.3DVC 5DVC 12/15/24DVC
+Outputvoltage3.3/5VDC9/12/15/24VDC3.3/5/9VDC12/15/24VDC --
+EmissionsC1/C24.7µF/16V4.7µF/16V4.7µF/25V4.7µF/25V4.7µF/50V
+CY--270pF/4kVDC
+VISHAY
+HGZ102MBP100pF/4kV1000pF/4kV270pF/2kV
+C3 RefertotheCoutintable1
+LDM 6.8µH
+3.ForadditionalinformationpleaserefertoDC-DCconverterapplicationnoteson
+www.mornsun-power.com
+(Vin=12V)
+
+=== PAGE 6 ===
+DC/DCConverter
+B_S-1WR3Series
+2024.09.10-A/6 Page6of6
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.reservesthecopyrightandrightoffinalinterpretationDimensionsandRecommendedLayout
+Notes:
+1.ForadditionalinformationonProductPackagingpleaserefertowww.mornsun-power.com.Packagingbagnumber:58200003;
+2.Iftheproductisnotoperatedwithintherequiredloadrange,theproductperformancecannotbeguaranteedtocomplywithall
+parametersinthedatasheet;
+3.Themaximumcapacitiveloadofferedweretestedatinputvoltagerangeandfullload;
+4.Unlessotherwisespecified,parametersinthisdatasheetweremeasuredundertheconditionsofTa=25℃,humidity<75%RHwithnominal
+inputvoltageandratedoutputload;
+5.Allindextestingmethodsinthisdatasheetarebasedonourcompanycorporatestandards;
+6.Wecanprovideproductcustomizationservice,pleasecontactourtechniciansdirectlyforspecificinformation;
+7.Productsarerelatedtolawsandregulations:see"Features"and"EMC";
+8.OurproductsshallbeclassifiedaccordingtoISO14001andrelatedenvironmentallawsandregulations,andshallbehandledby
+qualifiedunits.
+MORNSUNGuangzhouScience&TechnologyCo.,Ltd.
+Address:No.8Nanyun4thRoad,HuangpuDistrict,Guangzhou,China
+Tel:86-20-38601850 Fax:86-20-38601272 E-mail:info@mornsun.cn www.mornsun-power.com
