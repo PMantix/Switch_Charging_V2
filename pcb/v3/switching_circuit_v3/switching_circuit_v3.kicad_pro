@@ -642,13 +642,18 @@
       {
         "filename": "switching_circuit_v3.kicad_sch",
         "name": "switching_circuit_v3",
-        "uuid": "00000000-0000-0000-0000-000000000000"
+        "uuid": "11111111-1111-1111-1111-111111111111"
       }
     ],
-    "used_designators": "D_LED_AUTO1,C_BTN_A1,J2a1,D_LED_REC1,C_BTN_B1,C_BTN_C1,Q_RP1,D_TVS1,SW_A1,D_LED_PWR1,R_BTN_A1,D_NEO1,J2b1,L_AVDD1,R_LED_PWR1,PWR_FLAG_5V1,PWR_FLAG_AGND1,PWR_FLAG_CAN1,PWR_FLAG_CBN1,PWR_FLAG_GND1,R_BTN_C1,PWR_FLAG_HV1,R_BTN_B1,R_CYC_GND1,R_LED_AUTO1,R_LED_REC1,R_RP1,R_SCL1,R_SDA1,SW_B1,SW_C1,TP_CYC_N1,TP_CYC_P1,TP_NEO_DIN1,TP_NEO_GND1,TP_NEO_VDD1",
+    "used_designators": "",
     "variants": []
   },
-  "sheets": [],
+  "sheets": [
+    [
+      "11111111-1111-1111-1111-111111111111",
+      "switching_circuit_v3"
+    ]
+  ],
   "text_variables": {},
   "tuning_profiles": {
     "meta": {

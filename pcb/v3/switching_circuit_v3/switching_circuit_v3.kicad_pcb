@@ -27443,5 +27443,37 @@
 			)
 		)
 	)
+	(gr_rect
+		(start 16.5 106)
+		(end 22.5 128)
+		(stroke
+			(width 0.2)
+			(type default)
+		)
+		(fill no)
+		(layer "F.Cu")
+		(uuid "c99e6e1d-f7ef-4fc2-b902-ac31e88b8a24")
+	)
+	(zone
+		(net "CYCLER_IN+")
+		(layer "F.Cu")
+		(uuid "580c7c56-86ce-453c-a923-bfaad227fd18")
+		(name "In_pad_+")
+		(hatch edge 0.5)
+		(connect_pads
+			(clearance 0.5)
+		)
+		(min_thickness 0.25)
+		(fill
+			(thermal_gap 0.5)
+			(thermal_bridge_width 0.5)
+			(island_removal_mode 0)
+		)
+		(polygon
+			(pts
+				(xy 16.5 106) (xy 22.5 106) (xy 22.5 128) (xy 16.5 128)
+			)
+		)
+	)
 	(embedded_fonts no)
 )
