@@ -104,7 +104,7 @@ PIN_SCL = 7   # GP7 → INA226 I2C SCL
 # handler latches that as "fresh data available", the stream loop reads
 # the shunt/bus registers, then reads register 06h on each chip to clear
 # CVRF (and release the ALERT line) before arming the next sweep.
-PIN_ALERT = 27
+PIN_ALERT = 29
 
 PIN_NEOPIXEL = 16  # GP16 → onboard WS2812
 
@@ -112,7 +112,7 @@ PIN_NEOPIXEL = 16  # GP16 → onboard WS2812
 INA226_ADDRS = {
     "P1": 0x40,
     "P2": 0x41,
-    "N1": 0x43,
+    "N1": 0x49,
     "N2": 0x45,
 }
 

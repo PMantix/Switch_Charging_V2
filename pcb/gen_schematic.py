@@ -654,7 +654,7 @@ for ref, pos, nets in [
     add(Part(ref, "Device:C", pos, value=value, footprint=fp, pin_nets=nets))
 
 # ---------- B0512S isolated supplies ----------
-# switching_circuit_v2:B0512S_1WR3 pins: 1=Vin+, 2=Vin-, 3=Vout+, 4=Vout-
+# switching_circuit_v2:B0512S_1WR3 pins: 1=Vin-, 2=Vin+, 3=Vout-, 4=Vout+
 add(
     Part(
         "PS1",
@@ -663,10 +663,10 @@ add(
         value="B0512S-1WR3",
         footprint="switching_circuit_v2:B0512S_1WR3_SIP4",
         pin_nets={
-            "1": "+5V",
-            "2": "GND",
-            "3": "VCC2_P1",
-            "4": "CELL_A_POS",
+            "1": "GND",
+            "2": "+5V",
+            "3": "CELL_A_POS",
+            "4": "VCC2_P1",
         },
         fields={"MPN": "B0512S-1WR3"},
     )
@@ -679,10 +679,10 @@ add(
         value="B0512S-1WR3",
         footprint="switching_circuit_v2:B0512S_1WR3_SIP4",
         pin_nets={
-            "1": "+5V",
-            "2": "GND",
-            "3": "VCC2_P2",
-            "4": "CELL_B_POS",
+            "1": "GND",
+            "2": "+5V",
+            "3": "CELL_B_POS",
+            "4": "VCC2_P2",
         },
         fields={"MPN": "B0512S-1WR3"},
     )

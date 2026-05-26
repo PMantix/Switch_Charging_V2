@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Switching Circuit V2 — Connection Verification</title>
+<script src="https://unpkg.com/vis-network@9.1.9/standalone/umd/vis-network.min.js"></script>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --text: #f5f5f5;
+    --text-dim: #a0a0b8;
+    --green: #00e676;
+    --green-dim: #1b5e20;
+    --red: #ff1744;
+    --red-dim: #b71c1c;
+    --gray: #555;
+    --amber: #ffc107;
+    --blue: #448aff;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--surface2);
+    flex-shrink: 0;
+  }
+  #toolbar h1 { font-size: 14px; font-weight: 600; white-space: nowrap; }
+  .progress-bar {
+    flex: 1;
+    max-width: 300px;
+    height: 8px;
+    background: var(--gray);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .progress-fill {
+    height: 100%;
+    background: var(--green);
+    transition: width 0.3s;
+  }
+  .progress-text { font-size: 11px; color: var(--text-dim); white-space: nowrap; }
+  .toolbar-btn {
+    padding: 4px 12px;
+    background: var(--surface2);
+    border: 1px solid var(--gray);
+    color: var(--text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+  }
+  .toolbar-btn:hover { background: var(--blue); border-color: var(--blue); }
+  #filter-select {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--gray);
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 11px;
+  }
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+  #sidebar {
+    width: 380px;
+    min-width: 300px;
+    background: var(--surface);
+    border-right: 1px solid var(--surface2);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  #conn-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 4px;
+  }
+  #conn-list::-webkit-scrollbar { width: 6px; }
+  #conn-list::-webkit-scrollbar-thumb { background: var(--gray); border-radius: 3px; }
+  .group-header {
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--blue);
+    padding: 8px 8px 4px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    position: sticky;
+    top: 0;
+    background: var(--surface);
+    z-index: 1;
+  }
+  .conn-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    border: 1px solid transparent;
+    transition: all 0.15s;
+  }
+  .conn-item:hover { background: rgba(255,255,255,0.07); }
+  .conn-item.selected { border-color: var(--blue); background: rgba(68,138,255,0.15); }
+  .conn-item.st-approved { background: rgba(0,230,118,0.07); border-left: 3px solid var(--green); }
+  .conn-item.st-approved .conn-label { color: #c8f7d5; }
+  .conn-item.st-flagged { background: rgba(255,23,68,0.1); border-left: 3px solid var(--red); }
+  .conn-item.st-flagged .conn-label { color: #ffaaaa; }
+  .conn-item.st-unchecked { border-left: 3px solid transparent; }
+  .conn-item.st-unchecked .conn-label { color: #888; }
+  .conn-item .status-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    border: 1px solid;
+  }
+  .conn-item .status-dot.unchecked { background: var(--gray); border-color: #777; }
+  .conn-item .status-dot.approved { background: var(--green); border-color: var(--green); box-shadow: 0 0 6px var(--green); }
+  .conn-item .status-dot.flagged { background: var(--red); border-color: var(--red); box-shadow: 0 0 6px var(--red); animation: pulse-red 1.5s infinite; }
+  @keyframes pulse-red { 0%,100% { box-shadow: 0 0 4px var(--red); } 50% { box-shadow: 0 0 12px var(--red); } }
+  .conn-item .conn-label { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+  .conn-item .conn-net { font-size: 10px; color: var(--text-dim); }
+
+  #graph-area {
+    flex: 1;
+    position: relative;
+  }
+  #graph-container { width: 100%; height: 100%; }
+
+  #detail-panel {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    width: 400px;
+    max-height: calc(100% - 32px);
+    background: var(--surface);
+    border: 1px solid var(--surface2);
+    border-radius: 8px;
+    padding: 16px;
+    display: none;
+    overflow-y: auto;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+    z-index: 10;
+  }
+  #detail-panel.visible { display: block; }
+  #detail-panel h2 { font-size: 16px; margin-bottom: 10px; color: #fff; }
+  #detail-panel .detail-section { margin-bottom: 14px; }
+  #detail-panel .detail-label { font-size: 11px; color: var(--amber); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; font-weight: 600; }
+  #detail-panel .detail-value { font-size: 13px; line-height: 1.6; color: #ddd; }
+  #detail-panel .net-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--surface2);
+    border-radius: 3px;
+    font-size: 12px;
+    color: var(--amber);
+    margin: 2px 0;
+    font-weight: 600;
+  }
+  #detail-panel .pin-info { color: #82b1ff; font-size: 13px; font-weight: 600; }
+  .datasheet-link {
+    display: inline-block;
+    padding: 3px 10px;
+    background: var(--surface2);
+    border: 1px solid var(--blue);
+    border-radius: 4px;
+    color: var(--blue);
+    text-decoration: none;
+    font-size: 12px;
+    margin: 2px 4px 2px 0;
+    transition: all 0.15s;
+  }
+  .datasheet-link:hover { background: var(--blue); color: #fff; }
+  .status-buttons { display: flex; gap: 8px; margin-top: 12px; }
+  .status-btn {
+    flex: 1;
+    padding: 8px;
+    border: 2px solid;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    transition: all 0.15s;
+  }
+  .status-btn.approve { border-color: var(--green); color: var(--green); background: transparent; }
+  .status-btn.approve:hover, .status-btn.approve.active { background: var(--green); color: #000; }
+  .status-btn.flag { border-color: var(--red); color: var(--red); background: transparent; }
+  .status-btn.flag:hover, .status-btn.flag.active { background: var(--red); color: #fff; }
+  .status-btn.reset { border-color: var(--gray); color: var(--text-dim); background: transparent; }
+  .status-btn.reset:hover { background: var(--gray); color: #fff; }
+  #detail-notes {
+    width: 100%;
+    min-height: 60px;
+    background: var(--bg);
+    border: 1px solid var(--gray);
+    border-radius: 4px;
+    color: var(--text);
+    padding: 8px;
+    font-family: inherit;
+    font-size: 11px;
+    resize: vertical;
+    margin-top: 4px;
+  }
+  .close-btn {
+    position: absolute;
+    top: 8px;
+    right: 12px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+  }
+  .close-btn:hover { color: var(--text); }
+  .legend {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--text-dim);
+    align-items: center;
+  }
+  .legend-item { display: flex; align-items: center; gap: 4px; }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+</style>
+</head>
+<body>
+
+<div id="toolbar">
+  <h1>SCV2 Connection Verification</h1>
+  <div class="legend">
+    <div class="legend-item"><div class="legend-dot" style="background:var(--gray)"></div>Unchecked</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--green);box-shadow:0 0 4px var(--green)"></div>Approved</div>
+    <div class="legend-item"><div class="legend-dot" style="background:var(--red);box-shadow:0 0 4px var(--red)"></div>Flagged</div>
+  </div>
+  <select id="filter-select">
+    <option value="all">All Groups</option>
+  </select>
+  <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+  <span class="progress-text" id="progress-text">0 / 0</span>
+  <button class="toolbar-btn" onclick="saveState()">Save JSON</button>
+  <button class="toolbar-btn" onclick="document.getElementById('load-input').click()">Load JSON</button>
+  <input type="file" id="load-input" accept=".json" style="display:none" onchange="loadState(event)">
+</div>
+
+<div id="main">
+  <div id="sidebar">
+    <div id="conn-list"></div>
+  </div>
+  <div id="graph-area">
+    <div id="graph-container"></div>
+    <div id="detail-panel">
+      <button class="close-btn" onclick="closeDetail()">&times;</button>
+      <h2 id="detail-title"></h2>
+      <div class="detail-section">
+        <div class="detail-label">Connection</div>
+        <div class="detail-value" id="detail-pins"></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Net</div>
+        <div class="detail-value" id="detail-net"></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Why This Connection Is Correct</div>
+        <div class="detail-value" id="detail-rationale"></div>
+      </div>
+      <div class="detail-section">
+        <div class="detail-label">Specs / Verification</div>
+        <div class="detail-value" id="detail-specs"></div>
+      </div>
+      <div class="detail-section" id="detail-datasheet-section" style="display:none">
+        <div class="detail-label">Datasheets</div>
+        <div class="detail-value" id="detail-datasheets"></div>
+      </div>
+      <div class="status-buttons">
+        <button class="status-btn approve" onclick="setStatus('approved')">Approve</button>
+        <button class="status-btn flag" onclick="setStatus('flagged')">Flag Issue</button>
+        <button class="status-btn reset" onclick="setStatus('unchecked')">Reset</button>
+      </div>
+      <div class="detail-section" style="margin-top:12px">
+        <div class="detail-label">Notes</div>
+        <textarea id="detail-notes" placeholder="Add verification notes..." oninput="saveNotes()"></textarea>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CONNECTION DATA — every verifiable connection on the V2 PCB
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CONNECTIONS = [
+
+// ── Power Input Protection ──────────────────────────────────────────────────
+{
+  id:'pwr_01', group:'Power Input', label:'J1 → F1 (Cycler+)',
+  from:'J1', fromPins:'1,2', to:'F1', toPins:'1', net:'CYCLER_IN+',
+  rationale:'Cycler positive input enters via screw terminal J1 (pins 1+2 ganged for current capacity) and feeds directly into polyfuse F1 for overcurrent protection. The doubled pins handle the 3A continuous current without exceeding terminal ratings.',
+  specs:'F1: PPTC polyfuse, 3A hold / 6A trip, 1812 package. Verify < 50 mΩ continuity from J1 pin 1 to F1 pad 1.'
+},
+{
+  id:'pwr_02', group:'Power Input', label:'F1 → Q_RP (post-fuse)',
+  from:'F1', fromPins:'2', to:'Q_RP', toPins:'2', net:'+HV_PREFUSE',
+  rationale:'Post-fuse rail connects to the source of P-channel MOSFET Q_RP. In correct polarity, the P-ch gate is pulled low (to CYCLER_IN- ≈ GND) so Vgs is negative → FET conducts, passing +HV_PREFUSE through to +HV.',
+  specs:'Q_RP: AO3401A (P-ch, SOT-23, Rds(on) 44mΩ @ Vgs=-4.5V). Pin 2 = Source. Verify continuity F1 pad 2 → Q_RP pin 2.'
+},
+{
+  id:'pwr_03', group:'Power Input', label:'Q_RP gate bias (R_RP)',
+  from:'R_RP', fromPins:'1', to:'R_RP', toPins:'2', net:'+HV_PREFUSE / GND',
+  rationale:'R_RP pulls Q_RP gate to source (+HV_PREFUSE side) when no external drive is present. In normal operation, CYCLER_IN- ties to GND, so the gate sees ~0V while source sees +HV → Vgs < 0 → P-ch ON. If polarity is reversed, Vgs ≈ 0 → P-ch OFF, blocking reverse current.',
+  specs:'R_RP: 10 kΩ, 0603. Pin 1 → +HV_PREFUSE, Pin 2 → GND. Verify 10 kΩ between Q_RP source and gate.'
+},
+{
+  id:'pwr_04', group:'Power Input', label:'Q_RP drain → +HV',
+  from:'Q_RP', fromPins:'3', to:'D_TVS', toPins:'2', net:'+HV',
+  rationale:'Q_RP drain is the protected +HV rail output. All downstream power (shunts, FET drains) sources from this node. TVS diode clamps transients.',
+  specs:'Verify continuity Q_RP pin 3 (drain) to +HV rail. Should read < 1Ω when Q_RP is conducting (correct polarity applied).'
+},
+{
+  id:'pwr_05', group:'Power Input', label:'D_TVS (+HV clamp)',
+  from:'D_TVS', fromPins:'1,2', to:'D_TVS', toPins:'1,2', net:'+HV / GND',
+  rationale:'Bidirectional TVS diode clamps +HV rail transients. 12V standoff allows normal cycler voltages (2.65–10V) while clamping spikes from inductive loads or hot-plugging.',
+  specs:'SMBJ12CA: 12V standoff, 19.9V clamping @ 1A. SMB package. Pin 1 = GND, Pin 2 = +HV. Should read open-circuit in both directions at < 12V.'
+},
+{
+  id:'pwr_06', group:'Power Input', label:'C_BULK1 (+HV bulk)',
+  from:'C_BULK1', fromPins:'1,2', to:'C_BULK1', toPins:'1,2', net:'+HV / GND',
+  rationale:'10 µF bulk capacitor absorbs low-frequency ripple and provides local charge reservoir for the switching FETs.',
+  specs:'10 µF, X5R, 25V, 0805. Pin 1 = +HV, Pin 2 = GND.'
+},
+{
+  id:'pwr_07', group:'Power Input', label:'C_BULK2 (+HV HF bypass)',
+  from:'C_BULK2', fromPins:'1,2', to:'C_BULK2', toPins:'1,2', net:'+HV / GND',
+  rationale:'100 nF ceramic bypasses high-frequency noise on the +HV rail, complementing the 10 µF bulk cap.',
+  specs:'100 nF, X7R, 25V, 0603. Pin 1 = +HV, Pin 2 = GND.'
+},
+{
+  id:'pwr_08', group:'Power Input', label:'J1 → R_CYC_GND (Cycler−)',
+  from:'J1', fromPins:'3,4', to:'R_CYC_GND', toPins:'1', net:'CYCLER_IN-',
+  rationale:'Cycler negative enters J1 pins 3+4 (ganged). Kept as a separate net from GND — not every cycler is earth-referenced. Tied to GND through R_CYC_GND.',
+  specs:'Verify continuity J1 pin 3 → R_CYC_GND pad 1.'
+},
+{
+  id:'pwr_09', group:'Power Input', label:'R_CYC_GND (neg tie)',
+  from:'R_CYC_GND', fromPins:'1,2', to:'R_CYC_GND', toPins:'1,2', net:'CYCLER_IN- / GND',
+  rationale:'0Ω resistor ties CYCLER_IN- to system GND. Can be removed (desoldered) if the cycler requires a floating negative return. 0805 package for easy rework.',
+  specs:'0Ω, 0805. Verify < 1Ω between CYCLER_IN- and GND nets.'
+},
+{
+  id:'pwr_10', group:'Power Input', label:'C_5V1 (5V bulk)',
+  from:'C_5V1', fromPins:'1,2', to:'C_5V1', toPins:'1,2', net:'+5V / GND',
+  rationale:'10 µF bulk decoupling on the +5V rail (sourced from RP2040-Zero USB VBUS). Absorbs inrush from B0512S DC-DC converters.',
+  specs:'10 µF, X5R, 16V, 0805. Pin 1 = +5V, Pin 2 = GND.'
+},
+{
+  id:'pwr_11', group:'Power Input', label:'C_5V2 (5V HF bypass)',
+  from:'C_5V2', fromPins:'1,2', to:'C_5V2', toPins:'1,2', net:'+5V / GND',
+  rationale:'100 nF high-frequency bypass on +5V rail.',
+  specs:'100 nF, X7R, 25V, 0603. Pin 1 = +5V, Pin 2 = GND.'
+},
+
+// ── Power Stage P1 (High-Side → CELL_A_POS) ────────────────────────────────
+{
+  id:'stg_p1_01', group:'Stage P1 (HS-A)', label:'R_SH_P1 (+HV → +HV_P1)',
+  from:'R_SH_P1', fromPins:'1', to:'Q1', toPins:'3', net:'+HV / +HV_P1',
+  rationale:'50 mΩ current sense shunt in the P1 high-side path. INA226 (U_INA_P1) measures voltage drop across this resistor. Pin 1 on the +HV side, Pin 2 on the +HV_P1 (FET drain) side.',
+  specs:'0.05Ω ±1%, 1W, 2512 metal strip. At 3A → 150 mV drop, 450 mW dissipation. Verify 0.05Ω between +HV and +HV_P1.'
+},
+{
+  id:'stg_p1_02', group:'Stage P1 (HS-A)', label:'Q1 (P1 FET)',
+  from:'Q1', fromPins:'1,2,3', to:'Q1', toPins:'1,2,3', net:'GATE_P1_OUT / CELL_A_POS / +HV_P1',
+  rationale:'N-channel MOSFET switches +HV_P1 rail to CELL_A_POS cell tab. Gate driven by UCC5304 U1 via 10Ω series resistor. High-side N-ch requires bootstrap/isolated gate supply (VCC2_P1 from PS1) to achieve Vgs > Vth above the source potential.',
+  specs:'AO3400A: N-ch, SOT-23, Vds=30V, Id=5.8A, Rds(on)=20mΩ @ Vgs=4.5V. Pin 1=Gate (GATE_P1_OUT), Pin 2=Source (CELL_A_POS), Pin 3=Drain (+HV_P1).'
+},
+{
+  id:'stg_p1_03', group:'Stage P1 (HS-A)', label:'Rgpd_1 (P1 gate pulldown)',
+  from:'Rgpd_1', fromPins:'1,2', to:'Rgpd_1', toPins:'1,2', net:'GATE_P1_OUT / CELL_A_POS',
+  rationale:'10 kΩ pulldown from Q1 gate to source (CELL_A_POS). Ensures FET stays OFF when the UCC5304 output is tri-stated or floating (e.g., during power-up before driver initializes).',
+  specs:'10 kΩ, 0603. Pin 1 = GATE_P1_OUT, Pin 2 = CELL_A_POS. Verify 10 kΩ from Q1 gate to Q1 source.'
+},
+
+// ── Power Stage P2 (High-Side → CELL_B_POS) ────────────────────────────────
+{
+  id:'stg_p2_01', group:'Stage P2 (HS-B)', label:'R_SH_P2 (+HV → +HV_P2)',
+  from:'R_SH_P2', fromPins:'1', to:'Q2', toPins:'3', net:'+HV / +HV_P2',
+  rationale:'50 mΩ current sense shunt in the P2 high-side path. INA226 (U_INA_P2) measures voltage drop across this resistor.',
+  specs:'0.05Ω ±1%, 1W, 2512 metal strip. Verify 0.05Ω between +HV and +HV_P2.'
+},
+{
+  id:'stg_p2_02', group:'Stage P2 (HS-B)', label:'Q2 (P2 FET)',
+  from:'Q2', fromPins:'1,2,3', to:'Q2', toPins:'1,2,3', net:'GATE_P2_OUT / CELL_B_POS / +HV_P2',
+  rationale:'N-channel MOSFET switches +HV_P2 rail to CELL_B_POS cell tab. Gate driven by UCC5304 U2 via 10Ω series resistor. Isolated supply VCC2_P2 from PS2.',
+  specs:'AO3400A: Pin 1=Gate (GATE_P2_OUT), Pin 2=Source (CELL_B_POS), Pin 3=Drain (+HV_P2).'
+},
+{
+  id:'stg_p2_03', group:'Stage P2 (HS-B)', label:'Rgpd_2 (P2 gate pulldown)',
+  from:'Rgpd_2', fromPins:'1,2', to:'Rgpd_2', toPins:'1,2', net:'GATE_P2_OUT / CELL_B_POS',
+  rationale:'10 kΩ pulldown from Q2 gate to source (CELL_B_POS). Holds FET off when driver is floating.',
+  specs:'10 kΩ, 0603. Pin 1 = GATE_P2_OUT, Pin 2 = CELL_B_POS.'
+},
+
+// ── Power Stage N1 (Low-Side ← CELL_A_NEG) ─────────────────────────────────
+{
+  id:'stg_n1_01', group:'Stage N1 (LS-A)', label:'Q3 (N1 FET)',
+  from:'Q3', fromPins:'1,2,3', to:'Q3', toPins:'1,2,3', net:'GATE_N1_OUT / GND_N1 / CELL_A_NEG',
+  rationale:'N-channel MOSFET switches CELL_A_NEG tab to GND via shunt R_SH_N1. Low-side FET — gate driven directly by UCC5304 U3 referenced to system GND. No isolated supply needed.',
+  specs:'AO3400A: Pin 1=Gate (GATE_N1_OUT), Pin 2=Source (GND_N1), Pin 3=Drain (CELL_A_NEG).'
+},
+{
+  id:'stg_n1_02', group:'Stage N1 (LS-A)', label:'R_SH_N1 (GND_N1 → GND)',
+  from:'Q3', fromPins:'2', to:'R_SH_N1', toPins:'1', net:'GND_N1 / GND',
+  rationale:'50 mΩ current sense shunt in the N1 low-side return path. INA226 (U_INA_N1) measures voltage drop across this resistor.',
+  specs:'0.05Ω ±1%, 1W, 2512 metal strip. Pin 1 = GND_N1 (FET source side), Pin 2 = GND.'
+},
+{
+  id:'stg_n1_03', group:'Stage N1 (LS-A)', label:'Rgpd_3 (N1 gate pulldown)',
+  from:'Rgpd_3', fromPins:'1,2', to:'Rgpd_3', toPins:'1,2', net:'GATE_N1_OUT / GND_N1',
+  rationale:'10 kΩ pulldown from Q3 gate to source (GND_N1). Holds FET off when driver is floating.',
+  specs:'10 kΩ, 0603. Pin 1 = GATE_N1_OUT, Pin 2 = GND_N1.'
+},
+
+// ── Power Stage N2 (Low-Side ← CELL_B_NEG) ─────────────────────────────────
+{
+  id:'stg_n2_01', group:'Stage N2 (LS-B)', label:'Q4 (N2 FET)',
+  from:'Q4', fromPins:'1,2,3', to:'Q4', toPins:'1,2,3', net:'GATE_N2_OUT / GND_N2 / CELL_B_NEG',
+  rationale:'N-channel MOSFET switches CELL_B_NEG tab to GND via shunt R_SH_N2. Low-side FET — gate driven directly by UCC5304 U4.',
+  specs:'AO3400A: Pin 1=Gate (GATE_N2_OUT), Pin 2=Source (GND_N2), Pin 3=Drain (CELL_B_NEG).'
+},
+{
+  id:'stg_n2_02', group:'Stage N2 (LS-B)', label:'R_SH_N2 (GND_N2 → GND)',
+  from:'Q4', fromPins:'2', to:'R_SH_N2', toPins:'1', net:'GND_N2 / GND',
+  rationale:'50 mΩ current sense shunt in the N2 low-side return path. INA226 (U_INA_N2) measures voltage drop.',
+  specs:'0.05Ω ±1%, 1W, 2512. Pin 1 = GND_N2, Pin 2 = GND.'
+},
+{
+  id:'stg_n2_03', group:'Stage N2 (LS-B)', label:'Rgpd_4 (N2 gate pulldown)',
+  from:'Rgpd_4', fromPins:'1,2', to:'Rgpd_4', toPins:'1,2', net:'GATE_N2_OUT / GND_N2',
+  rationale:'10 kΩ pulldown from Q4 gate to source (GND_N2).',
+  specs:'10 kΩ, 0603. Pin 1 = GATE_N2_OUT, Pin 2 = GND_N2.'
+},
+
+// ── Cell Connector J2 ──────────────────────────────────────────────────────
+{
+  id:'cell_01', group:'Cell Connector', label:'J2 pin 4 → CELL_A_POS',
+  from:'J2', fromPins:'4', to:'Q1', toPins:'2', net:'CELL_A_POS',
+  rationale:'J2 pin 4 carries CELL_A_POS — the positive tab of the A-side of the 4-terminal pouch cell. Connects to Q1 source, PS1 Vout-, U1 VSS. NOTE: Pin numbering is 4=A_POS, 3=B_POS, 2=A_NEG, 1=B_NEG (reverse of naive expectation).',
+  specs:'5.08mm screw terminal. Verify continuity J2 pin 4 → Q1 source pad. CRITICAL: confirm pin ordering matches silkscreen.'
+},
+{
+  id:'cell_02', group:'Cell Connector', label:'J2 pin 2 → CELL_A_NEG',
+  from:'J2', fromPins:'2', to:'Q3', toPins:'3', net:'CELL_A_NEG',
+  rationale:'J2 pin 2 carries CELL_A_NEG — the negative tab of the A-side. Connects to Q3 drain. Only two components on this net (J2 + Q3).',
+  specs:'Verify continuity J2 pin 2 → Q3 drain.'
+},
+{
+  id:'cell_03', group:'Cell Connector', label:'J2 pin 3 → CELL_B_POS',
+  from:'J2', fromPins:'3', to:'Q2', toPins:'2', net:'CELL_B_POS',
+  rationale:'J2 pin 3 carries CELL_B_POS — the positive tab of the B-side. Connects to Q2 source, PS2 Vout-, U2 VSS.',
+  specs:'Verify continuity J2 pin 3 → Q2 source pad.'
+},
+{
+  id:'cell_04', group:'Cell Connector', label:'J2 pin 1 → CELL_B_NEG',
+  from:'J2', fromPins:'1', to:'Q4', toPins:'3', net:'CELL_B_NEG',
+  rationale:'J2 pin 1 carries CELL_B_NEG — the negative tab of the B-side. Connects to Q4 drain.',
+  specs:'Verify continuity J2 pin 1 → Q4 drain.'
+},
+
+// ── INA226 — P1 (0x40) ────────────────────────────────────────────────────
+{
+  id:'ina_p1_01', group:'INA226 Sensors', label:'U_INA_P1 sensing (+HV / +HV_P1)',
+  from:'U_INA_P1', fromPins:'10,9,8', to:'R_SH_P1', toPins:'1,2', net:'+HV / +HV_P1',
+  rationale:'INA226 high-side current sense across R_SH_P1. Vin+ (pin 10) connects to +HV (shunt high side), Vin- (pin 9) and Vbus (pin 8) connect to +HV_P1 (shunt low side = FET drain). Current = Vshunt / 0.05Ω.',
+  specs:'Vin+ (10) = +HV, Vin- (9) = +HV_P1, Vbus (8) = +HV_P1. Max common-mode: 36V. Full-scale at ±81.92 mV default.'
+},
+{
+  id:'ina_p1_02', group:'INA226 Sensors', label:'U_INA_P1 address (0x40)',
+  from:'U_INA_P1', fromPins:'1,2', to:'U_INA_P1', toPins:'1,2', net:'GND / GND',
+  rationale:'A1 (pin 1) = GND, A0 (pin 2) = GND → I2C address 0x40. This is the default INA226 address. Both pins tied to ground.',
+  specs:'Verify pin 1 (A1) and pin 2 (A0) are both connected to GND. Expected address: 0x40.'
+},
+{
+  id:'ina_p1_03', group:'INA226 Sensors', label:'U_INA_P1 power (VS/GND)',
+  from:'U_INA_P1', fromPins:'6,7', to:'U_INA_P1', toPins:'6,7', net:'+3V3 / GND',
+  rationale:'INA226 powered from 3.3V rail. VS (pin 6) = +3V3, GND (pin 7) = GND.',
+  specs:'VS range: 2.7V–5.5V. Quiescent current: 330µA typ. Verify 3.3V on pin 6, GND on pin 7.'
+},
+{
+  id:'ina_p1_04', group:'INA226 Sensors', label:'U_INA_P1 bus (SDA/SCL/ALERT)',
+  from:'U_INA_P1', fromPins:'4,5,3', to:'A1', toPins:'GP6,GP7,GP29', net:'SDA / SCL / ALERT',
+  rationale:'I2C bus pins SDA (pin 4) and SCL (pin 5) connect to shared bus pulled up to +3V3 via 4.7kΩ. ALERT (pin 3) is open-drain, wired-OR with all four INA226s, pulled up to +3V3.',
+  specs:'SDA = pin 4, SCL = pin 5, ALERT = pin 3. All share bus with other INA226s.'
+},
+{
+  id:'ina_p1_05', group:'INA226 Sensors', label:'C_INA_P1 (decoupling)',
+  from:'C_INA_P1', fromPins:'1,2', to:'C_INA_P1', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'100 nF decoupling capacitor for U_INA_P1, placed close to VS and GND pins.',
+  specs:'100 nF, 0603. Pin 1 = +3V3, Pin 2 = GND.'
+},
+
+// ── INA226 — P2 (0x41) ────────────────────────────────────────────────────
+{
+  id:'ina_p2_01', group:'INA226 Sensors', label:'U_INA_P2 sensing (+HV / +HV_P2)',
+  from:'U_INA_P2', fromPins:'10,9,8', to:'R_SH_P2', toPins:'1,2', net:'+HV / +HV_P2',
+  rationale:'INA226 high-side current sense across R_SH_P2. Same topology as P1.',
+  specs:'Vin+ (10) = +HV, Vin- (9) = +HV_P2, Vbus (8) = +HV_P2.'
+},
+{
+  id:'ina_p2_02', group:'INA226 Sensors', label:'U_INA_P2 address (0x41)',
+  from:'U_INA_P2', fromPins:'1,2', to:'U_INA_P2', toPins:'1,2', net:'GND / +3V3',
+  rationale:'A1 (pin 1) = GND, A0 (pin 2) = VS (+3V3) → I2C address 0x41.',
+  specs:'Verify pin 1 (A1) = GND, pin 2 (A0) = +3V3. Expected address: 0x41.'
+},
+{
+  id:'ina_p2_03', group:'INA226 Sensors', label:'U_INA_P2 power + bus',
+  from:'U_INA_P2', fromPins:'6,7,4,5,3', to:'U_INA_P2', toPins:'6,7,4,5,3', net:'+3V3/GND/SDA/SCL/ALERT',
+  rationale:'Same power and bus connections as all INA226s. VS=+3V3, GND=GND, SDA/SCL/ALERT shared.',
+  specs:'Pin 6=+3V3, Pin 7=GND, Pin 4=SDA, Pin 5=SCL, Pin 3=ALERT.'
+},
+{
+  id:'ina_p2_04', group:'INA226 Sensors', label:'C_INA_P2 (decoupling)',
+  from:'C_INA_P2', fromPins:'1,2', to:'C_INA_P2', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'100 nF decoupling for U_INA_P2.',
+  specs:'100 nF, 0603.'
+},
+
+// ── INA226 — N1 (0x49) ────────────────────────────────────────────────────
+{
+  id:'ina_n1_01', group:'INA226 Sensors', label:'U_INA_N1 sensing (GND_N1 / GND)',
+  from:'U_INA_N1', fromPins:'10,9,8', to:'R_SH_N1', toPins:'1,2', net:'GND_N1 / GND',
+  rationale:'INA226 low-side current sense across R_SH_N1. Vin+ (pin 10) = GND_N1 (shunt high side, FET source), Vin- (pin 9) = GND (shunt low side). Current flows from cell through FET into shunt to GND.',
+  specs:'Vin+ (10) = GND_N1, Vin- (9) = GND, Vbus (8) = GND_N1.'
+},
+{
+  id:'ina_n1_02', group:'INA226 Sensors', label:'U_INA_N1 address (0x49)',
+  from:'U_INA_N1', fromPins:'1,2', to:'U_INA_N1', toPins:'1,2', net:'SDA / +3V3',
+  rationale:'A1 (pin 1) = SDA, A0 (pin 2) = VS (+3V3) → I2C address 0x49. IMPORTANT: This differs from the breadboard (0x43) because V2 PCB hardwires A1 to SDA instead of GND. Firmware must use 0x49.',
+  specs:'Verify pin 1 (A1) connects to SDA bus, pin 2 (A0) connects to +3V3. Expected address: 0x49. FIRMWARE CHANGE REQUIRED from breadboard value 0x43.'
+},
+{
+  id:'ina_n1_03', group:'INA226 Sensors', label:'U_INA_N1 power + bus',
+  from:'U_INA_N1', fromPins:'6,7,4,5,3', to:'U_INA_N1', toPins:'6,7,4,5,3', net:'+3V3/GND/SDA/SCL/ALERT',
+  rationale:'Same power and bus connections as all INA226s.',
+  specs:'Pin 6=+3V3, Pin 7=GND, Pin 4=SDA, Pin 5=SCL, Pin 3=ALERT.'
+},
+{
+  id:'ina_n1_04', group:'INA226 Sensors', label:'C_INA_N1 (decoupling)',
+  from:'C_INA_N1', fromPins:'1,2', to:'C_INA_N1', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'100 nF decoupling for U_INA_N1.',
+  specs:'100 nF, 0603.'
+},
+
+// ── INA226 — N2 (0x45) ────────────────────────────────────────────────────
+{
+  id:'ina_n2_01', group:'INA226 Sensors', label:'U_INA_N2 sensing (GND_N2 / GND)',
+  from:'U_INA_N2', fromPins:'10,9,8', to:'R_SH_N2', toPins:'1,2', net:'GND_N2 / GND',
+  rationale:'INA226 low-side current sense across R_SH_N2. Same topology as N1.',
+  specs:'Vin+ (10) = GND_N2, Vin- (9) = GND, Vbus (8) = GND_N2.'
+},
+{
+  id:'ina_n2_02', group:'INA226 Sensors', label:'U_INA_N2 address (0x45)',
+  from:'U_INA_N2', fromPins:'1,2', to:'U_INA_N2', toPins:'1,2', net:'+3V3 / +3V3',
+  rationale:'A1 (pin 1) = VS (+3V3), A0 (pin 2) = VS (+3V3) → I2C address 0x45. Both address pins tied to supply.',
+  specs:'Verify pin 1 (A1) and pin 2 (A0) both connect to +3V3. Expected address: 0x45.'
+},
+{
+  id:'ina_n2_03', group:'INA226 Sensors', label:'U_INA_N2 power + bus',
+  from:'U_INA_N2', fromPins:'6,7,4,5,3', to:'U_INA_N2', toPins:'6,7,4,5,3', net:'+3V3/GND/SDA/SCL/ALERT',
+  rationale:'Same power and bus connections as all INA226s.',
+  specs:'Pin 6=+3V3, Pin 7=GND, Pin 4=SDA, Pin 5=SCL, Pin 3=ALERT.'
+},
+{
+  id:'ina_n2_04', group:'INA226 Sensors', label:'C_INA_N2 (decoupling)',
+  from:'C_INA_N2', fromPins:'1,2', to:'C_INA_N2', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'100 nF decoupling for U_INA_N2.',
+  specs:'100 nF, 0603.'
+},
+
+// ── I2C Bus Pullups ────────────────────────────────────────────────────────
+{
+  id:'i2c_01', group:'I2C / ALERT Bus', label:'R_SDA (SDA pullup)',
+  from:'R_SDA', fromPins:'1,2', to:'A1', toPins:'GP6', net:'+3V3 / SDA',
+  rationale:'4.7 kΩ pullup on SDA bus. Required because I2C is open-drain — all devices (4× INA226 + MCU) only pull low. Value chosen for 400 kHz fast-mode with estimated 50 pF bus capacitance (rise time ~235 ns, within spec).',
+  specs:'4.7 kΩ, 0603. Pin 1 = +3V3, Pin 2 = SDA. Verify pullup voltage reads ~3.3V when bus idle.'
+},
+{
+  id:'i2c_02', group:'I2C / ALERT Bus', label:'R_SCL (SCL pullup)',
+  from:'R_SCL', fromPins:'1,2', to:'A1', toPins:'GP7', net:'+3V3 / SCL',
+  rationale:'4.7 kΩ pullup on SCL bus. Same rationale as SDA pullup.',
+  specs:'4.7 kΩ, 0603. Pin 1 = +3V3, Pin 2 = SCL.'
+},
+{
+  id:'i2c_03', group:'I2C / ALERT Bus', label:'R_ALERT (ALERT pullup)',
+  from:'R_ALERT', fromPins:'1,2', to:'A1', toPins:'GP29', net:'+3V3 / ALERT',
+  rationale:'4.7 kΩ pullup on shared ALERT line. All four INA226 ALERT pins are wired-OR (open-drain). Any sensor asserting overcurrent pulls the line low → GP29 interrupt on MCU. NOTE: V2 uses GP29, not GP27 (breadboard).',
+  specs:'4.7 kΩ, 0603. Pin 1 = +3V3, Pin 2 = ALERT → GP29. FIRMWARE CHANGE REQUIRED from breadboard GP27.'
+},
+
+// ── Gate Driver U1 (P1 High-Side) ──────────────────────────────────────────
+{
+  id:'drv_u1_01', group:'Gate Driver U1 (P1-HS)', label:'U1 input (GATE_P1_IN)',
+  from:'U1', fromPins:'1', to:'A1', toPins:'GP2', net:'GATE_P1_IN',
+  rationale:'UCC5304 input pin IN (pin 1) receives 3.3V logic signal from RP2040 GP2. The driver level-shifts and isolates this to the floating high-side domain.',
+  specs:'UCC5304 IN threshold: 1.2V typ. 3.3V drive is well above threshold. Pin 1 = GATE_P1_IN.'
+},
+{
+  id:'drv_u1_02', group:'Gate Driver U1 (P1-HS)', label:'U1 input power (VCCI/GND)',
+  from:'U1', fromPins:'2,3,4', to:'U1', toPins:'2,3,4', net:'+3V3 / +3V3 / GND',
+  rationale:'VCCI (pins 2,3 ganged) = +3V3 supplies the input-side logic. GND (pin 4) is input-side ground. These are on the MCU/logic side of the isolation barrier.',
+  specs:'VCCI range: 2.25V–5.5V. Pins 2,3 = +3V3, Pin 4 = GND.'
+},
+{
+  id:'drv_u1_03', group:'Gate Driver U1 (P1-HS)', label:'U1 output ref (VSS = CELL_A_POS)',
+  from:'U1', fromPins:'5,6', to:'Q1', toPins:'2', net:'CELL_A_POS',
+  rationale:'VSS (pins 5,6 ganged) connects to the FET source node (CELL_A_POS). This is the floating output-side ground reference. The driver outputs gate voltage RELATIVE to this node, which floats with the cell tab voltage.',
+  specs:'Pins 5,6 = CELL_A_POS. CRITICAL: This is a floating net — do NOT connect to system GND.'
+},
+{
+  id:'drv_u1_04', group:'Gate Driver U1 (P1-HS)', label:'U1 output supply (VDD = VCC2_P1)',
+  from:'U1', fromPins:'8', to:'PS1', toPins:'3', net:'VCC2_P1',
+  rationale:'VDD (pin 8) = VCC2_P1 (~12V above CELL_A_POS), supplied by B0512S-1WR3 PS1 isolated DC-DC. This provides the gate drive voltage high enough above the FET source to fully enhance the N-ch MOSFET.',
+  specs:'UCC5304 UVLO: VDD must be > 5V for output to operate. VCC2_P1 = ~12V above VSS. Pin 8 = VCC2_P1.'
+},
+{
+  id:'drv_u1_05', group:'Gate Driver U1 (P1-HS)', label:'U1 output → R_G_U1 → Q1',
+  from:'U1', fromPins:'7', to:'R_G_U1', toPins:'1', net:'GATE_P1_OUT_PRE',
+  rationale:'Driver output (pin 7) connects through 10Ω gate series resistor R_G_U1 to the FET gate. The 10Ω limits peak gate current to ~1.2A and slows switching edges to reduce EMI/ringing.',
+  specs:'Pin 7 = GATE_P1_OUT_PRE. R_G_U1: 10Ω, 0603. Output to Q1 gate.'
+},
+{
+  id:'drv_u1_06', group:'Gate Driver U1 (P1-HS)', label:'R_G_U1 → GATE_P1_OUT',
+  from:'R_G_U1', fromPins:'2', to:'Q1', toPins:'1', net:'GATE_P1_OUT',
+  rationale:'Gate resistor output connects to Q1 gate and Rgpd_1 pulldown. This is the actual gate drive node.',
+  specs:'R_G_U1 pin 2 → GATE_P1_OUT net → Q1 pin 1 (gate) + Rgpd_1 pin 1.'
+},
+{
+  id:'drv_u1_07', group:'Gate Driver U1 (P1-HS)', label:'C_VCCI_U1 (input decoupling)',
+  from:'C_VCCI_U1', fromPins:'1,2', to:'U1', toPins:'2,4', net:'+3V3 / GND',
+  rationale:'100 nF VCCI-to-GND decoupling, placed close to U1 pins 2/3 and 4.',
+  specs:'100 nF, 0603. Pin 1 = +3V3, Pin 2 = GND.'
+},
+{
+  id:'drv_u1_08', group:'Gate Driver U1 (P1-HS)', label:'C_VDD_U1_1 (output bulk)',
+  from:'C_VDD_U1_1', fromPins:'1,2', to:'U1', toPins:'8,5', net:'VCC2_P1 / CELL_A_POS',
+  rationale:'10 µF bulk capacitor across U1 VDD-VSS (output side). Stores charge for gate drive pulses. Must be rated for the floating VCC2_P1 voltage.',
+  specs:'10 µF, X7R, 25V, 0805. Pin 1 = VCC2_P1, Pin 2 = CELL_A_POS.'
+},
+{
+  id:'drv_u1_09', group:'Gate Driver U1 (P1-HS)', label:'C_VDD_U1_2 (output HF)',
+  from:'C_VDD_U1_2', fromPins:'1,2', to:'U1', toPins:'8,5', net:'VCC2_P1 / CELL_A_POS',
+  rationale:'100 nF high-frequency bypass across U1 VDD-VSS.',
+  specs:'100 nF, X7R, 25V, 0603.'
+},
+
+// ── Gate Driver U2 (P2 High-Side) ──────────────────────────────────────────
+{
+  id:'drv_u2_01', group:'Gate Driver U2 (P2-HS)', label:'U2 input (GATE_P2_IN)',
+  from:'U2', fromPins:'1', to:'A1', toPins:'GP3', net:'GATE_P2_IN',
+  rationale:'UCC5304 input (pin 1) receives 3.3V logic from GP3. Same isolated driver topology as U1 but for the B-side high-side FET.',
+  specs:'Pin 1 = GATE_P2_IN.'
+},
+{
+  id:'drv_u2_02', group:'Gate Driver U2 (P2-HS)', label:'U2 input power (VCCI/GND)',
+  from:'U2', fromPins:'2,3,4', to:'U2', toPins:'2,3,4', net:'+3V3 / GND',
+  rationale:'Pins 2,3 = +3V3 (VCCI), Pin 4 = GND.',
+  specs:'Same as U1.'
+},
+{
+  id:'drv_u2_03', group:'Gate Driver U2 (P2-HS)', label:'U2 output ref (VSS = CELL_B_POS)',
+  from:'U2', fromPins:'5,6', to:'Q2', toPins:'2', net:'CELL_B_POS',
+  rationale:'VSS = CELL_B_POS (floating B-side positive tab). Same concept as U1 VSS = CELL_A_POS.',
+  specs:'Pins 5,6 = CELL_B_POS. Floating — do NOT connect to GND.'
+},
+{
+  id:'drv_u2_04', group:'Gate Driver U2 (P2-HS)', label:'U2 output supply (VDD = VCC2_P2)',
+  from:'U2', fromPins:'8', to:'PS2', toPins:'3', net:'VCC2_P2',
+  rationale:'VDD = VCC2_P2, supplied by PS2 isolated DC-DC.',
+  specs:'Pin 8 = VCC2_P2.'
+},
+{
+  id:'drv_u2_05', group:'Gate Driver U2 (P2-HS)', label:'U2 output → R_G_U2 → Q2',
+  from:'U2', fromPins:'7', to:'R_G_U2', toPins:'1', net:'GATE_P2_OUT_PRE',
+  rationale:'Driver output through 10Ω gate resistor to Q2 gate.',
+  specs:'Pin 7 = GATE_P2_OUT_PRE → R_G_U2 (10Ω) → GATE_P2_OUT → Q2 gate.'
+},
+{
+  id:'drv_u2_06', group:'Gate Driver U2 (P2-HS)', label:'C_VCCI_U2 + C_VDD_U2 (decoupling)',
+  from:'C_VCCI_U2', fromPins:'1,2', to:'U2', toPins:'2,4', net:'+3V3/GND, VCC2_P2/CELL_B_POS',
+  rationale:'Input decoupling: C_VCCI_U2 100nF +3V3→GND. Output decoupling: C_VDD_U2_1 10µF + C_VDD_U2_2 100nF across VCC2_P2→CELL_B_POS.',
+  specs:'C_VCCI_U2: 100nF. C_VDD_U2_1: 10µF 25V. C_VDD_U2_2: 100nF 25V.'
+},
+
+// ── Gate Driver U3 (N1 Low-Side) ───────────────────────────────────────────
+{
+  id:'drv_u3_01', group:'Gate Driver U3 (N1-LS)', label:'U3 input (GATE_N1_IN)',
+  from:'U3', fromPins:'1', to:'A1', toPins:'GP4', net:'GATE_N1_IN',
+  rationale:'UCC5304 input (pin 1) receives 3.3V logic from GP4. Low-side driver — output side is ground-referenced, not floating.',
+  specs:'Pin 1 = GATE_N1_IN.'
+},
+{
+  id:'drv_u3_02', group:'Gate Driver U3 (N1-LS)', label:'U3 power (VCCI=3V3, VDD=5V, VSS=GND)',
+  from:'U3', fromPins:'2,3,4,5,6,8', to:'U3', toPins:'2,3,4,5,6,8', net:'+3V3/GND/+5V',
+  rationale:'Input: VCCI (2,3) = +3V3, GND (4) = GND. Output: VSS (5,6) = GND (ground-referenced), VDD (8) = +5V. IMPORTANT: UCC5304 UVLO threshold is 5V — running VDD at exactly 5V is at the edge. This matches proven breadboard operation.',
+  specs:'Pins 2,3 = +3V3. Pin 4 = GND. Pins 5,6 = GND. Pin 8 = +5V. UVLO: VDD > 5V for output enable.'
+},
+{
+  id:'drv_u3_03', group:'Gate Driver U3 (N1-LS)', label:'U3 output → R_G_U3 → Q3',
+  from:'U3', fromPins:'7', to:'R_G_U3', toPins:'1', net:'GATE_N1_OUT_PRE',
+  rationale:'Driver output through 10Ω gate resistor to Q3 gate. Vgs ≈ 5V (VDD - VSS) when driving high — above AO3400A threshold (1V typ, 1.8V max).',
+  specs:'Pin 7 = GATE_N1_OUT_PRE → R_G_U3 (10Ω) → GATE_N1_OUT → Q3 gate.'
+},
+{
+  id:'drv_u3_04', group:'Gate Driver U3 (N1-LS)', label:'C_VCCI_U3 + C_VDD_U3 (decoupling)',
+  from:'C_VCCI_U3', fromPins:'1,2', to:'U3', toPins:'2,4', net:'+3V3/GND, +5V/GND',
+  rationale:'Input: C_VCCI_U3 100nF +3V3→GND. Output: C_VDD_U3_1 10µF + C_VDD_U3_2 100nF across +5V→GND.',
+  specs:'C_VCCI_U3: 100nF. C_VDD_U3_1: 10µF 25V. C_VDD_U3_2: 100nF 25V.'
+},
+
+// ── Gate Driver U4 (N2 Low-Side) ───────────────────────────────────────────
+{
+  id:'drv_u4_01', group:'Gate Driver U4 (N2-LS)', label:'U4 input (GATE_N2_IN)',
+  from:'U4', fromPins:'1', to:'A1', toPins:'GP5', net:'GATE_N2_IN',
+  rationale:'UCC5304 input (pin 1) receives 3.3V logic from GP5. Same low-side topology as U3.',
+  specs:'Pin 1 = GATE_N2_IN.'
+},
+{
+  id:'drv_u4_02', group:'Gate Driver U4 (N2-LS)', label:'U4 power (same as U3)',
+  from:'U4', fromPins:'2,3,4,5,6,8', to:'U4', toPins:'2,3,4,5,6,8', net:'+3V3/GND/+5V',
+  rationale:'Identical to U3: VCCI=+3V3, GND=GND, VSS=GND, VDD=+5V.',
+  specs:'Same as U3.'
+},
+{
+  id:'drv_u4_03', group:'Gate Driver U4 (N2-LS)', label:'U4 output → R_G_U4 → Q4',
+  from:'U4', fromPins:'7', to:'R_G_U4', toPins:'1', net:'GATE_N2_OUT_PRE',
+  rationale:'Driver output through 10Ω gate resistor to Q4 gate.',
+  specs:'Pin 7 = GATE_N2_OUT_PRE → R_G_U4 (10Ω) → GATE_N2_OUT → Q4 gate.'
+},
+{
+  id:'drv_u4_04', group:'Gate Driver U4 (N2-LS)', label:'C_VCCI_U4 + C_VDD_U4 (decoupling)',
+  from:'C_VCCI_U4', fromPins:'1,2', to:'U4', toPins:'2,4', net:'+3V3/GND, +5V/GND',
+  rationale:'Input: C_VCCI_U4 100nF. Output: C_VDD_U4_1 10µF + C_VDD_U4_2 100nF across +5V→GND.',
+  specs:'Same as U3 decoupling.'
+},
+
+// ── Isolated Gate Supplies ─────────────────────────────────────────────────
+{
+  id:'iso_01', group:'Isolated Supplies', label:'PS1 (B0512S → VCC2_P1)',
+  from:'PS1', fromPins:'1,2,3,4', to:'U1', toPins:'8,5', net:'+5V/GND → VCC2_P1/CELL_A_POS',
+  rationale:'B0512S-1WR3 isolated DC-DC: 5V input (from USB via RP2040) → 12V output floating above CELL_A_POS. Provides gate drive supply for high-side FET Q1 via driver U1. 1.5 kV isolation barrier matches UCC5304 isolation rating.',
+  specs:'B0512S-1WR3: SIP-4, 5Vin → 12Vout, 1W max, 1.5kV isolation. Pin 1=+5V, Pin 2=GND, Pin 3=VCC2_P1, Pin 4=CELL_A_POS. Output load: UCC5304 quiescent + gate charge (~10mW).'
+},
+{
+  id:'iso_02', group:'Isolated Supplies', label:'PS1 input cap (C_PS1_IN)',
+  from:'C_PS1_IN', fromPins:'1,2', to:'PS1', toPins:'1,2', net:'+5V / GND',
+  rationale:'4.7 µF input decoupling per Mornsun datasheet Table 1 (5V input variant). Stabilizes input against DC-DC switching transients.',
+  specs:'4.7 µF, 16V, 0805. Pin 1 = +5V, Pin 2 = GND.'
+},
+{
+  id:'iso_03', group:'Isolated Supplies', label:'PS1 output cap (C_PS1_OUT)',
+  from:'C_PS1_OUT', fromPins:'1,2', to:'PS1', toPins:'3,4', net:'VCC2_P1 / CELL_A_POS',
+  rationale:'2.2 µF output decoupling per Mornsun datasheet. Smooths 12V output ripple.',
+  specs:'2.2 µF, 25V, 0805. Pin 1 = VCC2_P1, Pin 2 = CELL_A_POS.'
+},
+{
+  id:'iso_04', group:'Isolated Supplies', label:'PS2 (B0512S → VCC2_P2)',
+  from:'PS2', fromPins:'1,2,3,4', to:'U2', toPins:'8,5', net:'+5V/GND → VCC2_P2/CELL_B_POS',
+  rationale:'Same as PS1 but for the B-side high-side path. Provides isolated 12V gate supply for Q2 via U2.',
+  specs:'Pin 1=+5V, Pin 2=GND, Pin 3=VCC2_P2, Pin 4=CELL_B_POS.'
+},
+{
+  id:'iso_05', group:'Isolated Supplies', label:'PS2 caps (C_PS2_IN + C_PS2_OUT)',
+  from:'C_PS2_IN', fromPins:'1,2', to:'PS2', toPins:'1,2', net:'+5V/GND, VCC2_P2/CELL_B_POS',
+  rationale:'Input 4.7µF + Output 2.2µF decoupling for PS2, same as PS1.',
+  specs:'C_PS2_IN: 4.7µF 16V. C_PS2_OUT: 2.2µF 25V.'
+},
+
+// ── MCU (RP2040-Zero) ──────────────────────────────────────────────────────
+{
+  id:'mcu_01', group:'MCU (RP2040-Zero)', label:'A1 power (5V/GND/3V3)',
+  from:'A1', fromPins:'5V,GND,3V3', to:'A1', toPins:'5V,GND,3V3', net:'+5V / GND / +3V3',
+  rationale:'RP2040-Zero provides all board power via USB-C: 5V pad = VBUS (source for B0512S, LS gate driver VDD), GND pad = system ground star point, 3V3 pad = on-board regulator output (source for INA226 VS, UCC5304 VCCI, I2C pullups, LEDs).',
+  specs:'5V pad → +5V rail (up to 500mA from USB). 3V3 pad → +3V3 rail (RP2040-Zero regulator, ~300mA). GND → system ground.'
+},
+{
+  id:'mcu_02', group:'MCU (RP2040-Zero)', label:'A1 GP2 → GATE_P1_IN',
+  from:'A1', fromPins:'GP2', to:'U1', toPins:'1', net:'GATE_P1_IN',
+  rationale:'GPIO 2 drives P1 high-side gate via UCC5304 U1. Also connects to LED D_LED_P1 anode for visual feedback.',
+  specs:'GP2 → GATE_P1_IN → U1 pin 1 + D_LED_P1 anode. 3.3V logic level.'
+},
+{
+  id:'mcu_03', group:'MCU (RP2040-Zero)', label:'A1 GP3 → GATE_P2_IN',
+  from:'A1', fromPins:'GP3', to:'U2', toPins:'1', net:'GATE_P2_IN',
+  rationale:'GPIO 3 drives P2 high-side gate via UCC5304 U2.',
+  specs:'GP3 → GATE_P2_IN → U2 pin 1 + D_LED_P2 anode.'
+},
+{
+  id:'mcu_04', group:'MCU (RP2040-Zero)', label:'A1 GP4 → GATE_N1_IN',
+  from:'A1', fromPins:'GP4', to:'U3', toPins:'1', net:'GATE_N1_IN',
+  rationale:'GPIO 4 drives N1 low-side gate via UCC5304 U3.',
+  specs:'GP4 → GATE_N1_IN → U3 pin 1 + D_LED_N1 anode.'
+},
+{
+  id:'mcu_05', group:'MCU (RP2040-Zero)', label:'A1 GP5 → GATE_N2_IN',
+  from:'A1', fromPins:'GP5', to:'U4', toPins:'1', net:'GATE_N2_IN',
+  rationale:'GPIO 5 drives N2 low-side gate via UCC5304 U4.',
+  specs:'GP5 → GATE_N2_IN → U4 pin 1 + D_LED_N2 anode.'
+},
+{
+  id:'mcu_06', group:'MCU (RP2040-Zero)', label:'A1 GP6 → SDA',
+  from:'A1', fromPins:'GP6', to:'U_INA_P1', toPins:'4', net:'SDA',
+  rationale:'GPIO 6 is the I2C SDA line. RP2040 I2C0 default SDA pin. Connects to all four INA226 SDA pins + R_SDA pullup. Also connects to U_INA_N1 A1 address pin.',
+  specs:'GP6 → SDA bus. 4.7kΩ pullup to +3V3. Open-drain, 400kHz fast mode.'
+},
+{
+  id:'mcu_07', group:'MCU (RP2040-Zero)', label:'A1 GP7 → SCL',
+  from:'A1', fromPins:'GP7', to:'U_INA_P1', toPins:'5', net:'SCL',
+  rationale:'GPIO 7 is the I2C SCL line. RP2040 I2C0 default SCL pin.',
+  specs:'GP7 → SCL bus. 4.7kΩ pullup to +3V3.'
+},
+{
+  id:'mcu_08', group:'MCU (RP2040-Zero)', label:'A1 GP29 → ALERT',
+  from:'A1', fromPins:'GP29', to:'U_INA_P1', toPins:'3', net:'ALERT',
+  rationale:'GPIO 29 receives the wired-OR ALERT interrupt from all four INA226s. When any sensor detects overcurrent, it pulls ALERT low → MCU can read which sensor triggered and shut down FETs. NOTE: V2 PCB uses GP29 (breadboard used GP27).',
+  specs:'GP29 → ALERT. 4.7kΩ pullup to +3V3. FIRMWARE must set PIN_ALERT = 29.'
+},
+
+// ── Peripheral Connectors ──────────────────────────────────────────────────
+{
+  id:'periph_01', group:'Peripherals', label:'A1 → J3 (Rotary Encoder)',
+  from:'A1', fromPins:'GP8,GP9,GP10', to:'J3', toPins:'3,4,5', net:'ENC_CLK / ENC_DT / ENC_SW',
+  rationale:'5-pin JST-XH header for external rotary encoder. GP8=CLK (A channel), GP9=DT (B channel), GP10=SW (push button). J3 pins 1,2 provide +3V3 and GND to the encoder.',
+  specs:'J3: pin 1=+3V3, pin 2=GND, pin 3=ENC_CLK (GP8), pin 4=ENC_DT (GP9), pin 5=ENC_SW (GP10).'
+},
+{
+  id:'periph_02', group:'Peripherals', label:'J3 power (3V3/GND)',
+  from:'J3', fromPins:'1,2', to:'J3', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'Encoder power supply pins. 3.3V is sufficient for most rotary encoders.',
+  specs:'Pin 1 = +3V3, Pin 2 = GND.'
+},
+{
+  id:'periph_03', group:'Peripherals', label:'A1 → J4 (TM1637 Display)',
+  from:'A1', fromPins:'GP14,GP15', to:'J4', toPins:'3,4', net:'DISPLAY_CLK / DISPLAY_DIO',
+  rationale:'4-pin JST-XH header for TM1637 7-segment display module. GP14=CLK, GP15=DIO. TM1637 uses a 2-wire protocol (not I2C).',
+  specs:'J4: pin 1=+3V3, pin 2=GND, pin 3=DISPLAY_CLK (GP14), pin 4=DISPLAY_DIO (GP15).'
+},
+{
+  id:'periph_04', group:'Peripherals', label:'J4 power (3V3/GND)',
+  from:'J4', fromPins:'1,2', to:'J4', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'Display power pins.',
+  specs:'Pin 1 = +3V3, Pin 2 = GND.'
+},
+
+// ── Status LEDs ────────────────────────────────────────────────────────────
+{
+  id:'led_01', group:'Status LEDs', label:'D_LED_P1 (P1 indicator)',
+  from:'D_LED_P1', fromPins:'2,1', to:'R_LED_P1', toPins:'1,2', net:'GATE_P1_IN / GND',
+  rationale:'Green LED lights when GP2 drives GATE_P1_IN HIGH. Anode (pin 2) connects to GATE_P1_IN, cathode (pin 1) through R_LED_P1 (1kΩ) to GND. Current ≈ (3.3V - 2.0V) / 1kΩ ≈ 1.3 mA — dim but visible, minimal MCU loading.',
+  specs:'LED: green 0603. R_LED_P1: 1kΩ 0603. LED anode = GATE_P1_IN, cathode → 1k → GND.'
+},
+{
+  id:'led_02', group:'Status LEDs', label:'D_LED_P2 (P2 indicator)',
+  from:'D_LED_P2', fromPins:'2,1', to:'R_LED_P2', toPins:'1,2', net:'GATE_P2_IN / GND',
+  rationale:'Same as P1 LED but on GATE_P2_IN (GP3).',
+  specs:'LED anode = GATE_P2_IN, cathode → R_LED_P2 (1k) → GND.'
+},
+{
+  id:'led_03', group:'Status LEDs', label:'D_LED_N1 (N1 indicator)',
+  from:'D_LED_N1', fromPins:'2,1', to:'R_LED_N1', toPins:'1,2', net:'GATE_N1_IN / GND',
+  rationale:'Same as P1 LED but on GATE_N1_IN (GP4).',
+  specs:'LED anode = GATE_N1_IN, cathode → R_LED_N1 (1k) → GND.'
+},
+{
+  id:'led_04', group:'Status LEDs', label:'D_LED_N2 (N2 indicator)',
+  from:'D_LED_N2', fromPins:'2,1', to:'R_LED_N2', toPins:'1,2', net:'GATE_N2_IN / GND',
+  rationale:'Same as P1 LED but on GATE_N2_IN (GP5).',
+  specs:'LED anode = GATE_N2_IN, cathode → R_LED_N2 (1k) → GND.'
+},
+{
+  id:'led_05', group:'Status LEDs', label:'D_LED_PWR (power indicator)',
+  from:'D_LED_PWR', fromPins:'2,1', to:'R_LED_PWR', toPins:'1,2', net:'+3V3 / GND',
+  rationale:'Always-on green LED indicates board has 3.3V power. Anode tied to +3V3, cathode through 1kΩ to GND.',
+  specs:'LED anode = +3V3, cathode → R_LED_PWR (1k) → GND. Always on when 3V3 present.'
+},
+
+// ── Test Pads ──────────────────────────────────────────────────────────────
+{
+  id:'tp_01', group:'Test Pads', label:'TP1–TP8 (unused GPIOs)',
+  from:'A1', fromPins:'GP0,GP1,GP11,GP12,GP13,GP26,GP27,GP28', to:'TP1', toPins:'1', net:'TP_GP0..TP_GP28',
+  rationale:'Eight unused RP2040 GPIOs (GP0, GP1, GP11–13, GP26–28) are each routed to a 1.5mm through-hole test pad for probing and future expansion. GP27 was the breadboard ALERT pin — on V2 it is unused (ALERT moved to GP29).',
+  specs:'8× test pads, D1.5mm through-hole. Each pad is a dedicated net (no other connections). GP27 is now a spare — do NOT connect to ALERT on V2.'
+}
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DATASHEETS — manufacturer PDFs for key components
+// ─────────────────────────────────────────────────────────────────────────────
+
+const DATASHEETS = {
+  'AO3400A':     { label: 'AO3400A (N-ch MOSFET)',    url: 'https://www.aosmd.com/pdfs/datasheet/AO3400A.pdf' },
+  'AO3401A':     { label: 'AO3401A (P-ch MOSFET)',    url: 'https://www.aosmd.com/pdfs/datasheet/AO3401A.pdf' },
+  'UCC5304':     { label: 'UCC5304 (Gate Driver)',     url: 'https://www.ti.com/lit/ds/symlink/ucc5304.pdf' },
+  'INA226':      { label: 'INA226 (Current Sensor)',   url: 'https://www.ti.com/lit/ds/symlink/ina226.pdf' },
+  'B0512S-1WR3': { label: 'B0512S-1WR3 (DC-DC)',      url: 'https://www.mornsun-power.com/public/uploads/pdf/B0512S-1WR3.pdf' },
+  'RP2040':      { label: 'RP2040 (MCU)',              url: 'https://datasheets.raspberrypi.com/rp2040/rp2040-datasheet.pdf' },
+};
+
+const REF_TO_DATASHEET = {
+  'Q1':'AO3400A', 'Q2':'AO3400A', 'Q3':'AO3400A', 'Q4':'AO3400A',
+  'Q_RP':'AO3401A',
+  'U1':'UCC5304', 'U2':'UCC5304', 'U3':'UCC5304', 'U4':'UCC5304',
+  'U_INA_P1':'INA226', 'U_INA_P2':'INA226', 'U_INA_N1':'INA226', 'U_INA_N2':'INA226',
+  'PS1':'B0512S-1WR3', 'PS2':'B0512S-1WR3',
+  'A1':'RP2040',
+};
+
+function getDatasheetsForConnection(conn) {
+  const keys = new Set();
+  if (REF_TO_DATASHEET[conn.from]) keys.add(REF_TO_DATASHEET[conn.from]);
+  if (REF_TO_DATASHEET[conn.to]) keys.add(REF_TO_DATASHEET[conn.to]);
+  return [...keys].map(k => DATASHEETS[k]).filter(Boolean);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAPH NODES & EDGES
+// ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAPH — comprehensive: every component is a node, edges auto-generated
+// ─────────────────────────────────────────────────────────────────────────────
+
+const GRAPH_NODES = [
+  // ── Power Input (top row) ────────────────────────────────────────────────
+  {id:'J1',       label:'J1\nCycler In',   group:'power',   x:-520, y:-450},
+  {id:'F1',       label:'F1\n3A Fuse',     group:'power',   x:-350, y:-450},
+  {id:'Q_RP',     label:'Q_RP\nAO3401A',   group:'power',   x:-180, y:-450},
+  {id:'R_RP',     label:'R_RP\n10k',       group:'minor',   x:-180, y:-380},
+  {id:'D_TVS',    label:'D_TVS\nSMBJ12CA', group:'power',   x:-20,  y:-450},
+  {id:'C_BULK1',  label:'C_BULK1\n10u',    group:'cap',     x:30,   y:-380},
+  {id:'C_BULK2',  label:'C_BULK2\n100n',   group:'cap',     x:80,   y:-380},
+  {id:'R_CYC_GND',label:'R_CYC\n0R',      group:'minor',   x:-450, y:-380},
+  {id:'C_5V1',    label:'C_5V1\n10u',      group:'cap',     x:180,  y:-380},
+  {id:'C_5V2',    label:'C_5V2\n100n',     group:'cap',     x:230,  y:-380},
+
+  // ── High-Side Stage A (left) ─────────────────────────────────────────────
+  {id:'R_SH_P1',  label:'R_SH_P1\n50mΩ',  group:'shunt',   x:-200, y:-280},
+  {id:'Q1',       label:'Q1 P1\nAO3400A',  group:'fet',     x:-200, y:-170},
+  {id:'Rgpd_1',   label:'Rgpd_1\n10k',    group:'minor',   x:-120, y:-170},
+
+  // ── High-Side Stage B (right) ────────────────────────────────────────────
+  {id:'R_SH_P2',  label:'R_SH_P2\n50mΩ',  group:'shunt',   x:200,  y:-280},
+  {id:'Q2',       label:'Q2 P2\nAO3400A',  group:'fet',     x:200,  y:-170},
+  {id:'Rgpd_2',   label:'Rgpd_2\n10k',    group:'minor',   x:280,  y:-170},
+
+  // ── Cell Connector (center) ──────────────────────────────────────────────
+  {id:'J2',       label:'J2\n4-Tab Cell',  group:'cell',    x:0,    y:0},
+
+  // ── Low-Side Stage A (left) ──────────────────────────────────────────────
+  {id:'Q3',       label:'Q3 N1\nAO3400A',  group:'fet',     x:-200, y:170},
+  {id:'Rgpd_3',   label:'Rgpd_3\n10k',    group:'minor',   x:-120, y:170},
+  {id:'R_SH_N1',  label:'R_SH_N1\n50mΩ',  group:'shunt',   x:-200, y:280},
+
+  // ── Low-Side Stage B (right) ─────────────────────────────────────────────
+  {id:'Q4',       label:'Q4 N2\nAO3400A',  group:'fet',     x:200,  y:170},
+  {id:'Rgpd_4',   label:'Rgpd_4\n10k',    group:'minor',   x:280,  y:170},
+  {id:'R_SH_N2',  label:'R_SH_N2\n50mΩ',  group:'shunt',   x:200,  y:280},
+
+  // ── INA226 Sensors (far left) ────────────────────────────────────────────
+  {id:'U_INA_P1', label:'INA P1\n0x40',    group:'sensor',  x:-430, y:-230},
+  {id:'C_INA_P1', label:'C_INA\nP1',       group:'cap',     x:-510, y:-230},
+  {id:'U_INA_P2', label:'INA P2\n0x41',    group:'sensor',  x:-430, y:-120},
+  {id:'C_INA_P2', label:'C_INA\nP2',       group:'cap',     x:-510, y:-120},
+  {id:'U_INA_N1', label:'INA N1\n0x49',    group:'sensor',  x:-430, y:120},
+  {id:'C_INA_N1', label:'C_INA\nN1',       group:'cap',     x:-510, y:120},
+  {id:'U_INA_N2', label:'INA N2\n0x45',    group:'sensor',  x:-430, y:230},
+  {id:'C_INA_N2', label:'C_INA\nN2',       group:'cap',     x:-510, y:230},
+
+  // ── I2C / ALERT Pullups ──────────────────────────────────────────────────
+  {id:'R_SDA',    label:'R_SDA\n4.7k',     group:'minor',   x:-520, y:-40},
+  {id:'R_SCL',    label:'R_SCL\n4.7k',     group:'minor',   x:-520, y:0},
+  {id:'R_ALERT',  label:'R_ALERT\n4.7k',   group:'minor',   x:-520, y:40},
+
+  // ── Gate Drivers + Gate Resistors (far right) ────────────────────────────
+  {id:'U1',       label:'U1 UCC5304\nP1-HS',group:'driver', x:430,  y:-230},
+  {id:'R_G_U1',   label:'R_G_U1\n10Ω',    group:'minor',   x:330,  y:-230},
+  {id:'C_VCCI_U1',label:'Cvcci\nU1',       group:'cap',     x:520,  y:-270},
+  {id:'C_VDD_U1_1',label:'Cvdd\nU1 10u',   group:'cap',     x:520,  y:-220},
+  {id:'C_VDD_U1_2',label:'Cvdd\nU1 100n',  group:'cap',     x:570,  y:-220},
+
+  {id:'U2',       label:'U2 UCC5304\nP2-HS',group:'driver', x:430,  y:-120},
+  {id:'R_G_U2',   label:'R_G_U2\n10Ω',    group:'minor',   x:330,  y:-120},
+  {id:'C_VCCI_U2',label:'Cvcci\nU2',       group:'cap',     x:520,  y:-120},
+
+  {id:'U3',       label:'U3 UCC5304\nN1-LS',group:'driver', x:430,  y:120},
+  {id:'R_G_U3',   label:'R_G_U3\n10Ω',    group:'minor',   x:330,  y:120},
+  {id:'C_VCCI_U3',label:'Cvcci\nU3',       group:'cap',     x:520,  y:120},
+
+  {id:'U4',       label:'U4 UCC5304\nN2-LS',group:'driver', x:430,  y:230},
+  {id:'R_G_U4',   label:'R_G_U4\n10Ω',    group:'minor',   x:330,  y:230},
+  {id:'C_VCCI_U4',label:'Cvcci\nU4',       group:'cap',     x:520,  y:230},
+
+  // ── Isolated Supplies ────────────────────────────────────────────────────
+  {id:'PS1',      label:'PS1\nB0512S',     group:'supply',  x:530,  y:-350},
+  {id:'C_PS1_IN', label:'C_PS1\nIN 4.7u',  group:'cap',     x:590,  y:-380},
+  {id:'C_PS1_OUT',label:'C_PS1\nOUT 2.2u', group:'cap',     x:600,  y:-340},
+  {id:'PS2',      label:'PS2\nB0512S',     group:'supply',  x:530,  y:350},
+  {id:'C_PS2_IN', label:'C_PS2\nIN 4.7u',  group:'cap',     x:590,  y:350},
+
+  // ── MCU ──────────────────────────────────────────────────────────────────
+  {id:'A1',       label:'A1\nRP2040-Zero', group:'mcu',     x:0,    y:430},
+
+  // ── Peripherals ──────────────────────────────────────────────────────────
+  {id:'J3',       label:'J3\nEncoder',     group:'periph',  x:-220, y:520},
+  {id:'J4',       label:'J4\nDisplay',     group:'periph',  x:220,  y:520},
+
+  // ── Status LEDs + Resistors ──────────────────────────────────────────────
+  {id:'D_LED_P1', label:'LED\nP1',         group:'led',     x:-130, y:500},
+  {id:'R_LED_P1', label:'R\nP1',           group:'cap',     x:-130, y:545},
+  {id:'D_LED_P2', label:'LED\nP2',         group:'led',     x:-70,  y:500},
+  {id:'R_LED_P2', label:'R\nP2',           group:'cap',     x:-70,  y:545},
+  {id:'D_LED_N1', label:'LED\nN1',         group:'led',     x:70,   y:500},
+  {id:'R_LED_N1', label:'R\nN1',           group:'cap',     x:70,   y:545},
+  {id:'D_LED_N2', label:'LED\nN2',         group:'led',     x:130,  y:500},
+  {id:'R_LED_N2', label:'R\nN2',           group:'cap',     x:130,  y:545},
+  {id:'D_LED_PWR',label:'LED\nPWR',        group:'led',     x:0,    y:500},
+  {id:'R_LED_PWR',label:'R\nPWR',          group:'cap',     x:0,    y:545},
+
+  // ── Test Pads ────────────────────────────────────────────────────────────
+  {id:'TP1',      label:'TP1-8',           group:'tp',      x:0,    y:580},
+];
+
+function generateGraphEdges() {
+  const nodeIds = new Set(GRAPH_NODES.map(n => n.id));
+  const edgeMap = new Map();
+  CONNECTIONS.forEach(c => {
+    if (c.from === c.to) return;
+    if (!nodeIds.has(c.from) || !nodeIds.has(c.to)) return;
+    const key = [c.from, c.to].sort().join('|');
+    if (!edgeMap.has(key)) {
+      edgeMap.set(key, { from: c.from, to: c.to, nets: new Set(), connIds: [] });
+    }
+    const entry = edgeMap.get(key);
+    c.net.split('/').forEach(n => entry.nets.add(n.trim().split('/')[0].trim()));
+    entry.connIds.push(c.id);
+  });
+  return [...edgeMap.values()].map((e, i) => {
+    const label = [...e.nets].slice(0, 2).join(', ');
+    return { id: 'e' + i, from: e.from, to: e.to, label, connIds: e.connIds };
+  });
+}
+
+let computedEdges = [];
+
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+
+let state = {};
+let selectedId = null;
+let network = null;
+
+function initState() {
+  const saved = localStorage.getItem('scv2_verification');
+  if (saved) {
+    try { state = JSON.parse(saved); } catch(e) { state = {}; }
+  }
+  CONNECTIONS.forEach(c => {
+    if (!state[c.id]) state[c.id] = { status: 'unchecked', notes: '' };
+  });
+}
+
+function persistState() {
+  localStorage.setItem('scv2_verification', JSON.stringify(state));
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SIDEBAR
+// ─────────────────────────────────────────────────────────────────────────────
+
+function buildSidebar(filter) {
+  const list = document.getElementById('conn-list');
+  list.innerHTML = '';
+  let lastGroup = '';
+  CONNECTIONS.forEach(c => {
+    if (filter && filter !== 'all' && c.group !== filter) return;
+    if (c.group !== lastGroup) {
+      lastGroup = c.group;
+      const h = document.createElement('div');
+      h.className = 'group-header';
+      h.textContent = c.group;
+      list.appendChild(h);
+    }
+    const item = document.createElement('div');
+    const st = state[c.id]?.status || 'unchecked';
+    item.className = 'conn-item st-' + st + (c.id === selectedId ? ' selected' : '');
+    item.dataset.id = c.id;
+    item.innerHTML = `
+      <div class="status-dot ${st}"></div>
+      <span class="conn-label">${c.label}</span>
+      <span class="conn-net">${c.net.split('/')[0].trim()}</span>
+    `;
+    item.onclick = () => selectConnection(c.id);
+    list.appendChild(item);
+  });
+}
+
+function buildFilterOptions() {
+  const sel = document.getElementById('filter-select');
+  const groups = [...new Set(CONNECTIONS.map(c => c.group))];
+  groups.forEach(g => {
+    const opt = document.createElement('option');
+    opt.value = g;
+    opt.textContent = g;
+    sel.appendChild(opt);
+  });
+  sel.onchange = () => buildSidebar(sel.value);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DETAIL PANEL
+// ─────────────────────────────────────────────────────────────────────────────
+
+function selectConnection(id) {
+  selectedId = id;
+  const c = CONNECTIONS.find(x => x.id === id);
+  if (!c) return;
+
+  document.getElementById('detail-title').textContent = c.label;
+  document.getElementById('detail-pins').innerHTML =
+    `<span class="pin-info">${c.from} [${c.fromPins}]</span> → <span class="pin-info">${c.to} [${c.toPins}]</span>`;
+  document.getElementById('detail-net').innerHTML =
+    c.net.split('/').map(n => `<span class="net-badge">${n.trim()}</span>`).join(' ');
+  document.getElementById('detail-rationale').textContent = c.rationale;
+  document.getElementById('detail-specs').textContent = c.specs;
+  document.getElementById('detail-notes').value = state[id]?.notes || '';
+
+  // Datasheet links
+  const sheets = getDatasheetsForConnection(c);
+  const dsSection = document.getElementById('detail-datasheet-section');
+  const dsContainer = document.getElementById('detail-datasheets');
+  if (sheets.length > 0) {
+    dsContainer.innerHTML = sheets.map(s =>
+      `<a class="datasheet-link" href="${s.url}" target="_blank" rel="noopener">${s.label}</a>`
+    ).join('');
+    dsSection.style.display = '';
+  } else {
+    dsSection.style.display = 'none';
+  }
+
+  const panel = document.getElementById('detail-panel');
+  panel.classList.add('visible');
+
+  // Update button active states
+  const st = state[id]?.status || 'unchecked';
+  document.querySelectorAll('.status-btn').forEach(b => b.classList.remove('active'));
+  if (st === 'approved') document.querySelector('.status-btn.approve').classList.add('active');
+  if (st === 'flagged') document.querySelector('.status-btn.flag').classList.add('active');
+
+  // Highlight in graph
+  highlightGraphNode(c);
+
+  // Update sidebar selection
+  document.querySelectorAll('.conn-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === id);
+  });
+}
+
+function closeDetail() {
+  document.getElementById('detail-panel').classList.remove('visible');
+  selectedId = null;
+  if (network) network.unselectAll();
+  document.querySelectorAll('.conn-item').forEach(el => el.classList.remove('selected'));
+}
+
+function setStatus(status) {
+  if (!selectedId) return;
+  state[selectedId] = state[selectedId] || {};
+  state[selectedId].status = status;
+  persistState();
+  updateProgress();
+  updateGraphColors();
+  const filter = document.getElementById('filter-select').value;
+  buildSidebar(filter);
+  selectConnection(selectedId);
+}
+
+function saveNotes() {
+  if (!selectedId) return;
+  state[selectedId] = state[selectedId] || {};
+  state[selectedId].notes = document.getElementById('detail-notes').value;
+  persistState();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PROGRESS
+// ─────────────────────────────────────────────────────────────────────────────
+
+function updateProgress() {
+  const total = CONNECTIONS.length;
+  const approved = CONNECTIONS.filter(c => state[c.id]?.status === 'approved').length;
+  const flagged = CONNECTIONS.filter(c => state[c.id]?.status === 'flagged').length;
+  const pct = Math.round((approved / total) * 100);
+  document.getElementById('progress-fill').style.width = pct + '%';
+  document.getElementById('progress-text').textContent =
+    `${approved}/${total} approved` + (flagged ? ` · ${flagged} flagged` : '');
+  if (flagged > 0) {
+    document.getElementById('progress-fill').style.background = 'var(--amber)';
+  } else {
+    document.getElementById('progress-fill').style.background = 'var(--green)';
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GRAPH
+// ─────────────────────────────────────────────────────────────────────────────
+
+let nodesDS, edgesDS;
+
+const GROUP_STYLES = {
+  power:  {bg:'#4a1c1c', border:'#ff5722', font:13},
+  shunt:  {bg:'#3e2723', border:'#a1887f', font:12},
+  fet:    {bg:'#1b3a1b', border:'#4caf50', font:13},
+  cell:   {bg:'#1a237e', border:'#7986cb', font:16},
+  sensor: {bg:'#2a1540', border:'#ce93d8', font:13},
+  driver: {bg:'#2a1030', border:'#f48fb1', font:13},
+  supply: {bg:'#004d40', border:'#4db6ac', font:13},
+  mcu:    {bg:'#1a3a5c', border:'#64b5f6', font:16},
+  periph: {bg:'#263238', border:'#90a4ae', font:12},
+  minor:  {bg:'#2d2d2d', border:'#999',    font:10},
+  cap:    {bg:'#2a2a3a', border:'#7e7eaa', font:9},
+  led:    {bg:'#2d3a1a', border:'#aed581', font:9},
+  tp:     {bg:'#1a1a1a', border:'#666',    font:9},
+};
+
+function getGroupColor(group) {
+  const s = GROUP_STYLES[group] || GROUP_STYLES.minor;
+  return {background: s.bg, border: s.border};
+}
+
+function buildGraph() {
+  const container = document.getElementById('graph-container');
+  computedEdges = generateGraphEdges();
+
+  nodesDS = new vis.DataSet(GRAPH_NODES.map(n => {
+    const s = GROUP_STYLES[n.group] || GROUP_STYLES.minor;
+    const isMinor = ['cap','minor','led','tp'].includes(n.group);
+    return {
+      ...n,
+      shape: 'box',
+      font: {size: s.font, color: '#fff', face: 'monospace'},
+      color: getGroupColor(n.group),
+      borderWidth: isMinor ? 1 : 2,
+      margin: isMinor ? 4 : 8,
+      widthConstraint: isMinor ? {minimum: 40} : {minimum: 70},
+    };
+  }));
+
+  edgesDS = new vis.DataSet(computedEdges.map(e => ({
+    ...e,
+    width: 1.5,
+    font: {size: 8, color: '#888', strokeWidth: 0, face: 'monospace'},
+    color: {color: '#555', highlight: '#aaa'},
+    arrows: '',
+    smooth: {type: 'dynamic'},
+  })));
+
+  const options = {
+    physics: { enabled: false },
+    interaction: { hover: true, zoomView: true, dragView: true, dragNodes: true },
+    nodes: { shape: 'box' },
+    edges: { smooth: {enabled: true, type: 'dynamic'} },
+  };
+
+  network = new vis.Network(container, { nodes: nodesDS, edges: edgesDS }, options);
+
+  network.on('click', params => {
+    if (params.edges.length > 0 && params.nodes.length === 0) {
+      const edgeId = params.edges[0];
+      const edge = computedEdges.find(e => e.id === edgeId);
+      if (edge && edge.connIds.length > 0) selectConnection(edge.connIds[0]);
+    } else if (params.nodes.length > 0) {
+      const nodeId = params.nodes[0];
+      const related = CONNECTIONS.filter(c => c.from === nodeId || c.to === nodeId);
+      if (related.length > 0) selectConnection(related[0].id);
+    }
+  });
+}
+
+function getNodeStatus(nodeId) {
+  const related = CONNECTIONS.filter(c => c.from === nodeId || c.to === nodeId);
+  if (related.length === 0) return 'unchecked';
+  const statuses = related.map(c => state[c.id]?.status || 'unchecked');
+  if (statuses.some(s => s === 'flagged')) return 'flagged';
+  if (statuses.every(s => s === 'approved')) return 'approved';
+  if (statuses.some(s => s === 'approved')) return 'partial';
+  return 'unchecked';
+}
+
+function updateGraphColors() {
+  if (!nodesDS || !edgesDS) return;
+
+  GRAPH_NODES.forEach(n => {
+    const agg = getNodeStatus(n.id);
+    const base = getGroupColor(n.group);
+    const upd = { id: n.id };
+    if (agg === 'approved') {
+      upd.color = {background:'#0a3d1a', border:'#00e676', highlight:{background:'#0d4d20', border:'#69f0ae'}};
+      upd.shadow = {enabled:true, color:'rgba(0,230,118,0.35)', size:12, x:0, y:0};
+      upd.borderWidth = 3;
+    } else if (agg === 'flagged') {
+      upd.color = {background:'#4a0a0a', border:'#ff1744', highlight:{background:'#5a1010', border:'#ff5252'}};
+      upd.shadow = {enabled:true, color:'rgba(255,23,68,0.45)', size:14, x:0, y:0};
+      upd.borderWidth = 3;
+    } else if (agg === 'partial') {
+      upd.color = {background: base.background, border:'#ffc107', highlight:{background: base.background, border:'#ffd54f'}};
+      upd.shadow = {enabled:true, color:'rgba(255,193,7,0.25)', size:8, x:0, y:0};
+      upd.borderWidth = 2;
+    } else {
+      upd.color = base;
+      upd.shadow = {enabled:false};
+      upd.borderWidth = ['cap','minor','led','tp'].includes(n.group) ? 1 : 2;
+    }
+    nodesDS.update(upd);
+  });
+
+  computedEdges.forEach(e => {
+    const statuses = e.connIds.map(id => state[id]?.status || 'unchecked');
+    if (statuses.some(s => s === 'flagged')) {
+      edgesDS.update({id:e.id, color:{color:'#ff1744',highlight:'#ff5252'}, width:3, shadow:{enabled:true,color:'rgba(255,23,68,0.4)',size:6}});
+    } else if (statuses.every(s => s === 'approved')) {
+      edgesDS.update({id:e.id, color:{color:'#00e676',highlight:'#69f0ae'}, width:3, shadow:{enabled:true,color:'rgba(0,230,118,0.3)',size:6}});
+    } else if (statuses.some(s => s === 'approved')) {
+      edgesDS.update({id:e.id, color:{color:'#ffc107',highlight:'#ffd54f'}, width:2, shadow:{enabled:false}});
+    } else {
+      edgesDS.update({id:e.id, color:{color:'#555',highlight:'#aaa'}, width:1.5, shadow:{enabled:false}});
+    }
+  });
+}
+
+function highlightGraphNode(conn) {
+  if (!network) return;
+  const nodeIdSet = new Set(GRAPH_NODES.map(n => n.id));
+  const nodeIds = [conn.from, conn.to].filter(id => nodeIdSet.has(id));
+  const uniqueNodes = [...new Set(nodeIds)];
+  const edgeIds = computedEdges
+    .filter(e => (uniqueNodes.includes(e.from) && uniqueNodes.includes(e.to)) ||
+                 (uniqueNodes.length === 1 && (e.from === uniqueNodes[0] || e.to === uniqueNodes[0])))
+    .map(e => e.id);
+  if (uniqueNodes.length > 0 || edgeIds.length > 0) {
+    network.setSelection({nodes: uniqueNodes, edges: edgeIds});
+    if (uniqueNodes[0]) network.focus(uniqueNodes[0], {scale: 1.0, animation: {duration: 300}});
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SAVE / LOAD
+// ─────────────────────────────────────────────────────────────────────────────
+
+function saveState() {
+  const exportData = {
+    version: '2.0',
+    board: 'Switching Circuit V2',
+    exportDate: new Date().toISOString(),
+    totalConnections: CONNECTIONS.length,
+    approved: CONNECTIONS.filter(c => state[c.id]?.status === 'approved').length,
+    flagged: CONNECTIONS.filter(c => state[c.id]?.status === 'flagged').length,
+    unchecked: CONNECTIONS.filter(c => (state[c.id]?.status || 'unchecked') === 'unchecked').length,
+    connections: CONNECTIONS.map(c => ({
+      id: c.id,
+      group: c.group,
+      label: c.label,
+      from: c.from,
+      fromPins: c.fromPins,
+      to: c.to,
+      toPins: c.toPins,
+      net: c.net,
+      rationale: c.rationale,
+      specs: c.specs,
+      status: state[c.id]?.status || 'unchecked',
+      notes: state[c.id]?.notes || '',
+    }))
+  };
+
+  const blob = new Blob([JSON.stringify(exportData, null, 2)], {type: 'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `scv2_verification_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function loadState(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.connections) {
+        data.connections.forEach(c => {
+          state[c.id] = { status: c.status || 'unchecked', notes: c.notes || '' };
+        });
+      } else {
+        // Legacy format: direct state object
+        Object.assign(state, data);
+      }
+      persistState();
+      updateProgress();
+      const filter = document.getElementById('filter-select').value;
+      buildSidebar(filter);
+      if (selectedId) selectConnection(selectedId);
+    } catch(err) {
+      alert('Failed to load: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KEYBOARD NAV
+// ─────────────────────────────────────────────────────────────────────────────
+
+document.addEventListener('keydown', e => {
+  if (e.target.tagName === 'TEXTAREA') return;
+  const items = [...document.querySelectorAll('.conn-item')];
+  const currentIdx = items.findIndex(el => el.dataset.id === selectedId);
+
+  if (e.key === 'ArrowDown' || e.key === 'j') {
+    e.preventDefault();
+    const next = items[currentIdx + 1] || items[0];
+    if (next) { selectConnection(next.dataset.id); next.scrollIntoView({block:'nearest'}); }
+  } else if (e.key === 'ArrowUp' || e.key === 'k') {
+    e.preventDefault();
+    const prev = items[currentIdx - 1] || items[items.length - 1];
+    if (prev) { selectConnection(prev.dataset.id); prev.scrollIntoView({block:'nearest'}); }
+  } else if (e.key === 'a' && selectedId) {
+    setStatus('approved');
+  } else if (e.key === 'f' && selectedId) {
+    setStatus('flagged');
+  } else if (e.key === 'r' && selectedId) {
+    setStatus('unchecked');
+  } else if (e.key === 'Escape') {
+    closeDetail();
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INIT
+// ─────────────────────────────────────────────────────────────────────────────
+
+initState();
+buildFilterOptions();
+buildSidebar('all');
+buildGraph();
+updateProgress();
+updateGraphColors();
+</script>
+</body>
+</html>
