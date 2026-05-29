@@ -109,7 +109,10 @@ function updateRow(row, pi) {
 
     // Status
     const statusTd = row.querySelector('[data-f="status"]');
-    statusTd.innerHTML = `<span class="status-badge ${pi.status}">${pi.status}</span>`;
+    statusTd.innerHTML =
+        `<span class="status-badge ${pi.status}">${pi.status}</span>` +
+        ` <button class="btn-refresh" title="Re-poll SW${pi.pi_num}"` +
+        ` onclick="refreshPi(${pi.pi_num})">&#x21bb;</button>`;
 
     // Main fields
     setCell(row, "mode", pi.mode || "--");
@@ -342,6 +345,30 @@ function updateBatchValueInput() {
         case "af-cc":
             container.innerHTML = `<input id="batch-value" type="number" value="0" min="0" max="10" step="any" placeholder="Amps">`;
             break;
+    }
+}
+
+// --- Refresh (force re-poll) ---
+
+async function refreshAll() {
+    try {
+        const resp = await fetch("/api/refresh", { method: "POST" });
+        const data = await resp.json();
+        if (data.ok) showToast("Refreshing all Pis…", "info");
+        else showToast(data.error || "refresh failed", "error");
+    } catch (e) {
+        showToast("network error", "error");
+    }
+}
+
+async function refreshPi(piNum) {
+    try {
+        const resp = await fetch(`/api/pi/${piNum}/refresh`, { method: "POST" });
+        const data = await resp.json();
+        if (data.ok) showToast(`SW${piNum}: refreshing…`, "info");
+        else showToast(`SW${piNum}: ${data.error || "refresh failed"}`, "error");
+    } catch (e) {
+        showToast(`SW${piNum}: network error`, "error");
     }
 }
 

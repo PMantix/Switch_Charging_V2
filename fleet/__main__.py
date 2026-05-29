@@ -35,7 +35,12 @@ def main():
     parser.add_argument("--no-cycle", action="store_true",
                         help="Don't start the AP cycler (dashboard-only mode)")
     parser.add_argument("--poll-pause", type=float, default=2.0,
-                        help="Seconds to pause between full fleet cycles")
+                        help="Seconds to pause between cycles when there was "
+                             "work to do (joins/commands)")
+    parser.add_argument("--idle-pause", type=float, default=30.0,
+                        help="Seconds between rediscovery scans when every "
+                             "visible Pi is already polled and idle. The "
+                             "cycler wakes early when a command is queued.")
     parser.add_argument("--log-level", default="INFO",
                         choices=["DEBUG", "INFO", "WARNING", "ERROR"])
     args = parser.parse_args()
@@ -55,6 +60,7 @@ def main():
         cycler = APCycler(
             store=store,
             poll_pause=args.poll_pause,
+            idle_pause=args.idle_pause,
         )
 
         def cycler_info():
@@ -64,6 +70,7 @@ def main():
                 "current_pi": cycler.current_pi,
                 "phase": cycler.current_phase,
             }
+        app.state.cycler = cycler
         app.state.cycler_info = cycler_info
         cycler.start()
         log.info("AP cycler started (auto-discovery from WiFi scan)")

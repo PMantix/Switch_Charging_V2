@@ -249,6 +249,19 @@ td.editable:hover {
 
 .btn-primary:hover { opacity: 0.9; }
 
+.btn-refresh {
+    border: none;
+    background: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 0.95rem;
+    line-height: 1;
+    padding: 0 4px;
+    vertical-align: middle;
+}
+
+.btn-refresh:hover { opacity: 0.7; }
+
 .toast-container {
     position: fixed;
     bottom: 20px;

@@ -57,6 +57,28 @@ def create_app(store: FleetStateStore) -> FastAPI:
     async def get_commands(pi_num: Optional[int] = None):
         return JSONResponse({"commands": store.get_commands(pi_num=pi_num)})
 
+    @app.post("/api/refresh")
+    async def refresh_all():
+        cyc = getattr(app.state, "cycler", None)
+        if cyc is None:
+            return JSONResponse(
+                {"ok": False, "error": "cycler not running (dashboard-only mode)"},
+                status_code=409,
+            )
+        cyc.request_repoll()
+        return JSONResponse({"ok": True, "repoll": "all"})
+
+    @app.post("/api/pi/{pi_num}/refresh")
+    async def refresh_pi(pi_num: int):
+        cyc = getattr(app.state, "cycler", None)
+        if cyc is None:
+            return JSONResponse(
+                {"ok": False, "error": "cycler not running (dashboard-only mode)"},
+                status_code=409,
+            )
+        cyc.request_repoll(pi_num)
+        return JSONResponse({"ok": True, "repoll": pi_num})
+
     @app.get("/api/cycler")
     async def get_cycler_status():
         # Injected by __main__ after cycler is created
