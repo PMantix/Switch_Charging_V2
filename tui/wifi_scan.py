@@ -13,6 +13,9 @@ macOS: `system_profiler SPAirPortDataType -json` (no elevation needed for scan)
        suppress it).
 Linux: `nmcli -t -f SSID,SIGNAL,IN-USE dev wifi list`
        `nmcli dev wifi connect <ssid> password <pw>`
+Windows: `netsh wlan show networks mode=bssid` (scan)
+       `netsh wlan add profile filename=<xml>` + `netsh wlan connect name=<ssid>`
+       (connect needs a saved profile, so we synthesize a WPA2-PSK profile XML).
 """
 
 from __future__ import annotations
@@ -80,6 +83,10 @@ def _is_linux() -> bool:
     return sys.platform.startswith("linux")
 
 
+def _is_windows() -> bool:
+    return sys.platform == "win32"
+
+
 # ---------------------------------------------------------------------------
 # Current SSID
 # ---------------------------------------------------------------------------
@@ -90,6 +97,8 @@ def current_ssid() -> Optional[str]:
         return _current_ssid_macos()
     if _is_linux():
         return _current_ssid_linux()
+    if _is_windows():
+        return _current_ssid_windows()
     return None
 
 
@@ -125,6 +134,24 @@ def _current_ssid_linux() -> Optional[str]:
     return None
 
 
+def _current_ssid_windows() -> Optional[str]:
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "interfaces"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    # Output has both "SSID : pi_SW1" and "BSSID : aa:bb:..." — match the
+    # SSID line only (skip BSSID), and only when actually associated.
+    for line in result.stdout.splitlines():
+        s = line.strip()
+        if s.startswith("SSID") and not s.startswith("BSSID") and ":" in s:
+            val = s.split(":", 1)[1].strip()
+            return val or None
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Scan
 # ---------------------------------------------------------------------------
@@ -141,6 +168,8 @@ def scan_pi_aps() -> ScanResult:
         aps, warning = _scan_macos()
     elif _is_linux():
         aps, warning = _scan_linux(), None
+    elif _is_windows():
+        aps, warning = _scan_windows(), None
     else:
         log.warning("wifi_scan: unsupported platform %s", sys.platform)
         aps, warning = [], None
@@ -377,6 +406,56 @@ def _scan_linux() -> list[PiAP]:
     return list(aps.values())
 
 
+_WIN_SSID_RE = re.compile(r"^SSID\s+\d+\s*:\s*(.*)$")
+_WIN_SIGNAL_RE = re.compile(r"^Signal\s*:\s*(\d+)\s*%")
+
+
+def _scan_windows() -> list[PiAP]:
+    """Scan via `netsh wlan show networks mode=bssid`.
+
+    netsh reports signal as a 0–100 percentage, one per BSSID. We keep the
+    strongest BSSID per SSID and convert percent → approximate dBm with the
+    common linear map (dBm = pct/2 - 100): good enough for ranking, not a
+    true measurement.
+    """
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "networks", "mode=bssid"],
+            capture_output=True, text=True, timeout=SCAN_TIMEOUT,
+        )
+    except (subprocess.SubprocessError, OSError) as exc:
+        log.warning("netsh scan failed: %s", exc)
+        return []
+    if result.returncode != 0:
+        log.warning("netsh scan returncode %d: %s",
+                    result.returncode, result.stderr.strip()[:200])
+        return []
+
+    current = _current_ssid_windows()
+    aps: dict[str, PiAP] = {}
+    cur_ssid: Optional[str] = None
+    for raw in result.stdout.splitlines():
+        line = raw.strip()
+        m = _WIN_SSID_RE.match(line)
+        if m:
+            ssid = m.group(1).strip()
+            cur_ssid = ssid if SSID_PATTERN.match(ssid) else None
+            if cur_ssid and cur_ssid not in aps:
+                aps[cur_ssid] = PiAP(
+                    ssid=cur_ssid, signal_dbm=None, is_current=(cur_ssid == current),
+                )
+            continue
+        ms = _WIN_SIGNAL_RE.match(line)
+        if ms and cur_ssid is not None:
+            dbm = int(ms.group(1)) // 2 - 100
+            existing = aps[cur_ssid]
+            if existing.signal_dbm is None or dbm > existing.signal_dbm:
+                aps[cur_ssid] = PiAP(
+                    ssid=cur_ssid, signal_dbm=dbm, is_current=existing.is_current,
+                )
+    return list(aps.values())
+
+
 # ---------------------------------------------------------------------------
 # Join
 # ---------------------------------------------------------------------------
@@ -415,6 +494,8 @@ def join_ap(
         err = _join_macos(ssid, password)
     elif _is_linux():
         err = _join_linux(ssid, password)
+    elif _is_windows():
+        err = _join_windows(ssid, password)
     else:
         return JoinResult(False, ssid, None, f"unsupported platform {sys.platform}")
 
@@ -477,6 +558,139 @@ def _join_linux(ssid: str, password: str) -> Optional[str]:
     return None
 
 
+_WINDOWS_PROFILE_TEMPLATE = """<?xml version="1.0"?>
+<WLANProfile xmlns="http://www.microsoft.com/networking/WLAN/profile/v1">
+  <name>{ssid}</name>
+  <SSIDConfig><SSID><name>{ssid}</name></SSID></SSIDConfig>
+  <connectionType>ESS</connectionType>
+  <connectionMode>manual</connectionMode>
+  <MSM><security>
+    <authEncryption>
+      <authentication>{auth}</authentication>
+      <encryption>AES</encryption>
+      <useOneX>false</useOneX>
+    </authEncryption>
+    <sharedKey>
+      <keyType>passPhrase</keyType>
+      <protected>false</protected>
+      <keyMaterial>{password}</keyMaterial>
+    </sharedKey>
+  </security></MSM>
+</WLANProfile>
+"""
+
+
+def _windows_ap_auth(ssid: str) -> str:
+    """Return the netsh profile <authentication> keyword matching what <ssid>
+    actually advertises, read from a live scan.
+
+    The Pi APs are created with NetworkManager `key-mgmt=wpa-psk` and no
+    explicit proto, which Windows sees as "WPA-Personal" (WPA1) — so a
+    hardcoded WPA2PSK profile fails to associate (no DHCP lease, APIPA
+    address). We map the advertised auth instead. Defaults to WPA2PSK if the
+    SSID isn't found in the scan.
+    """
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "networks", "mode=bssid"],
+            capture_output=True, text=True, timeout=SCAN_TIMEOUT,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return "WPA2PSK"
+    cur: Optional[str] = None
+    for raw in result.stdout.splitlines():
+        line = raw.strip()
+        m = _WIN_SSID_RE.match(line)
+        if m:
+            cur = m.group(1).strip()
+            continue
+        if cur == ssid and line.startswith("Authentication"):
+            val = line.split(":", 1)[1].strip().lower()
+            if "wpa3" in val:
+                return "WPA3SAE"
+            if "wpa2" in val:
+                return "WPA2PSK"
+            if "wpa" in val:
+                return "WPAPSK"
+            break
+    return "WPA2PSK"
+
+
+def _join_windows(ssid: str, password: str) -> Optional[str]:
+    """Associate to <ssid> via netsh.
+
+    netsh can only `connect` to a network that already has a saved WLAN
+    profile, so we synthesize a PSK profile XML and add it (idempotent —
+    re-adding overwrites) before connecting. The profile's authentication
+    type is matched to what the AP advertises (see _windows_ap_auth), since a
+    mismatch silently fails to associate. `netsh wlan connect` returns as soon
+    as the request is queued, not when association completes — join_ap()'s TCP
+    probe of 10.42.0.1:5555 is what actually confirms we're on.
+    """
+    iface = _wifi_interface_windows()
+    if not iface:
+        return "no WiFi interface found"
+
+    auth = _windows_ap_auth(ssid)
+    path: Optional[str] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".xml", delete=False, encoding="utf-8",
+        ) as f:
+            f.write(_WINDOWS_PROFILE_TEMPLATE.format(
+                ssid=ssid, password=password, auth=auth))
+            path = f.name
+        add = subprocess.run(
+            ["netsh", "wlan", "add", "profile",
+             f"filename={path}", f"interface={iface}", "user=current"],
+            capture_output=True, text=True, timeout=JOIN_TIMEOUT,
+        )
+        if add.returncode != 0:
+            out = (add.stderr or add.stdout)
+            # A pre-existing all-user (or group-policy) profile with the same
+            # name blocks a current-user add ("already exists in group policy
+            # or different user scope"). Delete the stale profile and retry —
+            # deleting an all-user profile works without admin; a group-policy
+            # profile can't be removed and the retry fails with a clear msg.
+            if "already exists" in out.lower():
+                subprocess.run(
+                    ["netsh", "wlan", "delete", "profile",
+                     f"name={ssid}", f"interface={iface}"],
+                    capture_output=True, text=True, timeout=JOIN_TIMEOUT,
+                )
+                add = subprocess.run(
+                    ["netsh", "wlan", "add", "profile",
+                     f"filename={path}", f"interface={iface}", "user=current"],
+                    capture_output=True, text=True, timeout=JOIN_TIMEOUT,
+                )
+            if add.returncode != 0:
+                return (add.stderr or add.stdout).strip() or "netsh add profile failed"
+    except subprocess.TimeoutExpired:
+        return "netsh add profile timed out"
+    except OSError as exc:
+        return f"netsh add profile unavailable: {exc}"
+    finally:
+        if path:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+
+    try:
+        conn = subprocess.run(
+            ["netsh", "wlan", "connect",
+             f"name={ssid}", f"ssid={ssid}", f"interface={iface}"],
+            capture_output=True, text=True, timeout=JOIN_TIMEOUT,
+        )
+    except subprocess.TimeoutExpired:
+        return "netsh connect timed out"
+    except OSError as exc:
+        return f"netsh connect unavailable: {exc}"
+    if conn.returncode != 0:
+        return (conn.stderr or conn.stdout).strip() or "netsh connect failed"
+    return None
+
+
 # ---------------------------------------------------------------------------
 # WiFi interface detection (macOS)
 # ---------------------------------------------------------------------------
@@ -507,3 +721,35 @@ def _wifi_interface_macos() -> str:
         pass
     _wifi_iface_cache = "en0"
     return _wifi_iface_cache
+
+
+# ---------------------------------------------------------------------------
+# WiFi interface detection (Windows)
+# ---------------------------------------------------------------------------
+
+_wifi_iface_cache_win: Optional[str] = None
+
+
+def _wifi_interface_windows() -> Optional[str]:
+    """Find the wireless interface name netsh uses (e.g. "Wi-Fi", "Wi-Fi 2").
+
+    netsh's `interface=` argument wants the adapter's connection name, which
+    is the "Name :" field in `netsh wlan show interfaces`. Returns None if no
+    wireless interface is present.
+    """
+    global _wifi_iface_cache_win
+    if _wifi_iface_cache_win:
+        return _wifi_iface_cache_win
+    try:
+        result = subprocess.run(
+            ["netsh", "wlan", "show", "interfaces"],
+            capture_output=True, text=True, timeout=5,
+        )
+    except (subprocess.SubprocessError, OSError):
+        return None
+    for line in result.stdout.splitlines():
+        s = line.strip()
+        if s.startswith("Name") and ":" in s:
+            _wifi_iface_cache_win = s.split(":", 1)[1].strip()
+            return _wifi_iface_cache_win
+    return None
