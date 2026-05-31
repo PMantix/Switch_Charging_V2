@@ -262,6 +262,16 @@ td.editable:hover {
 
 .btn-refresh:hover { opacity: 0.7; }
 
+/* Cells greyed out + non-clickable when the setting has no meaning
+   (auto-follow off, or frequency on a static all-off/all-on sequence) */
+td.cell-disabled {
+    opacity: 0.35;
+    pointer-events: none;
+}
+td.cell-disabled.editable {
+    border-bottom-color: transparent;
+}
+
 .toast-container {
     position: fixed;
     bottom: 20px;

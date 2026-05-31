@@ -13,6 +13,8 @@ const SEQUENCES = [
 ];
 
 const MODES = ["charge", "discharge", "pulse_charge", "idle"];
+// Auto-follow can only target a charging mode (server rejects others).
+const AF_TARGETS = ["charge", "pulse_charge"];
 
 let fleetState = {};
 let ws = null;
@@ -150,6 +152,21 @@ function updateRow(row, pi) {
         setCell(row, "avg", "--");
     }
 
+    // Grey out (and disable editing of) the auto-follow setting cells when
+    // auto-follow is off or its state is unknown. The AF enable toggle itself
+    // (af-en) stays active so it can be turned back on.
+    const afEnabled = !!(af && af.enabled);
+    for (const name of ["af-tgt", "af-cc", "af-ie", "af-ix"]) {
+        const el = row.querySelector(`[data-f="${name}"]`);
+        if (el) el.classList.toggle("cell-disabled", !afEnabled);
+    }
+
+    // Frequency is meaningless on the static sequences (all-off at index 0,
+    // all-on at the last index) — there is no switching cycle to clock.
+    const staticSeq = pi.sequence === 0 || pi.sequence === SEQUENCES.length - 1;
+    const freqEl = row.querySelector('[data-f="freq"]');
+    if (freqEl) freqEl.classList.toggle("cell-disabled", staticSeq);
+
     setCell(row, "age", pi.age_s != null ? formatAge(pi.age_s) : "never");
 }
 
@@ -160,8 +177,11 @@ function setCell(row, name, value) {
 
 function seqLabel(seq) {
     if (Array.isArray(seq)) return JSON.stringify(seq);
-    if (typeof seq === "number" && seq >= 1 && seq <= SEQUENCES.length)
-        return SEQUENCES[seq - 1];
+    // The Pi reports a 0-based sequence index (0-7), matching the TUI and
+    // server convention; the SEQUENCES labels already carry the 1-based
+    // human number ("8: all-on"), so index directly with the raw value.
+    if (typeof seq === "number" && seq >= 0 && seq < SEQUENCES.length)
+        return SEQUENCES[seq];
     return String(seq);
 }
 
@@ -199,25 +219,33 @@ function openEdit(piNum, field) {
             body.innerHTML = buildInput("Frequency (Hz)", "freq", pi.frequency || 10, "number", "0.1", "2000");
             buildCmd = () => ({ cmd: "set_frequency", frequency: parseFloat(val("freq")) });
             break;
-        case "sequence":
-            body.innerHTML = buildSelect("Sequence", "seq",
-                SEQUENCES.map((s, i) => i + 1), 1);
+        case "sequence": {
+            const cur = pi.sequence ?? 0;
+            const seqOpts = SEQUENCES.map((label, i) =>
+                `<option value="${i}" ${i === cur ? "selected" : ""}>${label}</option>`
+            ).join("");
+            body.innerHTML = `<div class="modal-field">
+                <label>Sequence</label>
+                <select id="edit-seq">${seqOpts}</select>
+            </div>`;
+            // value is the 0-based index — send it straight through.
             buildCmd = () => ({ cmd: "set_sequence", sequence: parseInt(val("seq")) });
             break;
+        }
         case "af-enabled":
             body.innerHTML = buildSelect("Auto-Follow", "afen", ["true", "false"],
                 pi.auto_follow?.enabled ? "true" : "false");
             buildCmd = () => ({ cmd: "auto_follow_set_enabled", enabled: val("afen") === "true" });
             break;
         case "af-target":
-            body.innerHTML = buildSelect("Target Mode", "aftgt", MODES,
+            body.innerHTML = buildSelect("Target Mode", "aftgt", AF_TARGETS,
                 pi.auto_follow?.target_mode || "charge");
-            buildCmd = () => ({ cmd: "auto_follow_set_target", target: val("aftgt") });
+            buildCmd = () => ({ cmd: "auto_follow_set_target", target_mode: val("aftgt") });
             break;
         case "af-cc":
             body.innerHTML = buildInput("CC Setpoint (A)", "afcc",
                 pi.auto_follow?.cc_setpoint_a || 0, "number", "0", "10");
-            buildCmd = () => ({ cmd: "auto_follow_set_cc_setpoint", amps: parseFloat(val("afcc")) });
+            buildCmd = () => ({ cmd: "auto_follow_set_cc_setpoint", cc_setpoint_a: parseFloat(val("afcc")) });
             break;
         case "af-ienter":
         case "af-iexit":
@@ -292,10 +320,10 @@ function batchSend() {
             cmd = { cmd: "auto_follow_set_enabled", enabled: value === "true" };
             break;
         case "af-target":
-            cmd = { cmd: "auto_follow_set_target", target: value };
+            cmd = { cmd: "auto_follow_set_target", target_mode: value };
             break;
         case "af-cc":
-            cmd = { cmd: "auto_follow_set_cc_setpoint", amps: parseFloat(value) };
+            cmd = { cmd: "auto_follow_set_cc_setpoint", cc_setpoint_a: parseFloat(value) };
             break;
         default:
             showToast("Unknown field", "error");
@@ -328,7 +356,7 @@ function updateBatchValueInput() {
             break;
         case "sequence":
             container.innerHTML = `<select id="batch-value">
-                ${SEQUENCES.map((s, i) => `<option value="${i+1}">${s}</option>`).join("")}
+                ${SEQUENCES.map((s, i) => `<option value="${i}">${s}</option>`).join("")}
             </select>`;
             break;
         case "af-enabled":
@@ -339,7 +367,7 @@ function updateBatchValueInput() {
             break;
         case "af-target":
             container.innerHTML = `<select id="batch-value">
-                ${MODES.map(m => `<option value="${m}">${m}</option>`).join("")}
+                ${AF_TARGETS.map(m => `<option value="${m}">${m}</option>`).join("")}
             </select>`;
             break;
         case "af-cc":
